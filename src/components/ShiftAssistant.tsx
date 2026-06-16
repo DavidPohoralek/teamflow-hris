@@ -251,6 +251,29 @@ export default function ShiftAssistant({ orgId, month }: Props) {
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: { id: string; reason: string }[] } | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
 
+  const storageKey = `tf_assistant_${orgId}_${month}_${draft}`;
+
+  // Restore persisted result + selection on mount / when key changes
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { result: AssistantResult; selected: string[] };
+        setResult(parsed.result);
+        setSelected(new Set(parsed.selected));
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // Persist result + selection whenever they change
+  useEffect(() => {
+    if (!result) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ result, selected: Array.from(selected) }));
+    } catch { /* ignore */ }
+  }, [result, selected, storageKey]);
+
   // Check license on mount
   useEffect(() => {
     managerFetch('/api/shift-assistant/license')
@@ -265,6 +288,7 @@ export default function ShiftAssistant({ orgId, month }: Props) {
     setResult(null);
     setSelected(new Set());
     setApplyResult(null);
+    try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
 
     try {
       const res = await managerFetch(`/api/shift-assistant/analyze?month=${month}&draft=${draft}`);

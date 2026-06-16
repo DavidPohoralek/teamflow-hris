@@ -1,5 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+async function notifyManager(sb: SupabaseClient, offer: { org_id: string; employee_id: string; date: string; work_type?: string | null }, result: 'accepted' | 'declined') {
+  try {
+    // Get manager email from profiles (role = owner/manager)
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('email')
+      .eq('organization_id', offer.org_id)
+      .eq('role', 'owner')
+      .maybeSingle();
+    if (!profile?.email) return;
+
+    // Get employee name
+    const { data: emp } = await sb.from('employees').select('name').eq('id', offer.employee_id).maybeSingle();
+    const employeeName = emp?.name ?? 'Zaměstnanec';
+    const action = result === 'accepted' ? 'přijal/a' : 'odmítl/a';
+    const botUrl = process.env.BOT_SERVICE_URL;
+    if (!botUrl) return;
+
+    // Get Resend integration for this org
+    const { data: integration } = await sb
+      .from('org_integrations')
+      .select('value')
+      .eq('organization_id', offer.org_id)
+      .eq('key', 'resend_api_key')
+      .maybeSingle();
+    if (!integration?.value) return;
+
+    const { data: fromInt } = await sb
+      .from('org_integrations')
+      .select('value')
+      .eq('organization_id', offer.org_id)
+      .eq('key', 'resend_from_email')
+      .maybeSingle();
+
+    await fetch(`${botUrl}/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channel: 'email',
+        email: {
+          to: profile.email,
+          subject: `Směna ${offer.date} — ${action} ${employeeName}`,
+          message: `${employeeName} ${action} směnu na ${offer.date}${offer.work_type ? ` (${offer.work_type})` : ''}.`,
+          apiKey: integration.value,
+          from: fromInt?.value ?? `noreply@tmflw.com`,
+        },
+      }),
+    });
+  } catch {
+    // Non-critical — don't fail the main request if notification fails
+  }
+}
 
 // Public endpoint — no manager auth needed, only the token is the secret
 function getServiceSupabase() {
@@ -81,6 +134,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   if (body.action === 'decline') {
     await sb.from('shift_offers').update({ status: 'declined', confirmed_at: new Date().toISOString() }).eq('id', offer.id);
+    await notifyManager(sb, offer, 'declined');
     return NextResponse.json({ ok: true, result: 'declined' });
   }
 
@@ -106,5 +160,9 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   }
 
   await sb.from('shift_offers').update({ status: 'accepted', confirmed_at: new Date().toISOString() }).eq('id', offer.id);
+
+  // Notify manager via email
+  await notifyManager(sb, offer, 'accepted');
+
   return NextResponse.json({ ok: true, result: 'accepted' });
 }
