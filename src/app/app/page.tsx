@@ -13,6 +13,8 @@ import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistant from '@/components/ShiftAssistant'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
 import { useLang, useT } from '@/lib/i18n'
+import AppTour from '@/components/AppTour'
+import TourSelectModal from '@/components/TourSelectModal'
 
 type Tab = 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'vacation' | 'analytics' | 'management' | 'assistant'
 
@@ -64,6 +66,9 @@ export default function HomePage() {
   const [showManagerLogin, setShowManagerLogin] = useState(false)
   const [showManagerPanel, setShowManagerPanel] = useState(false)
   const [managerPanelTab, setManagerPanelTab] = useState<'notifications' | undefined>(undefined)
+  const [showTourSelect, setShowTourSelect] = useState(false)
+  const [showTour, setShowTour] = useState(false)
+  const [tourLang, setTourLang] = useState<'cs' | 'en'>('cs')
 
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
@@ -78,6 +83,12 @@ export default function HomePage() {
     const handler = (e: Event) => setTheme(getTheme((e as CustomEvent).detail))
     window.addEventListener('tf:theme-change', handler)
     return () => window.removeEventListener('tf:theme-change', handler)
+  }, [])
+
+  // Show tour select on first visit
+  useEffect(() => {
+    const seen = localStorage.getItem('tf_tour_seen')
+    if (!seen) setShowTourSelect(true)
   }, [])
 
   // Load org + manager session on mount
@@ -347,6 +358,40 @@ export default function HomePage() {
           onSuccess={handleManagerSuccess}
           onClose={() => setShowManagerLogin(false)}
         />
+      )}
+
+      {/* Tour select modal — shown on first visit */}
+      {showTourSelect && (
+        <TourSelectModal
+          onStart={(l) => { setTourLang(l); setShowTourSelect(false); setShowTour(true); }}
+          onSkip={() => setShowTourSelect(false)}
+        />
+      )}
+
+      {/* App tour overlay */}
+      {showTour && (
+        <AppTour
+          lang={tourLang}
+          onClose={() => setShowTour(false)}
+        />
+      )}
+
+      {/* ? help button — fixed bottom right */}
+      {!showTour && !showTourSelect && (
+        <div className="fixed bottom-6 right-6 z-50 group">
+          <button
+            onClick={() => setShowTourSelect(true)}
+            className="w-11 h-11 rounded-full bg-white border-2 border-slate-200 shadow-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-400 hover:shadow-blue-100 transition-all duration-200 font-bold text-lg"
+            aria-label="Spustit průvodce"
+          >
+            ?
+          </button>
+          {/* Tooltip on hover */}
+          <div className="absolute bottom-14 right-0 bg-slate-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+            {t('Spustit průvodce', 'Start tour')}
+            <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-slate-800" />
+          </div>
+        </div>
       )}
     </div>
   )
