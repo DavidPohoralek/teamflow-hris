@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
+import { useT } from '@/lib/i18n';
 
 interface IntegrationState {
   slack_webhook_url: string;
@@ -11,6 +12,7 @@ interface IntegrationState {
 }
 
 export default function IntegrationSettings() {
+  const t = useT();
   const [state, setState] = useState<IntegrationState | null>(null);
   const [slackInput, setSlackInput] = useState('');
   const [resendInput, setResendInput] = useState('');
@@ -38,14 +40,14 @@ export default function IntegrationSettings() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      setMsg({ text: 'Uloženo', ok: true });
+      setMsg({ text: t('Uloženo', 'Saved'), ok: true });
       // Refresh state
       const fresh = await managerFetch('/api/integrations').then((x: Response) => x.json() as Promise<IntegrationState>);
       setState(fresh);
       setSlackInput('');
       setResendInput('');
     } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Chyba', ok: false });
+      setMsg({ text: e instanceof Error ? e.message : t('Chyba', 'Error'), ok: false });
     } finally {
       setSaving(false);
     }
@@ -58,17 +60,17 @@ export default function IntegrationSettings() {
     const fresh = await managerFetch('/api/integrations').then((x: Response) => x.json() as Promise<IntegrationState>);
     setState(fresh);
     setSaving(false);
-    setMsg({ text: 'Integrace odstraněna', ok: true });
+    setMsg({ text: t('Integrace odstraněna', 'Integration removed'), ok: true });
   }
 
-  if (!state) return <div className="text-slate-400 text-sm p-4">Načítám…</div>;
+  if (!state) return <div className="text-slate-400 text-sm p-4">{t('Načítám…', 'Loading…')}</div>;
 
   return (
     <div className="space-y-6 max-w-xl">
       <div>
-        <h3 className="font-semibold text-slate-700 mb-1">Integrace a oznámení</h3>
+        <h3 className="font-semibold text-slate-700 mb-1">{t('Integrace a oznámení', 'Integrations & notifications')}</h3>
         <p className="text-sm text-slate-500">
-          Nakonfigurujte externí kanály pro oslovování zaměstnanců ze Směnového asistenta.
+          {t('Nakonfigurujte externí kanály pro oslovování zaměstnanců ze Směnového asistenta.', 'Configure external channels for reaching employees from the Shift Assistant.')}
         </p>
       </div>
 
@@ -83,11 +85,11 @@ export default function IntegrationSettings() {
         <div className="flex items-center gap-2">
           <span className="text-xl">💬</span>
           <div>
-            <div className="font-medium text-slate-800 text-sm">Slack – Incoming Webhook</div>
-            <div className="text-xs text-slate-400">Posílá zprávu do kanálu (#smeny apod.)</div>
+            <div className="font-medium text-slate-800 text-sm">{t('Slack – Incoming Webhook', 'Slack – Incoming Webhook')}</div>
+            <div className="text-xs text-slate-400">{t('Posílá zprávu do kanálu (#smeny apod.)', 'Sends a message to a channel (#shifts etc.)')}</div>
           </div>
           {state.slack_configured && (
-            <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Aktivní</span>
+            <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{t('Aktivní', 'Active')}</span>
           )}
         </div>
         {state.slack_configured ? (
@@ -98,7 +100,7 @@ export default function IntegrationSettings() {
               disabled={saving}
               className="text-xs text-red-500 hover:text-red-700 ml-auto"
             >
-              Odebrat
+              {t('Odebrat', 'Remove')}
             </button>
           </div>
         ) : (
@@ -115,7 +117,7 @@ export default function IntegrationSettings() {
               disabled={saving || !slackInput}
               className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-40"
             >
-              Uložit
+              {t('Uložit', 'Save')}
             </button>
           </div>
         )}
@@ -125,7 +127,7 @@ export default function IntegrationSettings() {
           rel="noopener noreferrer"
           className="text-xs text-indigo-500 hover:underline"
         >
-          Jak vytvořit Slack webhook →
+          {t('Jak vytvořit Slack webhook →', 'How to create a Slack webhook →')}
         </a>
       </div>
 
@@ -134,16 +136,16 @@ export default function IntegrationSettings() {
         <div className="flex items-center gap-2">
           <span className="text-xl">📧</span>
           <div>
-            <div className="font-medium text-slate-800 text-sm">Email – Resend</div>
-            <div className="text-xs text-slate-400">Pošle email přímo zaměstnanci na jeho adresu v systému</div>
+            <div className="font-medium text-slate-800 text-sm">{t('Email – Resend', 'Email – Resend')}</div>
+            <div className="text-xs text-slate-400">{t('Pošle email přímo zaměstnanci na jeho adresu v systému', "Sends an email directly to the employee's address in the system")}</div>
           </div>
           {state.email_configured && (
-            <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Aktivní</span>
+            <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{t('Aktivní', 'Active')}</span>
           )}
         </div>
 
         <div>
-          <label className="text-xs text-slate-500 mb-1 block">API klíč</label>
+          <label className="text-xs text-slate-500 mb-1 block">{t('API klíč', 'API key')}</label>
           {state.email_configured ? (
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-500 font-mono">{state.resend_api_key}</span>
@@ -152,7 +154,7 @@ export default function IntegrationSettings() {
                 disabled={saving}
                 className="text-xs text-red-500 hover:text-red-700 ml-auto"
               >
-                Odebrat
+                {t('Odebrat', 'Remove')}
               </button>
             </div>
           ) : (
@@ -169,14 +171,14 @@ export default function IntegrationSettings() {
                 disabled={saving || !resendInput}
                 className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-40"
               >
-                Uložit
+                {t('Uložit', 'Save')}
               </button>
             </div>
           )}
         </div>
 
         <div>
-          <label className="text-xs text-slate-500 mb-1 block">Odesílatelská adresa</label>
+          <label className="text-xs text-slate-500 mb-1 block">{t('Odesílatelská adresa', 'Sender address')}</label>
           <div className="flex gap-2">
             <input
               type="email"
@@ -190,7 +192,7 @@ export default function IntegrationSettings() {
               disabled={saving || !emailFromInput}
               className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded-lg disabled:opacity-40"
             >
-              Uložit
+              {t('Uložit', 'Save')}
             </button>
           </div>
         </div>
@@ -201,12 +203,12 @@ export default function IntegrationSettings() {
           rel="noopener noreferrer"
           className="text-xs text-indigo-500 hover:underline"
         >
-          Vytvořit Resend API klíč →
+          {t('Vytvořit Resend API klíč →', 'Create Resend API key →')}
         </a>
       </div>
 
       <div className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
-        API klíče jsou uloženy šifrovaně na serveru a nikdy se neposílají do prohlížeče.
+        {t('API klíče jsou uloženy šifrovaně na serveru a nikdy se neposílají do prohlížeče.', 'API keys are stored encrypted on the server and are never sent to the browser.')}
       </div>
     </div>
   );

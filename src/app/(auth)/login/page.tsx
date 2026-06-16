@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { useT } from '@/lib/i18n';
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+  const t = useT();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +29,7 @@ export default function LoginPage() {
     if (authError) {
       setError(
         authError.message === 'Invalid login credentials'
-          ? 'Nesprávný e-mail nebo heslo.'
+          ? t('Nesprávný e-mail nebo heslo.', 'Incorrect email or password.')
           : authError.message
       );
       setLoading(false);
@@ -44,9 +46,9 @@ export default function LoginPage() {
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-slate-900">Přihlásit se</h2>
+        <h2 className="text-xl font-semibold text-slate-900">{t('Přihlásit se', 'Sign in')}</h2>
         <p className="text-sm text-slate-500 mt-1">
-          Zadejte své přihlašovací údaje
+          {t('Zadejte své přihlašovací údaje', 'Enter your login credentials')}
         </p>
       </div>
 
@@ -59,7 +61,7 @@ export default function LoginPage() {
 
         <div>
           <label htmlFor="email" className="form-label">
-            E-mailová adresa
+            {t('E-mailová adresa', 'Email address')}
           </label>
           <input
             id="email"
@@ -69,20 +71,20 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="form-input"
-            placeholder="vas@email.cz"
+            placeholder={t('vas@email.cz', 'your@email.com')}
           />
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label htmlFor="password" className="form-label mb-0">
-              Heslo
+              {t('Heslo', 'Password')}
             </label>
             <Link
               href="/forgot-password"
               className="text-xs text-blue-600 hover:text-blue-700 font-medium"
             >
-              Zapomenuté heslo?
+              {t('Zapomenuté heslo?', 'Forgot password?')}
             </Link>
           </div>
           <input
@@ -123,21 +125,21 @@ export default function LoginPage() {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              Přihlašování…
+              {t('Přihlašování…', 'Signing in…')}
             </span>
           ) : (
-            'Přihlásit se'
+            t('Přihlásit se', 'Sign in')
           )}
         </button>
       </form>
 
       <p className="text-center text-sm text-slate-500 mt-6">
-        Nemáte účet?{' '}
+        {t('Nemáte účet?', "Don't have an account?")}{' '}
         <Link
           href="/register"
           className="text-blue-600 hover:text-blue-700 font-medium"
         >
-          Registrovat organizaci
+          {t('Registrovat organizaci', 'Register organization')}
         </Link>
       </p>
     </>

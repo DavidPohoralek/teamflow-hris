@@ -1,12 +1,14 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
+import { useT } from '@/lib/i18n';
 
 interface Props {
   onLogoChange?: (url: string | null) => void;
 }
 
 export default function OrgLogoUpload({ onLogoChange }: Props) {
+  const t = useT();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -30,12 +32,12 @@ export default function OrgLogoUpload({ onLogoChange }: Props) {
     try {
       const res = await managerFetch('/api/org/logo', { method: 'POST', body: form });
       const d = await res.json() as { logoUrl?: string; error?: string };
-      if (!res.ok || d.error) throw new Error(d.error ?? 'Chyba uploadu');
+      if (!res.ok || d.error) throw new Error(d.error ?? t('Chyba uploadu', 'Upload error'));
       setLogoUrl(d.logoUrl ?? null);
       onLogoChange?.(d.logoUrl ?? null);
-      setMsg({ text: 'Logo uloženo', ok: true });
+      setMsg({ text: t('Logo uloženo', 'Logo saved'), ok: true });
     } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : 'Chyba', ok: false });
+      setMsg({ text: e instanceof Error ? e.message : t('Chyba', 'Error'), ok: false });
     } finally {
       setUploading(false);
     }
@@ -47,14 +49,14 @@ export default function OrgLogoUpload({ onLogoChange }: Props) {
     setLogoUrl(null);
     onLogoChange?.(null);
     setUploading(false);
-    setMsg({ text: 'Logo odstraněno', ok: true });
+    setMsg({ text: t('Logo odstraněno', 'Logo removed'), ok: true });
   }
 
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-semibold text-slate-700 mb-1">Logo organizace</h3>
-        <p className="text-sm text-slate-500">Zobrazí se v navigaci vedle loga TeamFlow. PNG, JPG, SVG, max 2 MB.</p>
+        <h3 className="font-semibold text-slate-700 mb-1">{t('Logo organizace', 'Organization logo')}</h3>
+        <p className="text-sm text-slate-500">{t('Zobrazí se v navigaci vedle loga TeamFlow. PNG, JPG, SVG, max 2 MB.', 'Displayed in the navigation next to the TeamFlow logo. PNG, JPG, SVG, max 2 MB.')}</p>
       </div>
 
       {msg && (
@@ -80,7 +82,7 @@ export default function OrgLogoUpload({ onLogoChange }: Props) {
             disabled={uploading}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-40 transition"
           >
-            {uploading ? 'Nahrávám…' : logoUrl ? 'Změnit logo' : 'Nahrát logo'}
+            {uploading ? t('Nahrávám…', 'Uploading…') : logoUrl ? t('Změnit logo', 'Change logo') : t('Nahrát logo', 'Upload logo')}
           </button>
           {logoUrl && (
             <button
@@ -88,7 +90,7 @@ export default function OrgLogoUpload({ onLogoChange }: Props) {
               disabled={uploading}
               className="ml-2 px-3 py-2 border border-slate-200 hover:border-red-300 hover:text-red-600 text-sm rounded-lg transition disabled:opacity-40"
             >
-              Odebrat
+              {t('Odebrat', 'Remove')}
             </button>
           )}
         </div>

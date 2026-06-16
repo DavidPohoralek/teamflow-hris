@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import PinPad from './PinPad';
+import { useT } from '@/lib/i18n';
 
 interface WorkType {
   id: string;
@@ -79,6 +80,7 @@ function formatDuration(checkIn: string): string {
 }
 
 export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
+  const t = useT();
   const [screen, setScreen] = useState<KioskScreen>('pin');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -183,11 +185,11 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         hour: '2-digit',
         minute: '2-digit',
       });
-      setSuccessMessage(`Příchod zaznamenán v ${now}`);
+      setSuccessMessage(`${t('Příchod zaznamenán v', 'Clocked in at')} ${now}`);
       setScreen('success-checkin');
       resetKiosk();
     } catch {
-      setErrorMessage('Chyba při záznamu příchodu. Zkuste to prosím znovu.');
+      setErrorMessage(t('Chyba při záznamu příchodu. Zkuste to prosím znovu.', 'Error recording clock-in. Please try again.'));
       setScreen('error');
       resetKiosk();
     } finally {
@@ -210,11 +212,11 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       });
       if (!res.ok) throw new Error();
       const duration = presence ? formatDuration(presence.checkIn) : '';
-      setSuccessMessage(`Odchod zaznamenán. Odpracováno: ${duration}`);
+      setSuccessMessage(`${t('Odchod zaznamenán. Odpracováno:', 'Clocked out. Time worked:')} ${duration}`);
       setScreen('success-checkout');
       resetKiosk();
     } catch {
-      setErrorMessage('Chyba při záznamu odchodu. Zkuste to prosím znovu.');
+      setErrorMessage(t('Chyba při záznamu odchodu. Zkuste to prosím znovu.', 'Error recording clock-out. Please try again.'));
       setScreen('error');
       resetKiosk();
     } finally {
@@ -227,10 +229,10 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   if (screen === 'pin') {
     return (
       <PinPad
-        title="Zadejte svůj PIN"
+        title={t('Zadejte svůj PIN', 'Enter your PIN')}
         onConfirm={handlePinConfirm}
         loading={loading}
-        error={pinError ? 'Nesprávný PIN. Zkuste to znovu.' : null}
+        error={pinError ? t('Nesprávný PIN. Zkuste to znovu.', 'Incorrect PIN. Please try again.') : null}
       />
     );
   }
@@ -241,9 +243,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       {screen === 'checkin' && (
         <div className="w-full max-w-2xl flex flex-col items-center gap-8">
           <h1 className="text-4xl font-bold text-slate-100 text-center">
-            Dobrý den, {employeeName}!
+            {t('Dobrý den', 'Hello')}, {employeeName}!
           </h1>
-          <p className="text-slate-400 text-xl">Vyberte typ pracovního místa:</p>
+          <p className="text-slate-400 text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
             {workTypes.map((wt, idx) => {
@@ -277,7 +279,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               onClick={() => { setScreen('pin'); setPin(''); }}
               className="flex-1 min-h-[64px] bg-slate-700 hover:bg-slate-600 text-white text-xl font-semibold rounded-xl transition-all active:scale-95"
             >
-              Zpět
+              {t('Zpět', 'Back')}
             </button>
             <button
               onClick={handleCheckin}
@@ -287,7 +289,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               {loading ? (
                 <span className="inline-block w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : null}
-              Zaznamenat příchod
+              {t('Zaznamenat příchod', 'Clock in')}
             </button>
           </div>
         </div>
@@ -297,12 +299,12 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       {screen === 'checkout' && (
         <div className="w-full max-w-lg flex flex-col items-center gap-8">
           <h1 className="text-4xl font-bold text-slate-100 text-center">
-            Dobrý den, {employeeName}!
+            {t('Dobrý den', 'Hello')}, {employeeName}!
           </h1>
 
           {presence && (
             <div className="bg-slate-700 rounded-2xl p-6 w-full text-center space-y-2">
-              <p className="text-slate-400 text-lg">Přihlášen/a od</p>
+              <p className="text-slate-400 text-lg">{t('Přihlášen/a od', 'Logged in since')}</p>
               <p className="text-3xl font-bold text-white">
                 {formatTime(presence.checkIn)}
               </p>
@@ -317,7 +319,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               onClick={() => { setScreen('pin'); setPin(''); }}
               className="flex-1 min-h-[64px] bg-slate-700 hover:bg-slate-600 text-white text-xl font-semibold rounded-xl transition-all active:scale-95"
             >
-              Zpět
+              {t('Zpět', 'Back')}
             </button>
             <button
               onClick={handleCheckout}
@@ -327,7 +329,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               {loading ? (
                 <span className="inline-block w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : null}
-              Zaznamenat odchod
+              {t('Zaznamenat odchod', 'Clock out')}
             </button>
           </div>
         </div>
@@ -338,7 +340,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-md flex flex-col items-center gap-6 bg-emerald-600 rounded-3xl p-12">
           <div className="text-8xl">✓</div>
           <p className="text-3xl font-bold text-white text-center">{successMessage}</p>
-          <p className="text-emerald-200 text-lg">Zavírám za 3 sekundy...</p>
+          <p className="text-emerald-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
         </div>
       )}
 
@@ -347,7 +349,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-md flex flex-col items-center gap-6 bg-emerald-600 rounded-3xl p-12">
           <div className="text-8xl">✓</div>
           <p className="text-3xl font-bold text-white text-center">{successMessage}</p>
-          <p className="text-emerald-200 text-lg">Zavírám za 3 sekundy...</p>
+          <p className="text-emerald-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
         </div>
       )}
 
@@ -356,7 +358,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-md flex flex-col items-center gap-6 bg-red-700 rounded-3xl p-12">
           <div className="text-8xl">✗</div>
           <p className="text-3xl font-bold text-white text-center">{errorMessage}</p>
-          <p className="text-red-200 text-lg">Zavírám za 3 sekundy...</p>
+          <p className="text-red-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
         </div>
       )}
     </div>

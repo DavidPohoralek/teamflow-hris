@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { useT } from '@/lib/i18n';
 
 export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
+  const t = useT();
 
   const [formData, setFormData] = useState({
     companyName: '',
@@ -29,12 +31,12 @@ export default function RegisterPage() {
     setError(null);
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Hesla se neshodují.');
+      setError(t('Hesla se neshodují.', 'Passwords do not match.'));
       return;
     }
 
     if (formData.password.length < 8) {
-      setError('Heslo musí mít alespoň 8 znaků.');
+      setError(t('Heslo musí mít alespoň 8 znaků.', 'Password must be at least 8 characters.'));
       return;
     }
 
@@ -61,7 +63,7 @@ export default function RegisterPage() {
     }
 
     if (!authData.user) {
-      setError('Registrace se nezdařila. Zkuste to znovu.');
+      setError(t('Registrace se nezdařila. Zkuste to znovu.', 'Registration failed. Please try again.'));
       setLoading(false);
       return;
     }
@@ -82,7 +84,7 @@ export default function RegisterPage() {
     const result = await res.json();
 
     if (!res.ok) {
-      setError(result.error || 'Nepodařilo se dokončit registraci.');
+      setError(result.error || t('Nepodařilo se dokončit registraci.', 'Failed to complete registration.'));
       setLoading(false);
       return;
     }
@@ -95,10 +97,10 @@ export default function RegisterPage() {
     <>
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-slate-900">
-          Registrovat organizaci
+          {t('Registrovat organizaci', 'Register organization')}
         </h2>
         <p className="text-sm text-slate-500 mt-1">
-          Vytvořte účet pro vaši společnost
+          {t('Vytvořte účet pro vaši společnost', 'Create an account for your company')}
         </p>
       </div>
 
@@ -111,7 +113,7 @@ export default function RegisterPage() {
 
         <div>
           <label htmlFor="companyName" className="form-label">
-            Název společnosti
+            {t('Název společnosti', 'Company name')}
           </label>
           <input
             id="companyName"
@@ -121,14 +123,14 @@ export default function RegisterPage() {
             value={formData.companyName}
             onChange={handleChange}
             className="form-input"
-            placeholder="Acme s.r.o."
+            placeholder={t('Acme s.r.o.', 'Acme Ltd.')}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="firstName" className="form-label">
-              Jméno
+              {t('Jméno', 'First name')}
             </label>
             <input
               id="firstName"
@@ -143,7 +145,7 @@ export default function RegisterPage() {
           </div>
           <div>
             <label htmlFor="lastName" className="form-label">
-              Příjmení
+              {t('Příjmení', 'Last name')}
             </label>
             <input
               id="lastName"
@@ -160,7 +162,7 @@ export default function RegisterPage() {
 
         <div>
           <label htmlFor="email" className="form-label">
-            E-mailová adresa
+            {t('E-mailová adresa', 'Email address')}
           </label>
           <input
             id="email"
@@ -171,13 +173,13 @@ export default function RegisterPage() {
             value={formData.email}
             onChange={handleChange}
             className="form-input"
-            placeholder="jan@spolecnost.cz"
+            placeholder={t('jan@spolecnost.cz', 'john@company.com')}
           />
         </div>
 
         <div>
           <label htmlFor="password" className="form-label">
-            Heslo
+            {t('Heslo', 'Password')}
           </label>
           <input
             id="password"
@@ -188,13 +190,13 @@ export default function RegisterPage() {
             value={formData.password}
             onChange={handleChange}
             className="form-input"
-            placeholder="Min. 8 znaků"
+            placeholder={t('Min. 8 znaků', 'Min. 8 characters')}
           />
         </div>
 
         <div>
           <label htmlFor="confirmPassword" className="form-label">
-            Potvrdit heslo
+            {t('Potvrdit heslo', 'Confirm password')}
           </label>
           <input
             id="confirmPassword"
@@ -205,7 +207,7 @@ export default function RegisterPage() {
             value={formData.confirmPassword}
             onChange={handleChange}
             className="form-input"
-            placeholder="Zopakujte heslo"
+            placeholder={t('Zopakujte heslo', 'Repeat password')}
           />
         </div>
 
@@ -235,21 +237,21 @@ export default function RegisterPage() {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              Registrace…
+              {t('Registrace…', 'Registering…')}
             </span>
           ) : (
-            'Vytvořit účet'
+            t('Vytvořit účet', 'Create account')
           )}
         </button>
       </form>
 
       <p className="text-center text-sm text-slate-500 mt-6">
-        Již máte účet?{' '}
+        {t('Již máte účet?', 'Already have an account?')}{' '}
         <Link
           href="/login"
           className="text-blue-600 hover:text-blue-700 font-medium"
         >
-          Přihlásit se
+          {t('Přihlásit se', 'Sign in')}
         </Link>
       </p>
     </>

@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import { THEMES } from '@/lib/themes';
+import { useT } from '@/lib/i18n';
 
 interface Props {
   onThemeChange?: (key: string) => void;
 }
 
 export default function ThemeSelector({ onThemeChange }: Props) {
+  const t = useT();
   const [selected, setSelected] = useState('slate');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -30,11 +32,11 @@ export default function ThemeSelector({ onThemeChange }: Props) {
         method: 'PUT',
         body: JSON.stringify({ ui_theme: key }),
       });
-      if (!res.ok) throw new Error('Chyba uložení');
+      if (!res.ok) throw new Error(t('Chyba uložení', 'Save error'));
       onThemeChange?.(key);
-      setMsg({ text: 'Motiv uložen', ok: true });
+      setMsg({ text: t('Motiv uložen', 'Theme saved'), ok: true });
     } catch {
-      setMsg({ text: 'Chyba uložení', ok: false });
+      setMsg({ text: t('Chyba uložení', 'Save error'), ok: false });
     } finally {
       setSaving(false);
     }
@@ -43,8 +45,8 @@ export default function ThemeSelector({ onThemeChange }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-semibold text-slate-700 mb-1">Barevný motiv aplikace</h3>
-        <p className="text-sm text-slate-500">Změní barvu navigační lišty a akcentů.</p>
+        <h3 className="font-semibold text-slate-700 mb-1">{t('Barevný motiv aplikace', 'App color theme')}</h3>
+        <p className="text-sm text-slate-500">{t('Změní barvu navigační lišty a akcentů.', 'Changes the color of the navigation bar and accents.')}</p>
       </div>
 
       {msg && (
@@ -74,7 +76,7 @@ export default function ThemeSelector({ onThemeChange }: Props) {
               {theme.label}
             </span>
             {selected === theme.key && (
-              <span className="text-xs text-indigo-600 font-semibold">✓ Aktivní</span>
+              <span className="text-xs text-indigo-600 font-semibold">{t('✓ Aktivní', '✓ Active')}</span>
             )}
           </button>
         ))}

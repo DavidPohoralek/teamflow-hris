@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AttendanceKiosk from './AttendanceKiosk';
 import { managerFetch } from '@/lib/managerFetch';
+import { useT } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,6 +116,7 @@ interface AddRecordModalProps {
 }
 
 function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddRecordModalProps) {
+  const t = useT();
   const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? '');
   const [checkInTime, setCheckInTime] = useState(nowTimeStr());
   const [checkOutTime, setCheckOutTime] = useState('');
@@ -173,7 +175,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
       />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-slate-900">Přidat záznam</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{t('Přidat záznam', 'Add record')}</h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100"
@@ -187,7 +189,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Zaměstnanec
+              {t('Zaměstnanec', 'Employee')}
             </label>
             <select
               value={employeeId}
@@ -204,7 +206,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Datum
+              {t('Datum', 'Date')}
             </label>
             <input
               type="date"
@@ -217,7 +219,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Příchod
+                {t('Příchod', 'Clock in')}
               </label>
               <input
                 type="time"
@@ -229,7 +231,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Odchod <span className="text-slate-400 font-normal">(volitelný)</span>
+                {t('Odchod', 'Clock out')} <span className="text-slate-400 font-normal">{t('(volitelný)', '(optional)')}</span>
               </label>
               <input
                 type="time"
@@ -243,7 +245,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
           {workTypes.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Oddělení / typ práce
+                {t('Oddělení / typ práce', 'Department / work type')}
               </label>
               <div className="flex flex-wrap gap-2">
                 {workTypes.map((wt) => (
@@ -263,7 +265,7 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Poznámka <span className="text-slate-400 font-normal">(volitelná)</span>
+              {t('Poznámka (volitelná)', 'Note (optional)')}
             </label>
             <input
               type="text"
@@ -286,14 +288,14 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
               onClick={onClose}
               className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              Zrušit
+              {t('Zrušit', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
               className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
             >
-              {loading ? 'Ukládám…' : 'Přidat záznam'}
+              {loading ? t('Ukládám…', 'Saving…') : t('Přidat záznam', 'Add record')}
             </button>
           </div>
         </form>
@@ -310,6 +312,7 @@ interface DeleteConfirmProps {
 }
 
 function DeleteConfirmDialog({ employeeName, onClose }: DeleteConfirmProps) {
+  const t = useT();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
@@ -330,7 +333,7 @@ function DeleteConfirmDialog({ employeeName, onClose }: DeleteConfirmProps) {
             </svg>
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Smazat záznam</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('Smazat záznam', 'Delete record')}</h3>
             <p className="text-sm text-slate-500 mt-1">
               Mazání záznamu pro <span className="font-medium text-slate-700">{employeeName}</span> není dosud podporováno v API.
               Tato funkce bude dostupná v příští verzi.
@@ -340,7 +343,7 @@ function DeleteConfirmDialog({ employeeName, onClose }: DeleteConfirmProps) {
             onClick={onClose}
             className="w-full px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-colors"
           >
-            Zavřít
+            {t('Zavřít', 'Close')}
           </button>
         </div>
       </div>
@@ -358,6 +361,7 @@ interface EditRowProps {
 }
 
 function EditRow({ log, date, onCancel, onSaved }: EditRowProps) {
+  const t = useT();
   const [checkIn, setCheckIn] = useState(toTimeInput(log.check_in));
   const [checkOut, setCheckOut] = useState(toTimeInput(log.check_out));
   const [saving, setSaving] = useState(false);
@@ -448,13 +452,13 @@ function EditRow({ log, date, onCancel, onSaved }: EditRowProps) {
             disabled={saving}
             className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
-            {saving ? 'Ukládám…' : 'Uložit'}
+            {saving ? t('Ukládám…', 'Saving…') : t('Uložit', 'Save')}
           </button>
           <button
             onClick={onCancel}
             className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors"
           >
-            Zrušit
+            {t('Zrušit', 'Cancel')}
           </button>
         </div>
       </td>
@@ -469,6 +473,7 @@ interface ManagerViewProps {
 }
 
 function ManagerView({ orgId: _orgId }: ManagerViewProps) {
+  const t = useT();
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -542,7 +547,7 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Správa docházky</h2>
+          <h2 className="text-xl font-bold text-slate-900">{t('Správa docházky', 'Attendance Management')}</h2>
           <p className="text-slate-500 text-sm mt-0.5 capitalize">{dayLabel}</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -559,7 +564,7 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
               <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            Přidat záznam
+            {t('Přidat záznam', 'Add record')}
           </button>
         </div>
       </div>
@@ -574,7 +579,7 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-semibold text-slate-900">
-            Záznamy za{' '}
+            {t('Záznamy za', 'Records for')}{' '}
             {new Date(selectedDate).toLocaleDateString('cs-CZ', {
               day: 'numeric',
               month: 'long',
@@ -582,7 +587,7 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
             })}
           </h3>
           {loading && (
-            <span className="text-xs text-slate-400 animate-pulse">Načítám…</span>
+            <span className="text-xs text-slate-400 animate-pulse">{t('Načítám…', 'Loading…')}</span>
           )}
         </div>
 
@@ -590,19 +595,19 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                <th className="text-left px-5 py-3 font-medium text-slate-500">Zaměstnanec</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Příchod</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Odchod</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Odpracováno</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Kategorie</th>
-                <th className="text-right px-5 py-3 font-medium text-slate-500">Akce</th>
+                <th className="text-left px-5 py-3 font-medium text-slate-500">{t('Zaměstnanec', 'Employee')}</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500">{t('Příchod', 'Clock in')}</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500">{t('Odchod', 'Clock out')}</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500">{t('Odpracováno', 'Hours worked')}</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500">{t('Kategorie', 'Category')}</th>
+                <th className="text-right px-5 py-3 font-medium text-slate-500">{t('Akce', 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {logs.length === 0 && !loading && (
                 <tr>
                   <td colSpan={6} className="px-5 py-10 text-center text-slate-400">
-                    Žádné záznamy pro vybraný den.
+                    {t('Žádné záznamy pro vybraný den.', 'No records for the selected day.')}
                   </td>
                 </tr>
               )}
@@ -659,7 +664,7 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
                         </span>
                       ) : isPresent ? (
                         <span className="text-green-600 text-xs font-medium animate-pulse">
-                          Probíhá…
+                          {t('Probíhá…', 'In progress…')}
                         </span>
                       ) : (
                         <span className="text-slate-300">—</span>
@@ -680,11 +685,11 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
                       ) : isPresent ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                          Přítomen/na
+                          {t('Přítomen/na', 'Present')}
                         </span>
                       ) : log.check_out ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                          Odešel/a
+                          {t('Odešel/a', 'Left')}
                         </span>
                       ) : (
                         <span className="text-slate-300 text-xs">—</span>
@@ -698,13 +703,13 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
                           onClick={() => setEditingId(log.id)}
                           className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition-colors"
                         >
-                          Upravit
+                          {t('Upravit', 'Edit')}
                         </button>
                         <button
                           onClick={() => setDeletingLog(log)}
                           className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 transition-colors"
                         >
-                          Smazat
+                          {t('Smazat', 'Delete')}
                         </button>
                       </div>
                     </td>
@@ -716,7 +721,7 @@ function ManagerView({ orgId: _orgId }: ManagerViewProps) {
               {logs.length > 0 && (
                 <tr className="bg-slate-50 border-t border-slate-200">
                   <td className="px-5 py-3 text-sm font-semibold text-slate-700" colSpan={3}>
-                    Celkem zaměstnanec-hodin
+                    {t('Celkem zaměstnanec-hodin', 'Total employee-hours')}
                   </td>
                   <td className="px-4 py-3 text-sm font-bold text-slate-900">
                     {formatMinutes(totalMinutes)}
@@ -759,6 +764,7 @@ interface AttendanceManagerProps {
 type ManagerTab = 'kiosk' | 'sprava';
 
 export default function AttendanceManager({ orgId }: AttendanceManagerProps) {
+  const t = useT();
   const [tab, setTab] = useState<ManagerTab>('kiosk');
 
   return (
@@ -786,7 +792,7 @@ export default function AttendanceManager({ orgId }: AttendanceManagerProps) {
             }`}
           >
             <span>📋</span>
-            Správa
+            {t('Správa', 'Management')}
           </button>
         </div>
       </div>

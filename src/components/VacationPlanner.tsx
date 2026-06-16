@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { managerFetch } from '@/lib/managerFetch';
+import { useT } from '@/lib/i18n';
 
 interface VacationRequest {
   id: string;
@@ -28,6 +29,10 @@ interface VacationPlannerProps {
 const CZ_MONTHS = [
   'Leden','Únor','Březen','Duben','Květen','Červen',
   'Červenec','Srpen','Září','Říjen','Listopad','Prosinec',
+];
+const EN_MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
 ];
 
 const DAY_NAMES_SHORT = ['Po','Út','St','Čt','Pá','So','Ne'];
@@ -72,6 +77,7 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? '');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -81,7 +87,7 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dateFrom) { setError('Zadejte datum od.'); return; }
+    if (!dateFrom) { setError(t('Zadejte datum od.', 'Please enter a start date.')); return; }
     setSaving(true);
     setError(null);
     try {
@@ -112,12 +118,12 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">Přidat dovolenou</h2>
+          <h2 className="text-lg font-semibold text-gray-800">{t('Přidat dovolenou', 'Add vacation')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Zaměstnanec</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
             <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
               {employees.map((emp) => (
@@ -127,18 +133,18 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Od *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Od *', 'From *')}</label>
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Do</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Do', 'To')}</label>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} min={dateFrom}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Poznámka</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Poznámka', 'Note')}</label>
             <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="Volitelná poznámka…" />
@@ -146,10 +152,10 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose}
-              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">Zrušit</button>
+              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">{t('Zrušit', 'Cancel')}</button>
             <button type="submit" disabled={saving}
               className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
-              {saving ? 'Ukládám…' : 'Přidat'}
+              {saving ? t('Ukládám…', 'Saving…') : t('Přidat', 'Add')}
             </button>
           </div>
         </form>
@@ -170,6 +176,7 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [dateFrom, setDateFrom] = useState(initialDate ?? '');
   const [dateTo, setDateTo] = useState('');
   const [note, setNote] = useState('');
@@ -198,7 +205,7 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dateFrom) { setError('Zadejte datum od.'); return; }
+    if (!dateFrom) { setError(t('Zadejte datum od.', 'Please enter a start date.')); return; }
     if (conflicts.length > 0) {
       setError(`Máte naplánované směny na: ${conflicts.map((d) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ')).join(', ')}. Nejprve si nechte zrušit směny a pak teprve požádejte o dovolenou.`);
       return;
@@ -219,7 +226,7 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
       setSuccess(true);
       onSaved();
       setTimeout(() => onClose(), 1800);
-    } catch { setError('Chyba sítě.'); }
+    } catch { setError(t('Chyba sítě.', 'Network error.')); }
     finally { setSaving(false); }
   };
 
@@ -227,7 +234,7 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Žádat o dovolenou</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{t('Žádat o dovolenou', 'Request vacation')}</h2>
           <p className="text-sm text-slate-500 mt-0.5">{employee.name}</p>
         </div>
         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 text-lg leading-none">✕</button>
@@ -236,20 +243,20 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Typ — Celý den / Část dne */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Typ</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('Typ', 'Type')}</label>
           <div className="flex gap-4">
             <label className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
               <input type="radio" value="full" checked={dayType === 'full'} onChange={() => setDayType('full')} className="accent-emerald-600" />
-              Celý den
+              {t('Celý den', 'Full day')}
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
               <input type="radio" value="partial" checked={dayType === 'partial'} onChange={() => setDayType('partial')} className="accent-emerald-600" />
-              Část dne
+              {t('Část dne', 'Part day')}
             </label>
           </div>
           {dayType === 'partial' && (
             <div className="mt-2">
-              <label className="block text-xs font-medium text-slate-600 mb-1">Počet hodin (1–8)</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{t('Počet hodin (1–8)', 'Hours (1–8)')}</label>
               <input
                 type="number"
                 min={1}
@@ -264,18 +271,18 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Od *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Od *', 'From *')}</label>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} required
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Do</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Do', 'To')}</label>
             <input type="date" value={dateTo} min={dateFrom} onChange={(e) => setDateTo(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Poznámka</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('Poznámka', 'Note')}</label>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
             placeholder="Volitelná poznámka…" />
@@ -288,12 +295,12 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
           </div>
         )}
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-        {success && <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-center font-medium">✓ Žádost odeslána ke schválení</p>}
+        {success && <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-center font-medium">{t('✓ Žádost odeslána ke schválení', '✓ Request submitted for approval')}</p>}
         {!success && (
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50">Zrušit</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50">{t('Zrušit', 'Cancel')}</button>
             <button type="submit" disabled={saving || conflicts.length > 0} className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
-              {saving ? 'Odesílám…' : 'Odeslat žádost'}
+              {saving ? t('Odesílám…', 'Submitting…') : t('Odeslat žádost', 'Submit request')}
             </button>
           </div>
         )}
@@ -303,6 +310,7 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
 }
 
 export default function VacationPlanner({ orgId, isManagerMode }: VacationPlannerProps) {
+  const t = useT();
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -467,7 +475,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
             </svg>
           </button>
           <span className="text-sm font-semibold text-slate-800 min-w-[150px] text-center px-2">
-            {CZ_MONTHS[mo - 1]} {year}
+            {t(CZ_MONTHS[mo - 1], EN_MONTHS[mo - 1])} {year}
           </span>
           <button onClick={() => setMonth(nextMonth(month))}
             className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors">
@@ -487,7 +495,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   disabled={myShiftsLoading}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${showMyShifts ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
                 >
-                  📅 {myShiftsLoading ? 'Načítám…' : 'Mé směny'}
+                  📅 {myShiftsLoading ? t('Načítám…', 'Loading…') : t('Mé směny', 'My shifts')}
                 </button>
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -525,7 +533,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
             <button onClick={() => setShowModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
               <span className="text-lg leading-none font-light">+</span>
-              Přidat dovolenou
+              {t('Přidat dovolenou', 'Add vacation')}
             </button>
           )}
         </div>
@@ -533,7 +541,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
 
       {/* Calendar grid */}
       {loading && (
-        <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Načítám…</div>
+        <div className="flex items-center justify-center py-12 text-gray-400 text-sm">{t('Načítám…', 'Loading…')}</div>
       )}
       <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
         {/* Day headers */}
@@ -574,7 +582,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   <span className={`text-xs font-bold ${isWeekend ? 'text-blue-400' : 'text-slate-700'}`}>{dayNum}</span>
                   <div className="flex items-center gap-1">
                     {hasMyShift && (
-                      <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1 py-0.5 rounded">směna</span>
+                      <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1 py-0.5 rounded">{t('směna', 'shift')}</span>
                     )}
                     <span className="hidden group-hover:flex items-center text-xs text-emerald-500 font-semibold gap-0.5">
                       <span className="text-base leading-none">+</span>
@@ -592,7 +600,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     return (
                       <div key={emp.id}
                         className={`text-xs px-1.5 py-0.5 rounded font-medium text-white truncate ${statusColor(st)}`}
-                        title={`${emp.name} (${st === 'approved' ? 'schváleno' : st === 'rejected' ? 'zamítnuto' : 'čeká'})`}>
+                        title={`${emp.name} (${st === 'approved' ? t('schváleno', 'approved') : st === 'rejected' ? t('zamítnuto', 'rejected') : t('čeká', 'pending')})`}>
                         {emp.name}
                       </div>
                     );
@@ -606,16 +614,16 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-4 text-xs text-slate-500">
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400" />Schválena</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-300" />Čeká na schválení</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />Zamítnuta</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400" />{t('Schválena', 'Approved')}</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-300" />{t('Čeká na schválení', 'Pending approval')}</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
       </div>
 
       {/* Employee vacation summary */}
       {isManagerMode && employees.length > 0 && (
         <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-700">Přehled dovolených — {year}</h3>
+            <h3 className="text-sm font-semibold text-slate-700">{t('Přehled dovolených —', 'Vacation overview —')} {year}</h3>
           </div>
           <div className="divide-y divide-slate-50">
             {employees.map((emp) => {
@@ -640,8 +648,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     </div>
                   </div>
                   <span className="text-xs text-slate-500 whitespace-nowrap shrink-0">
-                    <span className="font-semibold text-slate-700">{used}</span> / {total} dní
-                    {remaining > 0 && <span className="text-emerald-600 ml-1">({remaining} zbývá)</span>}
+                    <span className="font-semibold text-slate-700">{used}</span> / {total} {t('dní', 'days')}
+                    {remaining > 0 && <span className="text-emerald-600 ml-1">({remaining} {t('zbývá', 'remaining')})</span>}
                   </span>
                 </div>
               );

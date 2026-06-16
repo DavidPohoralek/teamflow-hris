@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n';
 
 interface ManagerLoginModalProps {
   orgId: string;
@@ -9,6 +10,7 @@ interface ManagerLoginModalProps {
 }
 
 export default function ManagerLoginModal({ orgId, onSuccess, onClose }: ManagerLoginModalProps) {
+  const t = useT();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,10 +34,10 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose }: Manager
         }
         onSuccess();
       } else {
-        setError('Nesprávné heslo');
+        setError(t('Nesprávné heslo', 'Incorrect password'));
       }
     } catch {
-      setError('Chyba připojení. Zkuste to znovu.');
+      setError(t('Chyba připojení. Zkuste to znovu.', 'Connection error. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -45,14 +47,14 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose }: Manager
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-8">
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Přihlášení manažera</h2>
-          <p className="text-sm text-gray-500 mt-1">Zadejte heslo pro přístup k manažerskému rozhraní</p>
+          <h2 className="text-xl font-semibold text-gray-900">{t('Přihlášení manažera', 'Manager Login')}</h2>
+          <p className="text-sm text-gray-500 mt-1">{t('Zadejte heslo pro přístup k manažerskému rozhraní', 'Enter the password to access the manager interface')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="manager-password" className="block text-sm font-medium text-gray-700 mb-1">
-              Heslo
+              {t('Heslo', 'Password')}
             </label>
             <input
               id="manager-password"
@@ -78,7 +80,7 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose }: Manager
               onClick={onClose}
               className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
             >
-              Zrušit
+              {t('Zrušit', 'Cancel')}
             </button>
             <button
               type="submit"
@@ -91,10 +93,10 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose }: Manager
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  Přihlašuji…
+                  {t('Přihlašuji…', 'Logging in…')}
                 </span>
               ) : (
-                'Přihlásit se'
+                t('Přihlásit se', 'Log in')
               )}
             </button>
           </div>

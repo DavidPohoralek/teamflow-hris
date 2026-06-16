@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useT } from '@/lib/i18n';
 
 type WorkType = 'Prodejna' | 'HO' | 'Kancelář' | string;
 
@@ -72,7 +73,7 @@ function formatDuration(checkInTime: string): { since: string; duration: string 
 
   const hh = checkIn.getHours().toString().padStart(2, '0');
   const mm = checkIn.getMinutes().toString().padStart(2, '0');
-  const since = `od ${hh}:${mm}`;
+  const since = `${hh}:${mm}`;
 
   let duration = '';
   if (hours > 0 && minutes > 0) {
@@ -97,6 +98,7 @@ function sortRecords(records: PresenceRecord[]): PresenceRecord[] {
 }
 
 export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDashboardProps) {
+  const t = useT();
   const [records, setRecords] = useState<PresenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +123,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
       setError(null);
       setLastUpdated(new Date());
     } catch (err) {
-      setError('Nepodařilo se načíst data o přítomnosti.');
+      setError(t('Nepodařilo se načíst data o přítomnosti.', 'Failed to load presence data.'));
     } finally {
       setLoading(false);
     }
@@ -147,11 +149,11 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
     <div className="w-full px-6 py-5 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900">Aktuální přítomnost</h2>
+        <h2 className="text-xl font-bold text-slate-900">{t('Aktuální přítomnost', 'Current presence')}</h2>
         <div className="flex items-center gap-3">
           {lastUpdated && (
             <span className="text-xs text-slate-400">
-              Aktualizováno:{' '}
+              {t('Aktualizováno:', 'Updated:')}{' '}
               {lastUpdated.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
@@ -159,7 +161,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
             onClick={fetchPresence}
             className="rounded-lg border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
           >
-            Obnovit
+            {t('Obnovit', 'Refresh')}
           </button>
         </div>
       </div>
@@ -172,7 +174,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
           </div>
           <div>
             <div className="text-xl font-bold text-emerald-700 leading-none">{totalCount}</div>
-            <div className="text-xs text-emerald-600 mt-0.5">Celkem přítomno</div>
+            <div className="text-xs text-emerald-600 mt-0.5">{t('Celkem přítomno', 'Total present')}</div>
           </div>
         </div>
         {summaryTypes.map((type) => {
@@ -229,8 +231,8 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
               />
             </svg>
           </div>
-          <p className="text-base font-semibold text-slate-700">Nikdo není aktuálně přihlášen</p>
-          <p className="mt-1.5 text-sm text-slate-400">Zaměstnanci se zobrazí po příchodu na pracoviště</p>
+          <p className="text-base font-semibold text-slate-700">{t('Nikdo není aktuálně přihlášen', 'Nobody is currently checked in')}</p>
+          <p className="mt-1.5 text-sm text-slate-400">{t('Zaměstnanci se zobrazí po příchodu na pracoviště', 'Employees will appear after clocking in')}</p>
         </div>
       )}
 
@@ -263,7 +265,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-gray-900">{record.name}</p>
                       <p className="text-xs text-gray-500">
-                        {since}{' '}
+                        {t('od', 'since')} {since}{' '}
                         <span className="text-gray-400">{duration}</span>
                       </p>
                     </div>
@@ -288,16 +290,16 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                         onClick={() => setEditingId(isEditing ? null : record.id)}
                         className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
                       >
-                        {isEditing ? 'Zavřít' : 'Upravit'}
+                        {isEditing ? t('Zavřít', 'Close') : t('Upravit', 'Edit')}
                       </button>
                     </div>
 
                     {isEditing && (
                       <div className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-600 space-y-2">
-                        <p className="font-medium text-gray-700">Ruční úprava příchodu/odchodu</p>
+                        <p className="font-medium text-gray-700">{t('Ruční úprava příchodu/odchodu', 'Manual clock-in/out adjustment')}</p>
                         <div className="flex gap-2">
                           <div className="flex-1">
-                            <label className="block mb-1 text-gray-500">Příchod</label>
+                            <label className="block mb-1 text-gray-500">{t('Příchod', 'Clock in')}</label>
                             <input
                               type="time"
                               defaultValue={new Date(record.checkInTime)
@@ -307,7 +309,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="block mb-1 text-gray-500">Odchod</label>
+                            <label className="block mb-1 text-gray-500">{t('Odchod', 'Clock out')}</label>
                             <input
                               type="time"
                               className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none"
@@ -316,7 +318,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                           </div>
                         </div>
                         <button className="mt-1 w-full rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors">
-                          Uložit změny
+                          {t('Uložit změny', 'Save changes')}
                         </button>
                       </div>
                     )}

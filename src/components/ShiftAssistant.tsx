@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
+import { useT } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ interface NotifyModalProps {
 }
 
 function NotifyModal({ target, onClose }: NotifyModalProps) {
+  const t = useT();
   const [channel, setChannel] = useState<'slack' | 'email' | 'both'>('email');
   const [customMessage, setCustomMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -109,12 +111,12 @@ function NotifyModal({ target, onClose }: NotifyModalProps) {
       const results: { channel: string; ok: boolean; error?: string }[] = data.results ?? [];
       const failed = results.filter(r => !r.ok);
       if (failed.length === 0) {
-        setResult({ ok: true, text: `Zpráva odeslána přes ${results.map(r => r.channel).join(' a ')}` });
+        setResult({ ok: true, text: `${t('Zpráva odeslána přes', 'Message sent via')} ${results.map(r => r.channel).join(' a ')}` });
       } else {
         setResult({ ok: false, text: failed.map(r => `${r.channel}: ${r.error}`).join('; ') });
       }
     } catch {
-      setResult({ ok: false, text: 'Chyba sítě' });
+      setResult({ ok: false, text: t('Chyba sítě', 'Network error') });
     } finally {
       setSending(false);
     }
@@ -127,22 +129,22 @@ function NotifyModal({ target, onClose }: NotifyModalProps) {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">📨 Oslovit zaměstnance</h3>
+          <h3 className="font-bold text-slate-800">{t('📨 Oslovit zaměstnance', '📨 Notify employee')}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
         </div>
 
         <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm">
           <span className="font-semibold text-slate-800">{target.employeeName}</span>
-          <span className="text-slate-500 ml-2">→ směna {target.shift.date} ({target.shift.dayName})</span>
+          <span className="text-slate-500 ml-2">→ {t('směna', 'shift')} {target.shift.date} ({target.shift.dayName})</span>
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">Kanál</label>
+          <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t('Kanál', 'Channel')}</label>
           <div className="grid grid-cols-3 gap-2">
             {([
               { id: 'email', icon: '📧', label: 'Email' },
               { id: 'slack', icon: '💬', label: 'Slack' },
-              { id: 'both',  icon: '📡', label: 'Oboje' },
+              { id: 'both',  icon: '📡', label: t('Oboje', 'Both') },
             ] as { id: 'slack' | 'email' | 'both'; icon: string; label: string }[]).map(opt => (
               <button
                 key={opt.id}
@@ -162,7 +164,7 @@ function NotifyModal({ target, onClose }: NotifyModalProps) {
 
         <div>
           <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-            Vlastní zpráva <span className="text-slate-400 font-normal">(volitelné – jinak se použije automatická)</span>
+            {t('Vlastní zpráva', 'Custom message')} <span className="text-slate-400 font-normal">{t('(volitelné – jinak se použije automatická)', '(optional – automatic message will be used otherwise)')}</span>
           </label>
           <textarea
             value={customMessage}
@@ -184,14 +186,14 @@ function NotifyModal({ target, onClose }: NotifyModalProps) {
             onClick={onClose}
             className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition"
           >
-            Zrušit
+            {t('Zrušit', 'Cancel')}
           </button>
           <button
             onClick={send}
             disabled={sending}
             className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition"
           >
-            {sending ? 'Odesílám…' : '📨 Odeslat zprávu'}
+            {sending ? t('Odesílám…', 'Sending…') : t('📨 Odeslat zprávu', '📨 Send message')}
           </button>
         </div>
       </div>
@@ -237,6 +239,7 @@ function confidenceColor(c: number): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ShiftAssistant({ orgId, month }: Props) {
+  const t = useT();
   const [license, setLicense] = useState<LicenseState>({ checked: false, licensed: false });
   const [draft, setDraft] = useState<'A' | 'B'>('A');
   const [result, setResult] = useState<AssistantResult | null>(null);
@@ -318,7 +321,7 @@ export default function ShiftAssistant({ orgId, month }: Props) {
     return (
       <div className="flex items-center justify-center py-32 text-slate-400">
         <div className="animate-spin w-6 h-6 border-2 border-slate-300 border-t-indigo-500 rounded-full mr-3" />
-        Ověřuji licenci…
+        {t('Ověřuji licenci…', 'Verifying license…')}
       </div>
     );
   }
@@ -326,29 +329,29 @@ export default function ShiftAssistant({ orgId, month }: Props) {
   // ── Upsell wall ──────────────────────────────────────────────────────────
   if (!license.licensed) {
     const reasonMsg: Record<string, string> = {
-      no_license: 'Vaše organizace nemá aktivovaný Asistent směn.',
-      inactive:   'Licence Asistenta směn není aktivní.',
-      expired:    'Platnost licence Asistenta směn vypršela.',
-      error:      'Nepodařilo se ověřit licenci. Zkuste to znovu.',
+      no_license: t('Vaše organizace nemá aktivovaný Asistent směn.', 'Your organization does not have Shift Assistant activated.'),
+      inactive:   t('Licence Asistenta směn není aktivní.', 'Shift Assistant license is not active.'),
+      expired:    t('Platnost licence Asistenta směn vypršela.', 'Shift Assistant license has expired.'),
+      error:      t('Nepodařilo se ověřit licenci. Zkuste to znovu.', 'Failed to verify license. Please try again.'),
     };
     return (
       <div className="flex flex-col items-center justify-center py-24 px-6 text-center max-w-lg mx-auto space-y-6">
         <div className="w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center text-4xl">🤖</div>
         <div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Asistent směn</h2>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">{t('Asistent směn', 'Shift Assistant')}</h2>
           <p className="text-slate-500 text-sm leading-relaxed">
-            {reasonMsg[license.reason ?? ''] ?? 'Asistent směn není aktivován.'}
+            {reasonMsg[license.reason ?? ''] ?? t('Asistent směn není aktivován.', 'Shift Assistant is not activated.')}
           </p>
           <p className="text-slate-400 text-sm mt-2">
-            Automaticky doplní chybějící směny na základě dostupnosti, tierů a preferencí zaměstnanců.
+            {t('Automaticky doplní chybějící směny…', 'Automatically fills missing shifts based on availability, tiers and employee preferences.')}
           </p>
         </div>
         <div className="bg-slate-50 rounded-2xl p-5 w-full space-y-2 text-left">
           {[
-            '✅ Analýza chybějících směn v reálném čase',
-            '✅ Scoring kandidátů podle tieru, sobot a hodin',
-            '✅ Automatické i manuální schvalování návrhů',
-            '✅ Večerní záskok – closing coverage logika',
+            t('✅ Analýza chybějících směn v reálném čase', '✅ Real-time missing shift analysis'),
+            t('✅ Scoring kandidátů podle tieru, sobot a hodin', '✅ Candidate scoring by tier, Saturdays and hours'),
+            t('✅ Automatické i manuální schvalování návrhů', '✅ Automatic and manual proposal approval'),
+            t('✅ Večerní záskok – closing coverage logika', '✅ Evening cover – closing coverage logic'),
           ].map(f => (
             <div key={f} className="text-sm text-slate-600">{f}</div>
           ))}
@@ -359,9 +362,9 @@ export default function ShiftAssistant({ orgId, month }: Props) {
           rel="noopener noreferrer"
           className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition text-sm"
         >
-          Aktivovat Asistenta směn →
+          {t('Aktivovat Asistenta směn →', 'Activate Shift Assistant →')}
         </a>
-        <p className="text-xs text-slate-400">Po zakoupení bude licence aktivována automaticky.</p>
+        <p className="text-xs text-slate-400">{t('Po zakoupení bude licence aktivována automaticky.', 'After purchase, the license will be activated automatically.')}</p>
       </div>
     );
   }
@@ -378,11 +381,11 @@ export default function ShiftAssistant({ orgId, month }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            🤖 Asistent směn
+            {t('🤖 Asistent směn', '🤖 Shift Assistant')}
             <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">DLC</span>
           </h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            Automatické doplnění chybějících směn na základě dostupnosti a preferencí
+            {t('Automatické doplnění chybějících směn na základě dostupnosti a preferencí', 'Automatic filling of missing shifts based on availability and preferences')}
           </p>
         </div>
 
@@ -402,7 +405,7 @@ export default function ShiftAssistant({ orgId, month }: Props) {
             disabled={loading}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition"
           >
-            {loading ? 'Analyzuji…' : '🔍 Analyzovat měsíc'}
+            {loading ? t('Analyzuji…', 'Analyzing…') : t('🔍 Analyzovat měsíc', '🔍 Analyze month')}
           </button>
         </div>
       </div>
@@ -417,10 +420,10 @@ export default function ShiftAssistant({ orgId, month }: Props) {
       {/* Apply result */}
       {applyResult && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-800">
-          ✅ Zapsáno {applyResult.applied} směn.
+          {t('✅ Zapsáno', '✅ Written')} {applyResult.applied} {t('směn.', 'shifts.')}
           {applyResult.skipped.length > 0 && (
             <span className="text-amber-700 ml-2">
-              Přeskočeno {applyResult.skipped.length}: {applyResult.skipped.map(s => s.reason).join(', ')}
+              {t('Přeskočeno', 'Skipped')} {applyResult.skipped.length}: {applyResult.skipped.map(s => s.reason).join(', ')}
             </span>
           )}
         </div>
@@ -430,10 +433,10 @@ export default function ShiftAssistant({ orgId, month }: Props) {
       {result && (
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Dnů v měsíci',   value: result.summary.totalDays,        color: 'bg-slate-100 text-slate-700' },
-            { label: 'Problémových',    value: result.summary.problemDays,       color: 'bg-red-50 text-red-700' },
-            { label: 'Doporučených',    value: result.summary.recommendedCount,  color: 'bg-indigo-50 text-indigo-700' },
-            { label: 'Vybráno',         value: selected.size,                    color: 'bg-amber-50 text-amber-700' },
+            { label: t('Dnů v měsíci', 'Days in month'),    value: result.summary.totalDays,        color: 'bg-slate-100 text-slate-700' },
+            { label: t('Problémových', 'Problematic'),     value: result.summary.problemDays,       color: 'bg-red-50 text-red-700' },
+            { label: t('Doporučených', 'Recommended'),     value: result.summary.recommendedCount,  color: 'bg-indigo-50 text-indigo-700' },
+            { label: t('Vybráno', 'Selected'),             value: selected.size,                    color: 'bg-amber-50 text-amber-700' },
           ].map(card => (
             <div key={card.label} className={`${card.color} rounded-xl p-4 text-center`}>
               <div className="text-2xl font-bold">{card.value}</div>
@@ -447,7 +450,7 @@ export default function ShiftAssistant({ orgId, month }: Props) {
       {result && result.summary.problemDays > 0 && (
         <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3">
           <div className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{selected.size}</span> návrhů vybráno k zapsání
+            <span className="font-semibold text-slate-800">{selected.size}</span> {t('návrhů vybráno k zapsání', 'proposals selected for writing')}
           </div>
           <div className="flex gap-2">
             <button
@@ -458,20 +461,20 @@ export default function ShiftAssistant({ orgId, month }: Props) {
               }}
               className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
             >
-              Vybrat doporučené
+              {t('Vybrat doporučené', 'Select recommended')}
             </button>
             <button
               onClick={() => setSelected(new Set())}
               className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
             >
-              Zrušit výběr
+              {t('Zrušit výběr', 'Clear selection')}
             </button>
             <button
               onClick={apply}
               disabled={applying || selected.size === 0}
               className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition"
             >
-              {applying ? 'Zapisuji…' : `✅ Zapsat ${selected.size} směn`}
+              {applying ? t('Zapisuji…', 'Writing…') : `${t('✅ Zapsat', '✅ Write')} ${selected.size} ${t('směn', 'shifts')}`}
             </button>
           </div>
         </div>
@@ -481,8 +484,8 @@ export default function ShiftAssistant({ orgId, month }: Props) {
       {result && result.problemDays.length === 0 && (
         <div className="text-center py-16 text-slate-400">
           <div className="text-4xl mb-3">🎉</div>
-          <div className="font-semibold text-slate-600">Všechny směny jsou obsazené!</div>
-          <div className="text-sm mt-1">Draft {result.draft} pro {result.month} nemá žádná chybějící místa.</div>
+          <div className="font-semibold text-slate-600">{t('Všechny směny jsou obsazené!', 'All shifts are filled!')}</div>
+          <div className="text-sm mt-1">Draft {result.draft} {t('pro', 'for')} {result.month} {t('nemá žádná chybějící místa.', 'has no missing slots.')}</div>
         </div>
       )}
 
@@ -503,16 +506,16 @@ export default function ShiftAssistant({ orgId, month }: Props) {
             <div className="flex items-center gap-3">
               {day.missingCount > 0 && (
                 <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
-                  Chybí {day.missingCount} {day.missingCount === 1 ? 'člověk' : 'lidé'}
+                  {t('Chybí', 'Missing')} {day.missingCount} {day.missingCount === 1 ? t('člověk', 'person') : t('lidé', 'people')}
                 </span>
               )}
               {day.closingCoverage.enabled && day.closingCoverage.missingStaff > 0 && (
                 <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
-                  Večer -{day.closingCoverage.missingStaff}
+                  {t('Večer -', 'Evening -')}{day.closingCoverage.missingStaff}
                 </span>
               )}
               <div className="text-xs text-slate-400">
-                Obsazeno: {day.assignedEmployees.join(', ') || '—'}
+                {t('Obsazeno:', 'Filled:')} {day.assignedEmployees.join(', ') || '—'}
               </div>
               <span className="text-slate-400 text-sm">{expandedDay === day.date ? '▲' : '▼'}</span>
             </div>
@@ -523,7 +526,7 @@ export default function ShiftAssistant({ orgId, month }: Props) {
             <div className="border-t border-slate-100 divide-y divide-slate-50">
               {day.suggestions.length === 0 ? (
                 <div className="px-5 py-6 text-sm text-slate-400 text-center">
-                  Žádní dostupní kandidáti pro tento den.
+                  {t('Žádní dostupní kandidáti pro tento den.', 'No available candidates for this day.')}
                 </div>
               ) : day.suggestions.map(s => {
                 const isSelected  = selected.has(s.id);
@@ -553,13 +556,13 @@ export default function ShiftAssistant({ orgId, month }: Props) {
                           <span className="text-xs text-slate-500">{s.timeLabel}</span>
                         )}
                         {isClosing && (
-                          <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded">Večerní záskok</span>
+                          <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded">{t('Večerní záskok', 'Evening cover')}</span>
                         )}
                         {isRecommended && !isClosing && (
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">★ Doporučeno</span>
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">{t('★ Doporučeno', '★ Recommended')}</span>
                         )}
                         <span className={`text-xs font-medium ml-auto ${confidenceColor(s.confidence)}`}>
-                          {s.confidence}% shoda
+                          {s.confidence}{t('% shoda', '% match')}
                         </span>
                       </div>
 
@@ -603,7 +606,7 @@ export default function ShiftAssistant({ orgId, month }: Props) {
                           }}
                           className="text-xs px-2 py-1 bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 rounded-lg transition"
                         >
-                          📨 Oslovit
+                          {t('📨 Oslovit zaměstnance', '📨 Notify employee')}
                         </button>
                     </div>
                   </div>
@@ -618,9 +621,9 @@ export default function ShiftAssistant({ orgId, month }: Props) {
       {!result && !loading && (
         <div className="text-center py-20 text-slate-400">
           <div className="text-5xl mb-4">🤖</div>
-          <div className="font-semibold text-slate-600 text-lg">Asistent směn připraven</div>
+          <div className="font-semibold text-slate-600 text-lg">{t('Asistent směn připraven', 'Shift Assistant ready')}</div>
           <div className="text-sm mt-2 max-w-sm mx-auto">
-            Klikni na "Analyzovat měsíc" a bot najde chybějící směny a navrhne optimální obsazení.
+            {t('Klikni na "Analyzovat měsíc" a bot najde chybějící směny...', 'Click "Analyze month" and the bot will find missing shifts and suggest optimal staffing.')}
           </div>
         </div>
       )}

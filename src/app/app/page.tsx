@@ -12,21 +12,22 @@ import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistant from '@/components/ShiftAssistant'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
+import { useLang, useT } from '@/lib/i18n'
 
 type Tab = 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'vacation' | 'analytics' | 'management' | 'assistant'
 
-const BASE_TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'schedule', label: 'Směny', icon: '📅' },
-  { id: 'attendance', label: 'Docházka', icon: '⏰' },
-  { id: 'overview', label: 'Přehled', icon: '📊' },
-  { id: 'my-hours', label: 'Zaměstnanec', icon: '👤' },
-  { id: 'vacation', label: 'Dovolená', icon: '🏖️' },
+const BASE_TABS: { id: Tab; labelCs: string; labelEn: string; icon: string }[] = [
+  { id: 'schedule', labelCs: 'Směny', labelEn: 'Shifts', icon: '📅' },
+  { id: 'attendance', labelCs: 'Docházka', labelEn: 'Attendance', icon: '⏰' },
+  { id: 'overview', labelCs: 'Přehled', labelEn: 'Overview', icon: '📊' },
+  { id: 'my-hours', labelCs: 'Zaměstnanec', labelEn: 'Employee', icon: '👤' },
+  { id: 'vacation', labelCs: 'Dovolená', labelEn: 'Vacation', icon: '🏖️' },
 ]
 
-const MANAGER_TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'analytics', label: 'Analytika', icon: '📈' },
-  { id: 'assistant', label: 'Asistent', icon: '🤖' },
-  { id: 'management', label: 'Správa', icon: '⚙️' },
+const MANAGER_TABS: { id: Tab; labelCs: string; labelEn: string; icon: string }[] = [
+  { id: 'analytics', labelCs: 'Analytika', labelEn: 'Analytics', icon: '📈' },
+  { id: 'assistant', labelCs: 'Asistent', labelEn: 'Assistant', icon: '🤖' },
+  { id: 'management', labelCs: 'Správa', labelEn: 'Management', icon: '⚙️' },
 ]
 
 const MANAGER_SESSION_KEY = 'hris_manager_session'
@@ -49,6 +50,8 @@ function isManagerSessionValid(): boolean {
 }
 
 export default function HomePage() {
+  const { lang, setLang } = useLang()
+  const t = useT()
   const [orgId, setOrgId] = useState<string | null>(null)
   const [orgName, setOrgName] = useState<string>('')
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null)
@@ -156,7 +159,7 @@ export default function HomePage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Načítání systému...</p>
+          <p className="text-gray-500 text-sm">{t('Načítání systému...', 'Loading...')}</p>
         </div>
       </div>
     )
@@ -169,7 +172,7 @@ export default function HomePage() {
         <div className="bg-white rounded-xl shadow p-8 max-w-sm w-full text-center">
           <div className="text-4xl mb-4">⚠️</div>
           <p className="text-gray-700 font-medium">
-            {error ?? 'Systém není nastaven. Kontaktujte správce.'}
+            {error ?? t('Systém není nastaven. Kontaktujte správce.', 'System not configured. Contact your administrator.')}
           </p>
         </div>
       </div>
@@ -239,7 +242,7 @@ export default function HomePage() {
                     }`}
                 >
                   <span className="text-base">{tab.icon}</span>
-                  <span>{tab.label}</span>
+                  <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
                 </button>
               ))}
             </div>
@@ -251,13 +254,13 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-1.5">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                  <span className="text-emerald-400 text-sm font-medium">Manažer</span>
+                  <span className="text-emerald-400 text-sm font-medium">{t('Manažer', 'Manager')}</span>
                 </div>
                 <button
                   onClick={handleManagerLogout}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}
                 >
-                  Odhlásit
+                  {t('Odhlásit', 'Log out')}
                 </button>
               </div>
             ) : (
@@ -266,9 +269,20 @@ export default function HomePage() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${theme.managerBtnClass}`}
               >
                 <span>🔐</span>
-                <span>Manažer</span>
+                <span>{t('Manažer', 'Manager')}</span>
               </button>
             )}
+          </div>
+
+          {/* Language toggle */}
+          <div className="shrink-0 flex items-center">
+            <button
+              onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${theme.logoutBtnClass}`}
+              title={lang === 'cs' ? 'Switch to English' : 'Přepnout do češtiny'}
+            >
+              {lang === 'cs' ? 'EN' : 'CS'}
+            </button>
           </div>
         </div>
       </nav>
