@@ -46,21 +46,25 @@ export async function PUT(req: NextRequest) {
 
   const updates: Record<string, unknown> = {};
 
-  // Password change requires current password verification
+  // Password change
   if (newPassword !== undefined) {
-    if (!currentPassword) {
-      return NextResponse.json({ error: 'Aktuální heslo je povinné pro změnu hesla.' }, { status: 400 });
+    if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+      return NextResponse.json({ error: 'Nové heslo nesmí být prázdné.' }, { status: 400 });
     }
     const { data: settings } = await supabase
       .from('company_settings')
       .select('manager_password')
       .eq('organization_id', orgId)
       .single();
-    if (!settings || (settings as { manager_password: string }).manager_password !== currentPassword) {
-      return NextResponse.json({ error: 'Aktuální heslo je nesprávné.' }, { status: 401 });
-    }
-    if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
-      return NextResponse.json({ error: 'Nové heslo nesmí být prázdné.' }, { status: 400 });
+    const existing = (settings as { manager_password: string | null } | null)?.manager_password ?? null;
+    // Initial setup: password not set yet — allow without currentPassword
+    if (existing !== null) {
+      if (!currentPassword) {
+        return NextResponse.json({ error: 'Aktuální heslo je povinné pro změnu hesla.' }, { status: 400 });
+      }
+      if (existing !== currentPassword) {
+        return NextResponse.json({ error: 'Aktuální heslo je nesprávné.' }, { status: 401 });
+      }
     }
     updates.manager_password = newPassword;
   }
