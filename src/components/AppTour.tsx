@@ -178,20 +178,29 @@ export default function AppTour({ lang, onClose }: Props) {
 
   const t = (cs: string, en: string) => lang === 'en' ? en : cs;
 
+  async function markPendingAndRedirect() {
+    localStorage.setItem('tf_tour_seen', '1');
+    try {
+      await fetch('/api/subscription', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'pending' }),
+      });
+    } catch { /* ignore — will be caught on next load */ }
+    onClose();
+    window.location.href = PRICING_URL;
+  }
+
   function handleNext() {
     if (isLast) {
-      localStorage.setItem('tf_tour_seen', '1');
-      onClose();
-      window.location.href = PRICING_URL;
+      markPendingAndRedirect();
     } else {
       setStepIndex(i => i + 1);
     }
   }
 
   function handleSkip() {
-    localStorage.setItem('tf_tour_seen', '1');
-    onClose();
-    window.location.href = PRICING_URL;
+    markPendingAndRedirect();
   }
 
   useEffect(() => {

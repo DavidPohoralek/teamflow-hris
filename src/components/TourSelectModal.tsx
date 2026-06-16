@@ -8,8 +8,15 @@ interface Props {
 }
 
 export default function TourSelectModal({ onStart, onSkip }: Props) {
-  function handleSkip() {
+  async function handleSkip() {
     localStorage.setItem('tf_tour_seen', '1');
+    try {
+      await fetch('/api/subscription', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'pending' }),
+      });
+    } catch { /* ignore */ }
     onSkip();
     window.location.href = PRICING_URL;
   }

@@ -15,6 +15,7 @@ import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
 import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
 import TourSelectModal from '@/components/TourSelectModal'
+import SubscriptionGate from '@/components/SubscriptionGate'
 
 type Tab = 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'vacation' | 'analytics' | 'management' | 'assistant'
 
@@ -69,6 +70,7 @@ export default function HomePage() {
   const [showTourSelect, setShowTourSelect] = useState(false)
   const [showTour, setShowTour] = useState(false)
   const [tourLang, setTourLang] = useState<'cs' | 'en'>('cs')
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
 
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
@@ -85,10 +87,17 @@ export default function HomePage() {
     return () => window.removeEventListener('tf:theme-change', handler)
   }, [])
 
-  // Show tour select on first visit
+  // Check subscription status — drives tour gate and paywall
   useEffect(() => {
-    const seen = localStorage.getItem('tf_tour_seen')
-    if (!seen) setShowTourSelect(true)
+    fetch('/api/subscription')
+      .then(r => r.json())
+      .then((d: { status: string }) => {
+        setSubscriptionStatus(d.status)
+        if (d.status === 'trial') {
+          setShowTourSelect(true)
+        }
+      })
+      .catch(() => setSubscriptionStatus('active'))
   }, [])
 
   // Load org + manager session on mount
@@ -163,6 +172,11 @@ export default function HomePage() {
     if (activeTab === 'management') {
       setActiveTab('schedule')
     }
+  }
+
+  // Paywall — pending or expired subscription
+  if (subscriptionStatus === 'pending' || subscriptionStatus === 'expired') {
+    return <SubscriptionGate status={subscriptionStatus} orgName={orgName} />
   }
 
   // Loading state

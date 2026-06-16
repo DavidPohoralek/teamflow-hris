@@ -56,10 +56,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Create default company_settings row so settings API always has a row to update
+  // Create default company_settings row — trial status for new orgs
   await supabaseAdmin
     .from('company_settings')
-    .insert({ organization_id: org.id, kiosk_enabled: true })
+    .insert({ organization_id: org.id, kiosk_enabled: true, subscription_status: 'trial' })
     .select()
     .maybeSingle();
 
