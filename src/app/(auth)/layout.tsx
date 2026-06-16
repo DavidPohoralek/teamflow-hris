@@ -8,48 +8,33 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         {/* Logo area */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 mb-4">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx="9"
-                cy="7"
-                r="4"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M23 21v-2a4 4 0 0 0-3-3.87"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M16 3.13a4 4 0 0 1 0 7.75"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <svg width="48" height="48" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
+              <polygon points="25,72 125,130 125,244 25,187" fill="#E09828"/>
+              <polygon points="125,15 225,72 213,72 125,22" fill="#EDB84A"/>
+              <polygon points="25,72 125,15 125,22 37,72" fill="#E09828"/>
+              <polygon points="225,72 125,130 125,122 213,72" fill="#96560A"/>
+              <polygon points="125,130 25,72 37,72 125,122" fill="#AE6A10"/>
+              <polygon points="37,72 125,22 125,122" fill="#2A4878"/>
+              <polygon points="213,72 125,22 125,122" fill="#05080F"/>
+              <line x1="125" y1="22" x2="125" y2="122" stroke="#1A2E58" strokeWidth="1.5"/>
+              <polyline points="125,22 213,72 125,122 37,72 125,22" fill="none" stroke="#182840" strokeWidth="1.8"/>
+              <polygon points="35,98 115,145 115,163 35,117" fill="#7A4808"/>
+              <polygon points="61,139 89,155 89,210 61,194" fill="#7A4808"/>
+              <polygon points="135,145 215,98 215,117 135,163" fill="#6A3806"/>
+              <polygon points="135,170 153,159 153,211 135,221" fill="#6A3806"/>
+              <polygon points="157,171 200,146 200,163 157,188" fill="#6A3806"/>
+              <polyline points="25,72 125,15 225,72" fill="none" stroke="#C07010" strokeWidth="2.5" strokeLinejoin="round"/>
+              <line x1="25" y1="72" x2="25" y2="187" stroke="#C07010" strokeWidth="2"/>
+              <line x1="225" y1="72" x2="225" y2="187" stroke="#8A4A08" strokeWidth="2"/>
+              <line x1="25" y1="187" x2="125" y2="244" stroke="#B07010" strokeWidth="2"/>
+              <line x1="225" y1="187" x2="125" y2="244" stroke="#8A4A08" strokeWidth="2"/>
+              <line x1="125" y1="130" x2="125" y2="244" stroke="#9A5C10" strokeWidth="2.5"/>
             </svg>
+            <h1 className="text-3xl font-bold text-white tracking-tight">TeamFlow</h1>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">HRIS</h1>
-          <p className="text-slate-400 text-sm mt-1">by SelbickyLabs</p>
+          <p className="text-slate-400 text-sm">by SelbickyLabs</p>
         </div>
 
         {/* Card */}
