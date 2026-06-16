@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
+import OrgLogoUpload from './OrgLogoUpload';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1030,6 +1031,11 @@ function SettingsTab() {
             <BenefitsSetting />
           </div>
         </div>
+      </section>
+
+      {/* Logo */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <OrgLogoUpload />
       </section>
 
       {/* Integrations */}

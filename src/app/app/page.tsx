@@ -51,6 +51,7 @@ function isManagerSessionValid(): boolean {
 export default function HomePage() {
   const [orgId, setOrgId] = useState<string | null>(null)
   const [orgName, setOrgName] = useState<string>('')
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,6 +98,11 @@ export default function HomePage() {
       setOrgId(data.id)
       setOrgName(data.name)
       localStorage.setItem(ORG_ID_KEY, data.id)
+      // Load org logo (public, no auth needed)
+      fetch(`/api/public/org-logo?orgId=${data.id}`)
+        .then(r => r.json())
+        .then((d: { logoUrl: string | null }) => setOrgLogoUrl(d.logoUrl ?? null))
+        .catch(() => {})
     } catch {
       if (showLoadingSpinner) {
         setError('Nepodařilo se načíst konfiguraci systému.')
@@ -153,6 +159,13 @@ export default function HomePage() {
         <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-6">
           {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
+            {orgLogoUrl && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={orgLogoUrl} alt="Logo organizace" className="h-9 w-auto max-w-[120px] object-contain rounded" />
+                <div className="h-6 w-px bg-slate-600" />
+              </>
+            )}
             <svg width="36" height="36" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
               {/* Outer faces */}
               <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
