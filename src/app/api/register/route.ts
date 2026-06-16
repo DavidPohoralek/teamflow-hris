@@ -56,5 +56,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Create default company_settings row so settings API always has a row to update
+  await supabaseAdmin
+    .from('company_settings')
+    .insert({ organization_id: org.id, kiosk_enabled: true })
+    .select()
+    .maybeSingle();
+
   return NextResponse.json({ ok: true, organizationId: org.id });
 }

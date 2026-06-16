@@ -84,10 +84,10 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Nebyla zadána žádná změna.' }, { status: 400 });
   }
 
+  // Use upsert so new orgs (no company_settings row yet) get one created
   const { error: updateError } = await supabase
     .from('company_settings')
-    .update(updates)
-    .eq('organization_id', orgId);
+    .upsert({ organization_id: orgId, ...updates }, { onConflict: 'organization_id' });
 
   if (updateError) {
     console.error('PUT /api/manager/settings error:', updateError);
