@@ -34,6 +34,9 @@ export default function LoginPage() {
       return;
     }
 
+    // Clear any leftover manager session from a previous org/user
+    localStorage.removeItem('hris_manager_session');
+
     router.push('/app');
     router.refresh();
   }

@@ -78,7 +78,6 @@ export default function HomePage() {
 
   // Load org + manager session on mount
   useEffect(() => {
-    setIsManagerMode(isManagerSessionValid())
     fetchOrg(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -95,6 +94,27 @@ export default function HomePage() {
       const data = (await res.json()) as { id: string; name: string }
       setOrgId(data.id)
       setOrgName(data.name)
+
+      // Validate manager session belongs to this org, clear if not
+      const managerValid = isManagerSessionValid()
+      if (managerValid) {
+        try {
+          const raw = localStorage.getItem(MANAGER_SESSION_KEY)
+          const decoded = atob(raw!)
+          const tokenOrgId = decoded.split(':')[0]
+          if (tokenOrgId !== data.id) {
+            localStorage.removeItem(MANAGER_SESSION_KEY)
+            setIsManagerMode(false)
+          } else {
+            setIsManagerMode(true)
+          }
+        } catch {
+          localStorage.removeItem(MANAGER_SESSION_KEY)
+          setIsManagerMode(false)
+        }
+      } else {
+        setIsManagerMode(false)
+      }
       // Load org logo
       fetch(`/api/public/org-logo?orgId=${data.id}`)
         .then(r => r.json())
