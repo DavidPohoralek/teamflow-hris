@@ -57,8 +57,9 @@ export async function PUT(req: NextRequest) {
       .eq('organization_id', orgId)
       .single();
     const existing = (settings as { manager_password: string | null } | null)?.manager_password ?? null;
-    // Initial setup: password not set yet — allow without currentPassword
-    if (existing !== null) {
+    // Treat null or the factory default 'manager123' as "not yet set" — allow without currentPassword
+    const isDefaultOrUnset = existing === null || existing === 'manager123';
+    if (!isDefaultOrUnset) {
       if (!currentPassword) {
         return NextResponse.json({ error: 'Aktuální heslo je povinné pro změnu hesla.' }, { status: 400 });
       }
