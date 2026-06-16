@@ -159,13 +159,6 @@ export default function HomePage() {
         <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-6">
           {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
-            {orgLogoUrl && (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={orgLogoUrl} alt="Logo organizace" className="h-9 w-auto max-w-[120px] object-contain rounded" />
-                <div className="h-6 w-px bg-slate-600" />
-              </>
-            )}
             <svg width="36" height="36" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
               {/* Outer faces */}
               <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
@@ -198,14 +191,15 @@ export default function HomePage() {
               <line x1="225" y1="187" x2="125" y2="244" stroke="#8A4A08" strokeWidth="2"/>
               <line x1="125" y1="130" x2="125" y2="244" stroke="#9A5C10" strokeWidth="2.5"/>
             </svg>
-            <div>
-              <div className="font-bold text-white text-sm leading-tight">TeamFlow</div>
-              {orgName && <div className="text-slate-400 text-xs leading-tight">{orgName}</div>}
             </div>
-          </div>
 
-          {/* Divider */}
+          {/* Divider + org logo */}
           <div className="h-6 w-px bg-slate-600" />
+          {orgLogoUrl
+            ? /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={orgLogoUrl} alt={orgName} className="h-8 w-auto max-w-[140px] object-contain" />
+            : <span className="text-slate-400 text-sm font-medium">{orgName}</span>
+          }
 
           {/* Tabs — center */}
           <div className="flex-1 flex justify-center">
