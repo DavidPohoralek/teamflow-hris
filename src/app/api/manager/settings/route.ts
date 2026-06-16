@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const { data: settings, error: settingsError } = await supabase
     .from('company_settings')
-    .select('kiosk_enabled, manager_password, saturday_logic_enabled')
+    .select('kiosk_enabled, manager_password, saturday_logic_enabled, ui_theme')
     .eq('organization_id', orgId)
     .single();
 
@@ -18,10 +18,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Nastavení nenalezeno.' }, { status: 404 });
   }
 
+  const s = settings as { kiosk_enabled: boolean; saturday_logic_enabled: boolean | null; manager_password: string | null; ui_theme: string | null };
   return NextResponse.json({
-    kioskEnabled: (settings as { kiosk_enabled: boolean }).kiosk_enabled,
-    saturday_logic_enabled: (settings as { saturday_logic_enabled: boolean | null }).saturday_logic_enabled ?? false,
-    managerPasswordSet: Boolean((settings as { manager_password: string | null }).manager_password),
+    kioskEnabled: s.kiosk_enabled,
+    saturday_logic_enabled: s.saturday_logic_enabled ?? false,
+    managerPasswordSet: Boolean(s.manager_password),
+    ui_theme: s.ui_theme ?? 'slate',
   });
 }
 
@@ -34,11 +36,12 @@ export async function PUT(req: NextRequest) {
   const { orgId, supabase } = resolved;
 
   const body = await req.json();
-  const { currentPassword, newPassword, kioskEnabled, saturday_logic_enabled } = body as {
+  const { currentPassword, newPassword, kioskEnabled, saturday_logic_enabled, ui_theme } = body as {
     currentPassword?: string;
     newPassword?: string;
     kioskEnabled?: boolean;
     saturday_logic_enabled?: boolean;
+    ui_theme?: string;
   };
 
   const updates: Record<string, unknown> = {};
@@ -68,6 +71,9 @@ export async function PUT(req: NextRequest) {
   }
   if (saturday_logic_enabled !== undefined) {
     updates.saturday_logic_enabled = saturday_logic_enabled;
+  }
+  if (ui_theme !== undefined) {
+    updates.ui_theme = ui_theme;
   }
 
   if (Object.keys(updates).length === 0) {

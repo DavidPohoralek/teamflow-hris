@@ -11,6 +11,7 @@ import ManagerPanel from '@/components/ManagerPanel'
 import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistant from '@/components/ShiftAssistant'
+import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
 
 type Tab = 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'vacation' | 'analytics' | 'management' | 'assistant'
 
@@ -52,6 +53,7 @@ export default function HomePage() {
   const [orgId, setOrgId] = useState<string | null>(null)
   const [orgName, setOrgName] = useState<string>('')
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null)
+  const [theme, setTheme] = useState<Theme>(DEFAULT_THEME)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -67,6 +69,13 @@ export default function HomePage() {
     const m = String(now.getMonth() + 1).padStart(2, '0')
     return `${y}-${m}`
   })
+
+  // Live theme change from settings panel
+  useEffect(() => {
+    const handler = (e: Event) => setTheme(getTheme((e as CustomEvent).detail))
+    window.addEventListener('tf:theme-change', handler)
+    return () => window.removeEventListener('tf:theme-change', handler)
+  }, [])
 
   // Load org + manager session on mount
   useEffect(() => {
@@ -102,6 +111,13 @@ export default function HomePage() {
       fetch(`/api/public/org-logo?orgId=${data.id}`)
         .then(r => r.json())
         .then((d: { logoUrl: string | null }) => setOrgLogoUrl(d.logoUrl ?? null))
+        .catch(() => {})
+      // Load theme from public settings
+      fetch(`/api/public/company-settings?orgId=${data.id}`)
+        .then(r => r.json())
+        .then((d: Record<string, string>) => {
+          if (d.ui_theme) setTheme(getTheme(d.ui_theme))
+        })
         .catch(() => {})
     } catch {
       if (showLoadingSpinner) {
@@ -155,7 +171,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Navbar */}
-      <nav className="bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-xl border-b border-slate-700/50 z-10">
+      <nav className={`${theme.navBg} text-white shadow-xl border-b ${theme.navBorder} z-10`}>
         <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-6">
           {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
@@ -194,7 +210,7 @@ export default function HomePage() {
             </div>
 
           {/* Divider + org logo */}
-          <div className="h-6 w-px bg-slate-600" />
+          <div className={`h-6 w-px ${theme.divider}`} />
           {orgLogoUrl
             ? /* eslint-disable-next-line @next/next/no-img-element */
               <img src={orgLogoUrl} alt={orgName} className="h-8 w-auto max-w-[140px] object-contain" />

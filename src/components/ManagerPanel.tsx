@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
+import ThemeSelector from './ThemeSelector';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1036,6 +1037,11 @@ function SettingsTab() {
       {/* Logo */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <OrgLogoUpload />
+      </section>
+
+      {/* Theme */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <ThemeSelector onThemeChange={key => window.dispatchEvent(new CustomEvent('tf:theme-change', { detail: key }))} />
       </section>
 
       {/* Integrations */}
