@@ -84,15 +84,13 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ ok: true, result: 'declined' });
   }
 
-  // Accept — write to work_plans (idempotent)
+  // Accept — write to work_plans (idempotent by org+employee+date)
   const { data: existing } = await sb
     .from('work_plans')
     .select('id')
     .eq('organization_id', offer.org_id)
     .eq('employee_id', offer.employee_id)
     .eq('date', offer.date)
-    .eq('type', 'draft')
-    .eq('draft_label', offer.draft_label)
     .maybeSingle();
 
   if (!existing) {
@@ -101,8 +99,6 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       employee_id:     offer.employee_id,
       date:            offer.date,
       work_type:       offer.work_type ?? 'Prodejna',
-      type:            'draft',
-      draft_label:     offer.draft_label,
       notes:           offer.notes ?? 'Přijato zaměstnancem',
       active:          true,
     });
