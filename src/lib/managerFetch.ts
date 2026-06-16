@@ -19,6 +19,8 @@ export async function managerFetch(url: string, options: RequestInit = {}): Prom
     }
   }
   if (token) headers['Manager-Token'] = token
-  if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
+  if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
+  }
   return fetch(url, { ...options, headers })
 }
