@@ -21,12 +21,14 @@ export async function resolveOrgId(req: { headers: { get(k: string): string | nu
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'Nepřihlášený uživatel.', status: 401 }
 
-  const { data: profile } = await supabase
+  // Use service role to read profile — bypasses RLS reliably
+  const serviceClient = getServiceClient()
+  const { data: profile } = await serviceClient
     .from('profiles')
     .select('organization_id')
     .eq('id', user.id)
     .single()
   if (!profile?.organization_id) return { error: 'Organizace nenalezena.', status: 404 }
 
-  return { orgId: profile.organization_id, supabase: supabase as ServiceClient }
+  return { orgId: profile.organization_id, supabase: serviceClient as ServiceClient }
 }
