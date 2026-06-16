@@ -78,15 +78,20 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function ManagerPanel({ onClose }: ManagerPanelProps) {
+export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     managerFetch('/api/requests?status=pending')
       .then((r) => r.json())
       .then((d) => setPendingCount((d.requests ?? []).length))
+      .catch(() => {});
+    managerFetch('/api/notifications')
+      .then((r) => r.json())
+      .then((d) => setUnreadCount((d.notifications ?? []).filter((n: { read: boolean }) => !n.read).length))
       .catch(() => {});
   }, []);
 
@@ -94,6 +99,7 @@ export default function ManagerPanel({ onClose }: ManagerPanelProps) {
     { id: 'employees' as const, label: t('Zaměstnanci', 'Employees'), icon: '👥' },
     { id: 'work-types' as const, label: t('Typy práce', 'Work Types'), icon: '🏷️' },
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
+    { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     { id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' },
   ];
 
@@ -121,6 +127,11 @@ export default function ManagerPanel({ onClose }: ManagerPanelProps) {
               {tab.id === 'requests' && pendingCount > 0 && (
                 <span className="flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold">
                   {pendingCount}
+                </span>
+              )}
+              {tab.id === 'notifications' && unreadCount > 0 && (
+                <span className="flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">
+                  {unreadCount}
                 </span>
               )}
             </button>
@@ -160,6 +171,7 @@ export default function ManagerPanel({ onClose }: ManagerPanelProps) {
           {activeTab === 'employees' && <EmployeesTab />}
           {activeTab === 'work-types' && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab />}
+          {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && <SettingsTab />}
         </div>
       </div>
@@ -1447,4 +1459,81 @@ function inputCls(error?: string) {
   return `block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
     error ? 'border-red-400 focus:ring-red-400' : 'border-gray-300'
   }`;
+}
+
+// ─── Notifications Tab ────────────────────────────────────────────────────────
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+function NotificationsTab({ onRead }: { onRead: () => void }) {
+  const t = useT();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    managerFetch('/api/notifications')
+      .then(r => r.json())
+      .then(d => {
+        setNotifications(d.notifications ?? []);
+        // Mark all as read
+        const hasUnread = (d.notifications ?? []).some((n: Notification) => !n.read);
+        if (hasUnread) {
+          managerFetch('/api/notifications', { method: 'PATCH' }).catch(() => {});
+          onRead();
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) return <div className="p-6 text-slate-500 text-sm">{t('Načítám…', 'Loading…')}</div>;
+
+  return (
+    <div className="p-6 max-w-2xl">
+      <p className="text-sm text-slate-500 mb-4">
+        {t('Notifikace od zaměstnanců o přijatých a odmítnutých směnách.', 'Notifications from employees about accepted and declined shifts.')}
+      </p>
+
+      {notifications.length === 0 ? (
+        <div className="text-center py-16 text-slate-400">
+          <div className="text-4xl mb-3">🔔</div>
+          <p className="font-medium">{t('Žádné notifikace', 'No notifications')}</p>
+          <p className="text-sm mt-1">{t('Notifikace se zobrazí, když zaměstnanec přijme nebo odmítne nabídku směny.', 'Notifications appear when an employee accepts or declines a shift offer.')}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {notifications.map(n => (
+            <div
+              key={n.id}
+              className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${
+                n.read ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'
+              }`}
+            >
+              <div className="text-xl mt-0.5">{n.title.startsWith('✅') ? '✅' : '❌'}</div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-slate-800 text-sm">{n.title.replace(/^[✅❌]\s*/, '')}</p>
+                <p className="text-slate-600 text-sm mt-0.5">{n.message}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {new Date(n.created_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              {!n.read && (
+                <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-medium shrink-0">
+                  {t('Nové', 'New')}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

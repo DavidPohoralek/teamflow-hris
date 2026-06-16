@@ -63,6 +63,7 @@ export default function HomePage() {
   const [isManagerMode, setIsManagerMode] = useState(false)
   const [showManagerLogin, setShowManagerLogin] = useState(false)
   const [showManagerPanel, setShowManagerPanel] = useState(false)
+  const [managerPanelTab, setManagerPanelTab] = useState<'notifications' | undefined>(undefined)
 
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
@@ -324,11 +325,18 @@ export default function HomePage() {
         )}
 
         {activeTab === 'assistant' && isManagerMode && (
-          <ShiftAssistant orgId={orgId} month={currentMonth} />
+          <ShiftAssistant
+            orgId={orgId}
+            month={currentMonth}
+            onOpenNotifications={() => {
+              setManagerPanelTab('notifications');
+              setShowManagerPanel(true);
+            }}
+          />
         )}
 
         {activeTab === 'management' && isManagerMode && (
-          <ManagerPanel orgId={orgId} onClose={() => setActiveTab('schedule')} />
+          <ManagerPanel orgId={orgId} onClose={() => setActiveTab('schedule')} initialTab={managerPanelTab} />
         )}
       </main>
 

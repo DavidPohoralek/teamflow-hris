@@ -3,54 +3,20 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 async function notifyManager(sb: SupabaseClient, offer: { org_id: string; employee_id: string; date: string; work_type?: string | null }, result: 'accepted' | 'declined') {
   try {
-    // Get manager email from profiles (role = owner/manager)
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('email')
-      .eq('organization_id', offer.org_id)
-      .eq('role', 'owner')
-      .maybeSingle();
-    if (!profile?.email) return;
-
-    // Get employee name
     const { data: emp } = await sb.from('employees').select('name').eq('id', offer.employee_id).maybeSingle();
     const employeeName = emp?.name ?? 'Zaměstnanec';
     const action = result === 'accepted' ? 'přijal/a' : 'odmítl/a';
-    const botUrl = process.env.BOT_SERVICE_URL;
-    if (!botUrl) return;
+    const icon = result === 'accepted' ? '✅' : '❌';
 
-    // Get Resend integration for this org
-    const { data: integration } = await sb
-      .from('org_integrations')
-      .select('value')
-      .eq('organization_id', offer.org_id)
-      .eq('key', 'resend_api_key')
-      .maybeSingle();
-    if (!integration?.value) return;
-
-    const { data: fromInt } = await sb
-      .from('org_integrations')
-      .select('value')
-      .eq('organization_id', offer.org_id)
-      .eq('key', 'resend_from_email')
-      .maybeSingle();
-
-    await fetch(`${botUrl}/notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        channel: 'email',
-        email: {
-          to: profile.email,
-          subject: `Směna ${offer.date} — ${action} ${employeeName}`,
-          message: `${employeeName} ${action} směnu na ${offer.date}${offer.work_type ? ` (${offer.work_type})` : ''}.`,
-          apiKey: integration.value,
-          from: fromInt?.value ?? `noreply@tmflw.com`,
-        },
-      }),
+    await sb.from('notifications').insert({
+      organization_id: offer.org_id,
+      type: `shift_${result}`,
+      title: `${icon} Směna ${result === 'accepted' ? 'přijata' : 'odmítnuta'}`,
+      message: `${employeeName} ${action} směnu na ${offer.date}${offer.work_type ? ` (${offer.work_type})` : ''}.`,
+      read: false,
     });
   } catch {
-    // Non-critical — don't fail the main request if notification fails
+    // Non-critical
   }
 }
 

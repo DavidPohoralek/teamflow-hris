@@ -238,7 +238,7 @@ function confidenceColor(c: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ShiftAssistant({ orgId, month }: Props) {
+export default function ShiftAssistant({ orgId, month, onOpenNotifications }: Props & { onOpenNotifications?: () => void }) {
   const t = useT();
   const [license, setLicense] = useState<LicenseState>({ checked: false, licensed: false });
   const [draft, setDraft] = useState<'A' | 'B'>('A');
@@ -250,6 +250,14 @@ export default function ShiftAssistant({ orgId, month }: Props) {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: { id: string; reason: string }[] } | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    managerFetch('/api/notifications')
+      .then(r => r.json())
+      .then(d => setUnreadCount((d.notifications ?? []).filter((n: { read: boolean }) => !n.read).length))
+      .catch(() => {});
+  }, [orgId]);
 
   const storageKey = `tf_assistant_${orgId}_${month}_${draft}`;
 
@@ -414,6 +422,20 @@ export default function ShiftAssistant({ orgId, month }: Props) {
         </div>
 
         <div className="flex items-center gap-3">
+          {onOpenNotifications && (
+            <button
+              onClick={() => { setUnreadCount(0); onOpenNotifications(); }}
+              className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"
+              title={t('Notifikace', 'Notifications')}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <label className="text-sm text-slate-600 font-medium">Draft:</label>
           <select
             value={draft}
