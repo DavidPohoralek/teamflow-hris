@@ -9,11 +9,15 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from('company_settings')
-    .select('key, value')
-    .eq('organization_id', orgId);
-  const settings: Record<string, string> = {};
-  for (const row of data ?? []) settings[row.key] = row.value;
-  return NextResponse.json(settings);
+    .select('kiosk_enabled, ui_theme')
+    .eq('organization_id', orgId)
+    .single();
+  if (!data) return NextResponse.json({});
+  const row = data as { kiosk_enabled: boolean | null; ui_theme: string | null };
+  return NextResponse.json({
+    kiosk_enabled: row.kiosk_enabled ?? false,
+    ui_theme: row.ui_theme ?? 'slate',
+  });
 }

@@ -171,7 +171,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Navbar */}
-      <nav className={`${theme.navBg} text-white shadow-xl border-b ${theme.navBorder} z-10`}>
+      <nav className={`${theme.navBg} ${theme.navText} shadow-xl border-b ${theme.navBorder} z-10`}>
         <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-6">
           {/* Logo */}
           <div className="flex items-center gap-3 shrink-0">
@@ -219,7 +219,7 @@ export default function HomePage() {
 
           {/* Tabs — center */}
           <div className="flex-1 flex justify-center">
-            <div className="flex items-center bg-slate-800/60 rounded-xl p-1 gap-0.5 border border-slate-700/50">
+            <div className={`flex items-center rounded-xl p-1 gap-0.5 ${theme.tabsBg}`}>
               {[...BASE_TABS, ...(isManagerMode ? MANAGER_TABS : [])].map((tab) => (
                 <button
                   key={tab.id}
@@ -227,7 +227,7 @@ export default function HomePage() {
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 whitespace-nowrap
                     ${activeTab === tab.id
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                      : theme.tabInactive
                     }`}
                 >
                   <span className="text-base">{tab.icon}</span>
@@ -247,7 +247,7 @@ export default function HomePage() {
                 </div>
                 <button
                   onClick={handleManagerLogout}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white transition-all"
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}
                 >
                   Odhlásit
                 </button>
@@ -255,7 +255,7 @@ export default function HomePage() {
             ) : (
               <button
                 onClick={() => setShowManagerLogin(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700/60 border border-slate-600/50 text-slate-300 hover:bg-slate-600 hover:text-white hover:border-slate-500 transition-all duration-200"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${theme.managerBtnClass}`}
               >
                 <span>🔐</span>
                 <span>Manažer</span>
