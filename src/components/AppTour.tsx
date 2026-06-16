@@ -1,10 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const PRICING_URL = 'https://selbickylabs.com/#teamflow';
 
-interface Step {
+// ─── CS video steps ────────────────────────────────────────────────────────────
+// 5 videos → 7 total steps (welcome + 5 videos + done)
+
+interface VideoStep {
+  type: 'video';
+  icon: string;
+  title: string;
+  desc: string;
+  videoSrc: string;
+}
+
+interface TextStep {
+  type: 'text';
   icon: string;
   titleCs: string;
   titleEn: string;
@@ -12,108 +24,145 @@ interface Step {
   descEn: string;
   hintCs?: string;
   hintEn?: string;
-  target?: 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'manager' | 'management' | 'done';
+  targetLabel?: string;
 }
 
-const STEPS: Step[] = [
+interface WelcomeStep { type: 'welcome' }
+interface DoneStep { type: 'done' }
+
+type Step = WelcomeStep | VideoStep | TextStep | DoneStep;
+
+const CS_STEPS: Step[] = [
+  { type: 'welcome' },
   {
-    icon: '👋',
-    titleCs: 'Vítejte v TeamFlow!',
-    titleEn: 'Welcome to TeamFlow!',
-    descCs: 'Provedeme vás základy systému. Průvodce trvá přibližně 2 minuty a ukáže vám vše potřebné.',
-    descEn: 'We\'ll guide you through the basics. This walkthrough takes about 2 minutes.',
+    type: 'video',
+    icon: '📅',
+    title: 'Přehled a plánování směn',
+    desc: 'Jak vypadá hlavní rozhraní a jak se orientovat v plánování směn.',
+    videoSrc: '/videos/tour/tour-1.mp4',
   },
   {
+    type: 'video',
+    icon: '✏️',
+    title: 'Přiřazování a správa zaměstnanců',
+    desc: 'Jak přiřadit zaměstnance na směnu a spravovat jejich rozvrh.',
+    videoSrc: '/videos/tour/tour-2.mp4',
+  },
+  {
+    type: 'video',
+    icon: '📋',
+    title: 'Kopírování a rychlé plánování',
+    desc: 'Jak využít kopírování směn pro urychlení tvorby rozvrhu.',
+    videoSrc: '/videos/tour/tour-3.mp4',
+  },
+  {
+    type: 'video',
+    icon: '👤',
+    title: 'Portál zaměstnance a docházka',
+    desc: 'Co vidí zaměstnanec po přihlášení a jak funguje docházkový kiosek.',
+    videoSrc: '/videos/tour/tour-4.mp4',
+  },
+  {
+    type: 'video',
+    icon: '🔐',
+    title: 'Manažerský přístup a správa systému',
+    desc: 'Jak se přihlásit jako manažer a co najdete ve správě systému.',
+    videoSrc: '/videos/tour/tour-5.mp4',
+  },
+  { type: 'done' },
+];
+
+const EN_STEPS: Step[] = [
+  { type: 'welcome' },
+  {
+    type: 'text',
     icon: '📅',
     titleCs: 'Plánování směn',
     titleEn: 'Shift planning',
     descCs: 'Záložka Směny zobrazuje plán celého týmu. Každý sloupec = den, každý řádek = zaměstnanec.',
     descEn: 'The Shifts tab shows the full team plan. Each column = day, each row = employee.',
-    hintCs: 'Klikněte na záložku "Směny" v horní liště a prohlédněte si tabulku.',
     hintEn: 'Click the "Shifts" tab in the top bar and explore the grid.',
-    target: 'schedule',
+    targetLabel: 'Tab: Shifts',
   },
   {
+    type: 'text',
     icon: '✏️',
     titleCs: 'Přiřazení zaměstnance',
     titleEn: 'Assigning employees',
-    descCs: 'Klikněte na libovolnou buňku v tabulce směn pro přiřazení zaměstnance na daný den. Buňky lze také kopírovat přetažením.',
-    descEn: 'Click any cell in the shift grid to assign an employee to that day. Cells can also be copied by dragging.',
-    hintCs: 'Zkuste kliknout na prázdnou buňku v tabulce.',
-    hintEn: 'Try clicking an empty cell in the grid.',
-    target: 'schedule',
+    descCs: 'Klikněte na libovolnou buňku pro přiřazení zaměstnance. Buňky lze kopírovat přetažením.',
+    descEn: 'Click any cell to assign an employee. Cells can be copied by dragging.',
+    hintEn: 'Try clicking an empty cell in the shift grid.',
+    targetLabel: 'Tab: Shifts',
   },
   {
+    type: 'text',
     icon: '📊',
     titleCs: 'Přehled přítomnosti',
     titleEn: 'Attendance overview',
-    descCs: 'Záložka Přehled ukazuje kdo je aktuálně přihlášen na směně a stav docházky v reálném čase.',
+    descCs: 'Záložka Přehled ukazuje kdo je aktuálně přihlášen na směně.',
     descEn: 'The Overview tab shows who is currently clocked in and live attendance status.',
-    hintCs: 'Přejděte na záložku "Přehled".',
     hintEn: 'Switch to the "Overview" tab.',
-    target: 'overview',
+    targetLabel: 'Tab: Overview',
   },
   {
+    type: 'text',
     icon: '👤',
     titleCs: 'Portál zaměstnance',
     titleEn: 'Employee portal',
-    descCs: 'Záložka Zaměstnanec umožňuje každému vidět své hodiny, naplánované směny a žádat o dovolenou — bez sdílení hesel.',
-    descEn: 'The Employee tab lets each person see their hours, planned shifts and request leave — without sharing passwords.',
-    hintCs: 'Přejděte na záložku "Zaměstnanec".',
+    descCs: 'Záložka Zaměstnanec — osobní přehled hodin, směn a žádostí o dovolenou.',
+    descEn: 'The Employee tab shows personal hours, shifts and leave requests without sharing passwords.',
     hintEn: 'Switch to the "Employee" tab.',
-    target: 'my-hours',
+    targetLabel: 'Tab: Employee',
   },
   {
+    type: 'text',
     icon: '⏰',
     titleCs: 'Docházkový kiosek',
     titleEn: 'Attendance kiosk',
-    descCs: 'Záložka Docházka slouží jako kiosek — zaměstnanec se přihlásí PIN kódem a označí příchod/odchod.',
+    descCs: 'Záložka Docházka — zaměstnanec se přihlásí PIN kódem a označí příchod/odchod.',
     descEn: 'The Attendance tab works as a kiosk — employees clock in/out using their PIN code.',
-    hintCs: 'Záložka "Docházka" funguje i na tabletu umístěném u vchodu.',
-    hintEn: 'The "Attendance" tab works great on a tablet placed at the entrance.',
-    target: 'attendance',
+    hintEn: 'Works great on a tablet placed at the entrance.',
+    targetLabel: 'Tab: Attendance',
   },
   {
+    type: 'text',
     icon: '🔐',
     titleCs: 'Manažerský přístup',
     titleEn: 'Manager access',
-    descCs: 'Klikněte na tlačítko "Manažer" vpravo nahoře a zadejte manažerské heslo. Odemknete tím záložky Analytika, Asistent a Správa.',
-    descEn: 'Click the "Manager" button top-right and enter the manager password to unlock Analytics, Assistant and Management tabs.',
-    hintCs: 'Tlačítko "Manažer" je v pravém horním rohu navigace.',
+    descCs: 'Klikněte na "Manažer" vpravo nahoře, zadejte heslo. Odemknete Analytiku, Asistenta a Správu.',
+    descEn: 'Click "Manager" top-right, enter your password to unlock Analytics, Assistant and Management.',
     hintEn: 'The "Manager" button is in the top-right of the navigation bar.',
-    target: 'manager',
+    targetLabel: 'Button: Manager (top right)',
   },
-  {
-    icon: '⚙️',
-    titleCs: 'Správa systému',
-    titleEn: 'System management',
-    descCs: 'V záložce Správa nastavíte zaměstnance, typy práce, notifikace, šablony směn a vše ostatní. Je dostupná jen pro manažera.',
-    descEn: 'The Management tab lets you configure employees, work types, notifications, shift templates and everything else. Manager-only.',
-    hintCs: 'Po přihlášení jako manažer se záložka "Správa" zobrazí v navigaci.',
-    hintEn: 'After logging in as manager, the "Management" tab appears in the navigation.',
-    target: 'management',
-  },
-  {
-    icon: '🎉',
-    titleCs: 'Jste připraveni!',
-    titleEn: 'You\'re all set!',
-    descCs: 'Zvládli jste základy TeamFlow. Teď si vyberte předplatné, které vám nejvíce vyhovuje, a začněte plánovat.',
-    descEn: 'You\'ve mastered the basics of TeamFlow. Now choose the subscription that fits you best and start planning.',
-    hintCs: 'Základní plán nebo plán s AI asistentem pro pokročilé plánování.',
-    hintEn: 'Standard plan or plan with AI Assistant for advanced scheduling.',
-    target: 'done',
-  },
+  { type: 'done' },
 ];
 
-const TARGET_LABELS: Record<string, { cs: string; en: string }> = {
-  schedule: { cs: 'Záložka: Směny', en: 'Tab: Shifts' },
-  attendance: { cs: 'Záložka: Docházka', en: 'Tab: Attendance' },
-  overview: { cs: 'Záložka: Přehled', en: 'Tab: Overview' },
-  'my-hours': { cs: 'Záložka: Zaměstnanec', en: 'Tab: Employee' },
-  manager: { cs: 'Tlačítko: Manažer (vpravo nahoře)', en: 'Button: Manager (top right)' },
-  management: { cs: 'Záložka: Správa', en: 'Tab: Management' },
-  done: { cs: 'Konec průvodce', en: 'End of tour' },
-};
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function VideoPlayer({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {});
+    }
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      className="w-full rounded-xl bg-slate-900 max-h-56 object-contain"
+      controls
+      playsInline
+      muted
+      autoPlay
+    />
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
   lang: 'cs' | 'en';
@@ -121,10 +170,11 @@ interface Props {
 }
 
 export default function AppTour({ lang, onClose }: Props) {
-  const [step, setStep] = useState(0);
-  const total = STEPS.length;
-  const current = STEPS[step];
-  const isLast = step === total - 1;
+  const steps = lang === 'cs' ? CS_STEPS : EN_STEPS;
+  const [stepIndex, setStepIndex] = useState(0);
+  const total = steps.length;
+  const current = steps[stepIndex];
+  const isLast = stepIndex === total - 1;
 
   const t = (cs: string, en: string) => lang === 'en' ? en : cs;
 
@@ -134,7 +184,7 @@ export default function AppTour({ lang, onClose }: Props) {
       onClose();
       window.location.href = PRICING_URL;
     } else {
-      setStep(s => s + 1);
+      setStepIndex(i => i + 1);
     }
   }
 
@@ -144,106 +194,151 @@ export default function AppTour({ lang, onClose }: Props) {
     window.location.href = PRICING_URL;
   }
 
-  // Prevent body scroll while tour is open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  const targetLabel = current.target ? TARGET_LABELS[current.target] : null;
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-8 px-4 pointer-events-none">
-      {/* Backdrop — only bottom portion, keep app visible above */}
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px] pointer-events-auto" onClick={() => {}} />
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-6 px-4 pointer-events-none">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] pointer-events-auto" />
 
-      {/* Tour card */}
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl pointer-events-auto border border-slate-200 overflow-hidden">
         {/* Progress bar */}
         <div className="h-1 bg-slate-100">
           <div
             className="h-full bg-blue-500 transition-all duration-500"
-            style={{ width: `${((step + 1) / total) * 100}%` }}
+            style={{ width: `${((stepIndex + 1) / total) * 100}%` }}
           />
         </div>
 
-        <div className="p-6">
-          {/* Step counter + skip */}
-          <div className="flex items-center justify-between mb-4">
+        <div className="p-5">
+          {/* Counter + skip */}
+          <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              {step + 1} / {total}
+              {stepIndex + 1} / {total}
             </span>
-            {!isLast && (
+            {!isLast && current.type !== 'welcome' && (
               <button onClick={handleSkip} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
                 {t('Přeskočit průvodce →', 'Skip tour →')}
               </button>
             )}
           </div>
 
-          {/* Icon + title */}
-          <div className="flex items-start gap-4 mb-4">
-            <div className="text-4xl flex-shrink-0 mt-0.5">{current.icon}</div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                {t(current.titleCs, current.titleEn)}
+          {/* ── Welcome step ── */}
+          {current.type === 'welcome' && (
+            <div className="text-center py-4">
+              <div className="text-5xl mb-3">🎓</div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                {t('Průvodce aplikací', 'App tour')}
               </h3>
-              <p className="text-slate-600 text-sm mt-1 leading-relaxed">
-                {t(current.descCs, current.descEn)}
-              </p>
-            </div>
-          </div>
-
-          {/* Target indicator */}
-          {targetLabel && current.target !== 'done' && (
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-4">
-              <span className="text-blue-500 text-sm">👆</span>
-              <span className="text-blue-700 text-xs font-semibold">{t(targetLabel.cs, targetLabel.en)}</span>
-            </div>
-          )}
-
-          {/* Hint */}
-          {(current.hintCs || current.hintEn) && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4">
-              <p className="text-amber-700 text-xs leading-relaxed">
-                💡 {t(current.hintCs ?? '', current.hintEn ?? '')}
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {t(
+                  'Provedeme vás základy TeamFlow pomocí krátkých videí. Celý průvodce trvá přibližně 2 minuty.',
+                  'We\'ll walk you through TeamFlow basics step by step. The tour takes about 2 minutes.'
+                )}
               </p>
             </div>
           )}
 
-          {/* Pricing CTA on last step */}
-          {isLast && (
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 mb-4 text-white">
-              <p className="font-semibold text-sm mb-2">{t('Vyberte si předplatné', 'Choose your plan')}</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-white/15 rounded-lg p-2.5">
-                  <p className="font-bold">Standard</p>
-                  <p className="opacity-80 mt-0.5">{t('Plánování, docházka, analytika', 'Scheduling, attendance, analytics')}</p>
+          {/* ── Video step (CS only) ── */}
+          {current.type === 'video' && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">{current.icon}</span>
+                <h3 className="text-base font-bold text-slate-900">{current.title}</h3>
+              </div>
+              <VideoPlayer src={current.videoSrc} />
+              <p className="text-slate-500 text-xs mt-2 leading-relaxed">{current.desc}</p>
+            </div>
+          )}
+
+          {/* ── Text step (EN) ── */}
+          {current.type === 'text' && (
+            <div>
+              <div className="flex items-start gap-3 mb-3">
+                <span className="text-3xl flex-shrink-0 mt-0.5">{current.icon}</span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {t(current.titleCs, current.titleEn)}
+                  </h3>
+                  <p className="text-slate-600 text-sm mt-1 leading-relaxed">
+                    {t(current.descCs, current.descEn)}
+                  </p>
                 </div>
-                <div className="bg-white/15 rounded-lg p-2.5 border border-white/30">
-                  <p className="font-bold flex items-center gap-1">Pro + AI <span className="text-amber-300">✦</span></p>
-                  <p className="opacity-80 mt-0.5">{t('Vše + AI asistent směn', 'Everything + AI shift assistant')}</p>
+              </div>
+              {current.targetLabel && (
+                <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mb-2">
+                  <span className="text-blue-500 text-sm">👆</span>
+                  <span className="text-blue-700 text-xs font-semibold">{current.targetLabel}</span>
+                </div>
+              )}
+              {(current.hintCs || current.hintEn) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    💡 {t(current.hintCs ?? '', current.hintEn ?? '')}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Done step ── */}
+          {current.type === 'done' && (
+            <div className="text-center py-2">
+              <div className="text-4xl mb-3">🎉</div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                {t('Jste připraveni!', 'You\'re all set!')}
+              </h3>
+              <p className="text-slate-500 text-sm mb-4">
+                {t(
+                  'Zvládli jste základy TeamFlow. Teď si vyberte předplatné.',
+                  'You\'ve mastered the basics. Now choose your plan.'
+                )}
+              </p>
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white text-left">
+                <p className="font-semibold text-sm mb-3">{t('Vyberte si předplatné', 'Choose your plan')}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white/15 rounded-lg p-3">
+                    <p className="font-bold text-sm">Standard</p>
+                    <p className="opacity-80 mt-1 leading-relaxed">
+                      {t('Plánování, docházka, analytika', 'Scheduling, attendance, analytics')}
+                    </p>
+                  </div>
+                  <div className="bg-white/15 rounded-lg p-3 border border-white/40 relative">
+                    <span className="absolute -top-2 -right-1 bg-amber-400 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {t('Doporučeno', 'Recommended')}
+                    </span>
+                    <p className="font-bold text-sm flex items-center gap-1">Pro + AI <span className="text-amber-300">✦</span></p>
+                    <p className="opacity-80 mt-1 leading-relaxed">
+                      {t('Vše + AI asistent směn', 'Everything + AI shift assistant')}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
           {/* Navigation */}
-          <div className="flex gap-3">
-            {step > 0 && (
-              <button onClick={() => setStep(s => s - 1)}
+          <div className="flex gap-3 mt-4">
+            {stepIndex > 0 && (
+              <button onClick={() => setStepIndex(i => i - 1)}
                 className="flex-1 py-2.5 px-4 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
                 ← {t('Zpět', 'Back')}
               </button>
             )}
             <button onClick={handleNext}
-              className={`py-2.5 px-4 rounded-xl text-sm font-semibold transition-colors ${
+              className={`py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
                 isLast
-                  ? 'flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25'
-                  : step === 0 ? 'flex-1 bg-blue-600 hover:bg-blue-700 text-white' : 'flex-1 bg-blue-600 hover:bg-blue-700 text-white'
+                  ? 'flex-1 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white shadow-lg shadow-blue-500/25'
+                  : 'flex-1 bg-blue-600 hover:bg-blue-700 text-white'
               }`}>
               {isLast
                 ? t('Vybrat předplatné →', 'Choose plan →')
-                : t('Další →', 'Next →')}
+                : current.type === 'welcome'
+                  ? t('Začít průvodce →', 'Start tour →')
+                  : t('Další →', 'Next →')
+              }
             </button>
           </div>
         </div>
