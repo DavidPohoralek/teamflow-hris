@@ -1,0 +1,1219 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { managerFetch } from '@/lib/managerFetch';
+import PinPad from './PinPad';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface WorkPlanEntry {
+  id: string;
+  date: string;
+  employeeId: string;
+  employeeName: string | null;
+  workType: string | null;
+  workTypeId: string | null;
+  workTypeName: string | null;
+  workTypeColor: string | null;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+interface ScheduleDayMeta {
+  date: string;
+  dayType: string;
+  requiredTotal: number;
+  assignedCount: number;
+  notes?: string | null;
+  assigned_employees?: { id: string; name: string }[];
+}
+
+interface WorkType {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  category: string | null;
+  sort_order: number | null;
+}
+
+interface ScheduleData {
+  month: string;
+  workPlans: WorkPlanEntry[];
+  scheduleDays: ScheduleDayMeta[];
+}
+
+interface WorkPlanGridProps {
+  orgId: string;
+  month: string; // YYYY-MM
+  isManagerMode: boolean;
+  onMonthChange: (month: string) => void;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const CZ_MONTHS = [
+  'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
+  'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec',
+];
+
+const DAY_NAMES_SHORT = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+
+const DAY_TYPE_OPTIONS = [
+  { value: 'working', label: 'Pracovní' },
+  { value: 'holiday', label: 'Svátek' },
+  { value: 'closed', label: 'Zavřeno' },
+];
+
+function formatMonthLabel(month: string): string {
+  const [year, m] = month.split('-').map(Number);
+  return `${CZ_MONTHS[m - 1]} ${year}`;
+}
+
+function prevMonth(month: string): string {
+  const [year, m] = month.split('-').map(Number);
+  const d = new Date(year, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function nextMonth(month: string): string {
+  const [year, m] = month.split('-').map(Number);
+  const d = new Date(year, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Returns Monday-based weekday index 0–6 for a date string YYYY-MM-DD */
+function mondayWeekday(dateStr: string): number {
+  const d = new Date(dateStr + 'T00:00:00');
+  return (d.getDay() + 6) % 7; // 0=Mon … 6=Sun
+}
+
+function buildCalendarDays(month: string): string[] {
+  const [year, m] = month.split('-').map(Number);
+  const lastDay = new Date(year, m, 0).getDate();
+  const days: string[] = [];
+  for (let d = 1; d <= lastDay; d++) {
+    days.push(`${month}-${String(d).padStart(2, '0')}`);
+  }
+  return days;
+}
+
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+interface ToastProps {
+  message: string;
+  onDone: () => void;
+}
+
+function Toast({ message, onDone }: ToastProps) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div className="fixed top-5 right-5 z-[200] flex items-center gap-2 bg-green-600 text-white text-sm font-semibold px-4 py-3 rounded-xl shadow-xl shadow-green-900/20 animate-[fadeInDown_0.25s_ease]">
+      <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+      </svg>
+      {message}
+    </div>
+  );
+}
+
+// ─── AddShiftModal ────────────────────────────────────────────────────────────
+
+interface Employee {
+  id: string;
+  name: string;
+}
+
+interface AddShiftModalProps {
+  orgId: string;
+  defaultDate: string;
+  workTypes: WorkType[];
+  isManagerMode: boolean;
+  sessionPin?: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPin, onClose, onSuccess }: AddShiftModalProps) {
+  const [date, setDate] = useState(defaultDate);
+  const [workTypeId, setWorkTypeId] = useState(workTypes[0]?.id ?? '');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Sync workTypeId when workTypes loads after modal opens
+  useEffect(() => {
+    if (!workTypeId && workTypes.length > 0) {
+      setWorkTypeId(workTypes[0].id);
+    }
+  }, [workTypes, workTypeId]);
+
+  // Manager mode: employee picker
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+
+  useEffect(() => {
+    if (!isManagerMode) return;
+    managerFetch('/api/employees')
+      .then((r) => r.json())
+      .then((data: { employees?: Employee[] } | Employee[]) => {
+        const list = Array.isArray(data) ? data : (data as { employees?: Employee[] }).employees ?? [];
+        setEmployees(list);
+        if (list[0]) setSelectedEmployeeId(list[0].id);
+      })
+      .catch(() => {});
+  }, [isManagerMode]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workTypeId) { setError('Vyberte prosím typ práce.'); return; }
+
+    if (isManagerMode) {
+      if (!selectedEmployeeId) { setError('Vyberte zaměstnance.'); return; }
+      setSubmitting(true);
+      setError(null);
+      try {
+        const res = await managerFetch('/api/public/work-plans', {
+          method: 'POST',
+          body: JSON.stringify({
+            orgId,
+            employeeId: selectedEmployeeId,
+            date,
+            workTypeId,
+            startTime: startTime || undefined,
+            endTime: endTime || undefined,
+            note: note || undefined,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error ?? 'Nepodařilo se přidat směnu.'); }
+        else { onSuccess(); onClose(); }
+      } catch { setError('Síťová chyba. Zkuste to znovu.'); }
+      finally { setSubmitting(false); }
+    } else {
+      const usedPin = sessionPin || pin.trim();
+      if (!usedPin) { setError('Zadejte prosím svůj PIN.'); return; }
+      setSubmitting(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/public/schedule/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orgId, pin: usedPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined }),
+        });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error ?? 'Nepodařilo se přidat směnu.'); }
+        else { onSuccess(); onClose(); }
+      } catch { setError('Síťová chyba. Zkuste to znovu.'); }
+      finally { setSubmitting(false); }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold text-gray-800">Přidat směnu</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Zavřít">×</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Datum</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" />
+          </div>
+
+          {/* Manager: employee dropdown | Employee: PIN (only if no session) */}
+          {isManagerMode ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Zaměstnanec</label>
+              <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {employees.length === 0 && <option value="">Načítám…</option>}
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : !sessionPin ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Váš PIN</label>
+              <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="••••" autoComplete="off" />
+            </div>
+          ) : null}
+
+          {/* Work type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Typ práce</label>
+            <div className="flex flex-wrap gap-2">
+              {workTypes.map((wt) => (
+                <button key={wt.id} type="button" onClick={() => setWorkTypeId(wt.id)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border-l-4 transition-colors ${workTypeId === wt.id ? 'bg-blue-50 border-blue-500 text-blue-800 ring-1 ring-blue-300' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                  style={workTypeId !== wt.id && wt.color ? { borderLeftColor: wt.color } : undefined}>
+                  {wt.name}
+                </button>
+              ))}
+              {workTypes.length === 0 && <p className="text-sm text-gray-400">Žádné typy práce nenalezeny.</p>}
+            </div>
+          </div>
+
+          {/* Times */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Začátek</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Konec</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+
+          {/* Note */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Poznámka (nepovinné)</label>
+            <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Volitelná poznámka…" />
+          </div>
+
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Zrušit</button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {submitting ? 'Ukládám…' : 'Přidat směnu'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── EditDayModal ─────────────────────────────────────────────────────────────
+
+interface EditDayModalProps {
+  orgId: string;
+  dateStr: string;
+  meta: ScheduleDayMeta | undefined;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function EditDayModal({ orgId, dateStr, meta, onClose, onSuccess }: EditDayModalProps) {
+  const [requiredTotal, setRequiredTotal] = useState<number>(meta?.requiredTotal ?? 1);
+  const [dayType, setDayType] = useState<string>(meta?.dayType ?? 'working');
+  const [notes, setNotes] = useState<string>(meta?.notes ?? '');
+  const [assignedEmployees, setAssignedEmployees] = useState<{ id: string; name: string }[]>(
+    meta?.assigned_employees ?? []
+  );
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [addEmpId, setAddEmpId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    managerFetch('/api/employees')
+      .then((r) => r.json())
+      .then((data: { employees?: Employee[] } | Employee[]) => {
+        const list = Array.isArray(data) ? data : (data as { employees?: Employee[] }).employees ?? [];
+        setAllEmployees(list);
+        const firstAvail = list.find((e) => !assignedEmployees.some((a) => a.id === e.id));
+        if (firstAvail) setAddEmpId(firstAvail.id);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId]);
+
+  const handleAddEmployee = () => {
+    const emp = allEmployees.find((e) => e.id === addEmpId);
+    if (!emp || assignedEmployees.some((a) => a.id === emp.id)) return;
+    const name = emp.name;
+    setAssignedEmployees((prev) => [...prev, { id: emp.id, name }]);
+    const next = allEmployees.find((e) => e.id !== addEmpId && !assignedEmployees.some((a) => a.id === e.id));
+    if (next) setAddEmpId(next.id);
+  };
+
+  const handleRemoveEmployee = (id: string) => {
+    setAssignedEmployees((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/schedule/${encodeURIComponent(dateStr)}?draft=A`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requiredTotal,
+          dayType,
+          notes: notes || undefined,
+          assignedEmployees: assignedEmployees.map((e) => e.id),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? 'Nepodařilo se uložit změny.');
+      } else {
+        onSuccess();
+        onClose();
+      }
+    } catch {
+      setError('Síťová chyba. Zkuste to znovu.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">Upravit den</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{dateStr}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            aria-label="Zavřít"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Required staff */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Požadovaný počet zaměstnanců</label>
+            <input
+              type="number"
+              min={0}
+              value={requiredTotal}
+              onChange={(e) => setRequiredTotal(Number(e.target.value))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Day type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Typ dne</label>
+            <div className="flex gap-2">
+              {DAY_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setDayType(opt.value)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                    dayType === opt.value
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Poznámky</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              placeholder="Volitelná poznámka ke dni…"
+            />
+          </div>
+
+          {/* Assigned employees */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Přiřazení zaměstnanci</label>
+            {assignedEmployees.length === 0 ? (
+              <p className="text-xs text-gray-400 italic mb-2">Žádní přiřazení zaměstnanci.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5 mb-2">
+                {assignedEmployees.map((emp) => (
+                  <div key={emp.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                    <span className="text-sm text-slate-700">{emp.name}</span>
+                    <button type="button" onClick={() => handleRemoveEmployee(emp.id)}
+                      className="text-slate-400 hover:text-red-500 transition-colors ml-2" aria-label={`Odebrat ${emp.name}`}>
+                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Add employee row */}
+            {allEmployees.length > 0 && (
+              <div className="flex gap-2">
+                <select value={addEmpId} onChange={(e) => setAddEmpId(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  {allEmployees
+                    .filter((e) => !assignedEmployees.some((a) => a.id === e.id))
+                    .map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+                <button type="button" onClick={handleAddEmployee}
+                  className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg border border-blue-200 transition-colors whitespace-nowrap">
+                  + Přidat
+                </button>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Zrušit
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {submitting ? 'Ukládám…' : 'Uložit'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── DayCard ──────────────────────────────────────────────────────────────────
+
+interface ClipboardEntry {
+  employeeId: string;
+  employeeName: string | null;
+  workTypeId: string | null;
+  workTypeName: string | null;
+  workTypeColor: string | null;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+interface DayCardProps {
+  dateStr: string;
+  entries: WorkPlanEntry[];
+  scheduleMeta: ScheduleDayMeta | undefined;
+  isManagerMode: boolean;
+  isWeekend: boolean;
+  isClosed?: boolean;
+  clipboard: ClipboardEntry | null;
+  sessionEmployeeId?: string;
+  onClickDay?: (dateStr: string) => void;
+  onEditDay?: (dateStr: string) => void;
+  onRemoveEmployee?: (dateStr: string, employeeId: string) => void;
+  onCopyEntry?: (entry: ClipboardEntry) => void;
+  onPaste?: (dateStr: string) => void;
+}
+
+function DayCard({
+  dateStr,
+  entries,
+  scheduleMeta,
+  isManagerMode,
+  isWeekend,
+  isClosed,
+  clipboard,
+  sessionEmployeeId,
+  onClickDay,
+  onEditDay,
+  onRemoveEmployee,
+  onCopyEntry,
+  onPaste,
+}: DayCardProps) {
+  const day = new Date(dateStr + 'T00:00:00');
+  const dayNum = day.getDate();
+  const dayName = DAY_NAMES_SHORT[mondayWeekday(dateStr)];
+  const isEmpty = entries.length === 0;
+  const isWeekendEmpty = isWeekend && isEmpty;
+  const isPasteMode = !!clipboard;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger if clicking a button inside
+    if ((e.target as HTMLElement).closest('button')) return;
+    if (isPasteMode && onPaste) {
+      onPaste(dateStr);
+    } else if (onClickDay) {
+      onClickDay(dateStr);
+    }
+  };
+
+  return (
+    <div
+      onClick={isClosed ? undefined : handleCardClick}
+      className={`group rounded-xl border min-h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative ${
+        isClosed
+          ? 'bg-slate-100 border-slate-200 cursor-default'
+          : isPasteMode
+          ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
+          : isWeekend
+          ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
+          : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
+      }`}
+    >
+      {isClosed && (
+        <span className="absolute top-1.5 right-1.5 text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+          Zavřeno
+        </span>
+      )}
+      {/* Manager edit button */}
+      {!isClosed && isManagerMode && !isPasteMode && onEditDay && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEditDay(dateStr); }}
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600"
+          aria-label={`Upravit den ${dateStr}`}
+          title="Upravit den"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
+        </button>
+      )}
+
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-0.5">
+        <span className={`text-xs font-semibold ${isWeekend ? 'text-slate-400' : 'text-slate-500'}`}>
+          {dayName}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {isManagerMode && scheduleMeta && (
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                scheduleMeta.assignedCount >= scheduleMeta.requiredTotal
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-orange-100 text-orange-600'
+              }`}
+            >
+              {scheduleMeta.assignedCount}/{scheduleMeta.requiredTotal}
+            </span>
+          )}
+          <span className={`text-sm font-bold ${isWeekend ? 'text-slate-400' : 'text-slate-700'} ${isManagerMode ? 'mr-5' : ''}`}>
+            {dayNum}
+          </span>
+        </div>
+      </div>
+
+      {/* Chips */}
+      <div className="flex flex-col gap-1">
+        {entries.map((entry, idx) => {
+          const color = entry.workTypeColor ?? '#94a3b8';
+          const timeLabel =
+            entry.startTime && entry.endTime
+              ? ` ${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
+              : '';
+          return (
+            <div
+              key={idx}
+              className="group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1"
+              style={{
+                borderLeft: `3px solid ${color}`,
+                backgroundColor: `${color}22`,
+                color: '#1e293b',
+              }}
+              title={`${entry.employeeName ?? '—'} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
+            >
+              <span className="truncate">
+                <span className="font-semibold">{entry.employeeName ?? '—'}</span>
+                {timeLabel && <span style={{ color: '#94a3b8' }}>{timeLabel}</span>}
+              </span>
+              {(isManagerMode || (onCopyEntry && (!sessionEmployeeId || entry.employeeId === sessionEmployeeId))) && (
+                <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">
+                  {onCopyEntry && (isManagerMode || !sessionEmployeeId || entry.employeeId === sessionEmployeeId) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
+                      className="text-slate-400 hover:text-blue-500 p-0.5"
+                      aria-label="Kopírovat směnu"
+                      title="Kopírovat na jiné dny"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                      </svg>
+                    </button>
+                  )}
+                  {onRemoveEmployee && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.employeeId); }}
+                      className="text-slate-400 hover:text-red-500"
+                      aria-label={`Odebrat ${entry.employeeName ?? entry.employeeId}`}
+                      title="Odebrat ze dne"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Legend ───────────────────────────────────────────────────────────────────
+
+interface LegendProps {
+  workTypes: WorkType[];
+  isManagerMode: boolean;
+  onChanged: () => void;
+}
+
+function Legend({ workTypes, isManagerMode, onChanged }: LegendProps) {
+  const [editing, setEditing] = useState<WorkType | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', color: '#3b82f6', category: 'shift' as string });
+  const [saving, setSaving] = useState(false);
+
+  const openAdd = () => { setForm({ name: '', color: '#3b82f6', category: 'shift' }); setAdding(true); };
+  const openEdit = (wt: WorkType) => { setForm({ name: wt.name, color: wt.color ?? '#94a3b8', category: wt.category ?? 'shift' }); setEditing(wt); };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      if (editing) {
+        await managerFetch(`/api/work-types/${editing.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(form),
+        });
+      } else {
+        await managerFetch('/api/work-types', {
+          method: 'POST',
+          body: JSON.stringify(form),
+        });
+      }
+      setEditing(null); setAdding(false);
+      onChanged();
+    } catch { /* silent */ }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Smazat tento typ práce?')) return;
+    await managerFetch(`/api/work-types/${id}`, { method: 'DELETE' });
+    onChanged();
+  };
+
+  const CATEGORIES = [
+    { value: 'shift', label: 'Směna' },
+    { value: 'presence', label: 'Docházka' },
+    { value: 'absence', label: 'Absence' },
+  ];
+
+  return (
+    <div className="mt-4 px-1">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
+        {workTypes.map((wt) => (
+          <div key={wt.id} className="flex items-center gap-1.5 group">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: wt.color ?? '#94a3b8' }} />
+            <span className="text-xs text-slate-600">{wt.name}</span>
+            {isManagerMode && (
+              <div className="hidden group-hover:flex items-center gap-1 ml-0.5">
+                <button onClick={() => openEdit(wt)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Upravit">
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                </button>
+                <button onClick={() => handleDelete(wt.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Smazat">
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {isManagerMode && (
+          <button onClick={openAdd} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-500 rounded px-2 py-0.5 transition-colors">
+            <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd"/></svg>
+            Přidat typ
+          </button>
+        )}
+      </div>
+
+      {/* Edit/Add modal */}
+      {(editing || adding) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-gray-800">{editing ? 'Upravit typ práce' : 'Přidat typ práce'}</h2>
+              <button onClick={() => { setEditing(null); setAdding(false); }} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Název *</label>
+                <input autoFocus value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="např. Prodejna" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kategorie</label>
+                <div className="flex gap-2">
+                  {CATEGORIES.map((c) => (
+                    <button key={c.value} type="button" onClick={() => setForm((f) => ({ ...f, category: c.value }))}
+                      className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors ${form.category === c.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Barva</label>
+                <div className="flex items-center gap-3">
+                  <input type="color" value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+                    className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5" />
+                  <span className="text-sm text-gray-500">{form.color}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button type="button" onClick={() => { setEditing(null); setAdding(false); }}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">Zrušit</button>
+              <button type="button" onClick={handleSave} disabled={saving || !form.name.trim()}
+                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Ukládám…' : editing ? 'Uložit' : 'Přidat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── WorkPlanGrid ─────────────────────────────────────────────────────────────
+
+export default function WorkPlanGrid({
+  orgId,
+  month,
+  isManagerMode,
+  onMonthChange,
+}: WorkPlanGridProps) {
+  const [data, setData] = useState<ScheduleData | null>(null);
+  const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [addShiftDate, setAddShiftDate] = useState<string>(() => todayISO());
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('✓ Směna přidána');
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardEntry | null>(null);
+  // Closed days from company settings
+  const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
+  const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
+  // Employee PIN session — set once in header, unlocks actions
+  const [sessionPin, setSessionPin] = useState('');
+  const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [pinInputValue, setPinInputValue] = useState('');
+  const [pinInputError, setPinInputError] = useState(false);
+  const [pinInputLoading, setPinInputLoading] = useState(false);
+
+  const fetchSchedule = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(month)}`);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? 'Nepodařilo se načíst rozvrh.');
+      } else {
+        setData(json);
+      }
+    } catch {
+      setError('Síťová chyba. Zkuste obnovit stránku.');
+    } finally {
+      setLoading(false);
+    }
+  }, [orgId, month]);
+
+  const fetchWorkTypes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`);
+      const json = await res.json();
+      if (res.ok) setWorkTypes(json.workTypes ?? []);
+    } catch {
+      // non-critical
+    }
+  }, [orgId]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
+
+  useEffect(() => {
+    fetchWorkTypes();
+  }, [fetchWorkTypes]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
+      .then((r) => r.json())
+      .then((s: Record<string, string>) => {
+        const dates = (s.closed_dates ?? '').split(',').map((d) => d.trim()).filter(Boolean);
+        setClosedDates(new Set(dates));
+        const keyMap: Record<string, number> = {
+          hours_mon: 1, hours_tue: 2, hours_wed: 3, hours_thu: 4,
+          hours_fri: 5, hours_sat: 6, hours_sun: 0,
+        };
+        const closed = new Set<number>();
+        for (const [key, wd] of Object.entries(keyMap)) {
+          if (key in s && !s[key]) closed.add(wd);
+        }
+        setClosedWeekdays(closed);
+      })
+      .catch(() => {});
+  }, [orgId]);
+
+  const handleShiftSuccess = useCallback(() => {
+    fetchSchedule();
+    setToastMessage('✓ Směna přidána');
+    setShowToast(true);
+  }, [fetchSchedule]);
+
+  const handleClickDay = useCallback((dateStr: string) => {
+    setAddShiftDate(dateStr);
+    setShowModal(true);
+  }, []);
+
+  const handleCopyEntry = useCallback((entry: ClipboardEntry) => {
+    setClipboard(entry);
+  }, []);
+
+  const handlePinLogin = useCallback(async () => {
+    if (pinInputValue.length < 4) return;
+    setPinInputLoading(true);
+    setPinInputError(false);
+    try {
+      const res = await fetch(`/api/public/presence?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pinInputValue)}`);
+      if (!res.ok) { setPinInputError(true); setPinInputValue(''); return; }
+      const json = await res.json();
+      setSessionPin(pinInputValue);
+      setSessionEmployee({ id: json.employeeId, name: json.employeeName });
+      setPinInputValue('');
+    } catch {
+      setPinInputError(true);
+      setPinInputValue('');
+    } finally {
+      setPinInputLoading(false);
+    }
+  }, [pinInputValue, orgId]);
+
+  const handlePaste = useCallback(async (dateStr: string) => {
+    if (!clipboard) return;
+    if (isManagerMode) {
+      try {
+        const res = await managerFetch('/api/public/work-plans', {
+          method: 'POST',
+          body: JSON.stringify({
+            orgId,
+            employeeId: clipboard.employeeId,
+            date: dateStr,
+            workTypeId: clipboard.workTypeId,
+            startTime: clipboard.startTime || undefined,
+            endTime: clipboard.endTime || undefined,
+          }),
+        });
+        if (res.ok) {
+          await fetchSchedule();
+          setToastMessage(`✓ Zkopírováno na ${dateStr.slice(8)}.${dateStr.slice(5, 7)}.`);
+          setShowToast(true);
+        }
+      } catch { /* ignore */ }
+    } else if (sessionPin) {
+      // Employee with active session: paste directly
+      try {
+        const res = await fetch('/api/public/schedule/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orgId,
+            pin: sessionPin,
+            date: dateStr,
+            workTypeId: clipboard.workTypeId,
+            startTime: clipboard.startTime || undefined,
+            endTime: clipboard.endTime || undefined,
+          }),
+        });
+        if (res.ok) {
+          await fetchSchedule();
+          setToastMessage(`✓ Zkopírováno na ${dateStr.slice(8)}.${dateStr.slice(5, 7)}.`);
+          setShowToast(true);
+        }
+      } catch { /* ignore */ }
+    }
+  }, [clipboard, orgId, isManagerMode, sessionPin, fetchSchedule]);
+
+  const handleRemoveEmployee = useCallback(async (dateStr: string, employeeId: string) => {
+    const entry = data?.workPlans.find((wp) => wp.date === dateStr && wp.employeeId === employeeId);
+    if (!entry?.id) return;
+    const res = await managerFetch(`/api/public/work-plans?workPlanId=${entry.id}&orgId=${orgId}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) await fetchSchedule();
+  }, [data, orgId, fetchSchedule]);
+
+  const calendarDays = buildCalendarDays(month);
+  const firstDayOffset = calendarDays.length > 0 ? mondayWeekday(calendarDays[0]) : 0;
+
+  const entriesByDate = new Map<string, WorkPlanEntry[]>();
+  const metaByDate = new Map<string, ScheduleDayMeta>();
+
+  if (data) {
+    for (const entry of data.workPlans) {
+      const list = entriesByDate.get(entry.date) ?? [];
+      list.push(entry);
+      entriesByDate.set(entry.date, list);
+    }
+    for (const meta of data.scheduleDays) {
+      metaByDate.set(meta.date, meta);
+    }
+  }
+
+  const editingMeta = editingDate ? metaByDate.get(editingDate) : undefined;
+
+  return (
+    <div className="w-full px-6 py-5">
+      {/* Toast */}
+      {showToast && (
+        <Toast message={toastMessage} onDone={() => setShowToast(false)} />
+      )}
+
+      {/* Clipboard banner */}
+      {clipboard && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-blue-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-2xl shadow-blue-900/40">
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+          </svg>
+          <span>
+            Kopírování: <span className="font-bold">{clipboard.employeeName ?? '—'}</span>
+            {clipboard.workTypeName ? ` · ${clipboard.workTypeName}` : ''}
+            {' — klikněte na den pro vložení'}
+          </span>
+          <button
+            onClick={() => setClipboard(null)}
+            className="ml-2 text-blue-200 hover:text-white transition-colors"
+            title="Zrušit kopírování"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+        {/* Month navigation */}
+        <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
+          <button
+            onClick={() => onMonthChange(prevMonth(month))}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            aria-label="Předchozí měsíc"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <span className="text-sm font-semibold text-slate-800 min-w-[150px] text-center px-2">
+            {formatMonthLabel(month)}
+          </span>
+          <button
+            onClick={() => onMonthChange(nextMonth(month))}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            aria-label="Následující měsíc"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Right side: PIN session + add button */}
+        <div className="flex items-center gap-2">
+          {/* Employee PIN session widget */}
+          {!isManagerMode && (
+            sessionEmployee ? (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
+                <button
+                  onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); }}
+                  className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs"
+                  title="Odhlásit"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }}
+                className="flex items-center gap-1.5"
+              >
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={pinInputValue}
+                  onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
+                  placeholder="Váš kód"
+                  className={`w-24 text-sm px-3 py-2 rounded-xl border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-slate-200'} focus:outline-none focus:ring-2 focus:ring-blue-400 text-center tracking-widest`}
+                />
+                <button
+                  type="submit"
+                  disabled={pinInputValue.length < 4 || pinInputLoading}
+                  className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-40"
+                >
+                  {pinInputLoading ? '…' : 'OK'}
+                </button>
+              </form>
+            )
+          )}
+
+          {/* Add shift button */}
+          <button
+            onClick={() => { setAddShiftDate(todayISO()); setShowModal(true); }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 active:scale-95"
+          >
+            <span className="text-lg leading-none font-light">+</span>
+            Přidat směnu
+          </button>
+        </div>
+      </div>
+
+      {/* Loading / error states */}
+      {loading && (
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">
+          Načítám rozvrh…
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <p className="text-red-600 text-sm">{error}</p>
+          <button
+            onClick={fetchSchedule}
+            className="px-4 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm hover:bg-red-100 transition-colors"
+          >
+            Zkusit znovu
+          </button>
+        </div>
+      )}
+
+      {/* Calendar grid */}
+      {!loading && !error && (
+        <>
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-1 mb-1.5 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
+            {DAY_NAMES_SHORT.map((d) => (
+              <div
+                key={d}
+                className={`text-center text-xs font-semibold py-0.5 ${
+                  d === 'So' || d === 'Ne' ? 'text-slate-500' : 'text-slate-300'
+                }`}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div className="grid grid-cols-7 gap-1">
+            {/* Leading empty cells */}
+            {Array.from({ length: firstDayOffset }).map((_, i) => (
+              <div key={`empty-start-${i}`} />
+            ))}
+
+            {calendarDays.map((dateStr) => {
+              const wd = mondayWeekday(dateStr);
+              const isWeekend = wd === 5 || wd === 6;
+              const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
+              return (
+                <DayCard
+                  key={dateStr}
+                  dateStr={dateStr}
+                  entries={entriesByDate.get(dateStr) ?? []}
+                  scheduleMeta={metaByDate.get(dateStr)}
+                  isManagerMode={isManagerMode}
+                  isWeekend={isWeekend}
+                  isClosed={isClosed}
+                  clipboard={clipboard}
+                  sessionEmployeeId={sessionEmployee?.id}
+                  onClickDay={handleClickDay}
+                  onEditDay={isManagerMode ? setEditingDate : undefined}
+                  onRemoveEmployee={isManagerMode ? handleRemoveEmployee : undefined}
+                  onCopyEntry={handleCopyEntry}
+                  onPaste={handlePaste}
+                />
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <Legend workTypes={workTypes} isManagerMode={isManagerMode} onChanged={fetchWorkTypes} />
+        </>
+      )}
+
+      {/* Add shift modal */}
+      {showModal && (
+        <AddShiftModal
+          orgId={orgId}
+          defaultDate={addShiftDate}
+          workTypes={workTypes}
+          isManagerMode={isManagerMode}
+          sessionPin={sessionPin || undefined}
+          onClose={() => setShowModal(false)}
+          onSuccess={handleShiftSuccess}
+        />
+      )}
+
+      {/* Edit day modal */}
+      {editingDate && (
+        <EditDayModal
+          orgId={orgId}
+          dateStr={editingDate}
+          meta={editingMeta}
+          onClose={() => setEditingDate(null)}
+          onSuccess={fetchSchedule}
+        />
+      )}
+    </div>
+  );
+}

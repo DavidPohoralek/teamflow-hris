@@ -1,0 +1,88 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { resolveOrgId } from '@/lib/resolveOrg';
+
+// GET /api/manager/settings
+// Returns current settings (without password)
+export async function GET(req: NextRequest) {
+  const resolved = await resolveOrgId(req);
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  const { orgId, supabase } = resolved;
+
+  const { data: settings, error: settingsError } = await supabase
+    .from('company_settings')
+    .select('kiosk_enabled, manager_password, saturday_logic_enabled')
+    .eq('organization_id', orgId)
+    .single();
+
+  if (settingsError || !settings) {
+    return NextResponse.json({ error: 'Nastavení nenalezeno.' }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    kioskEnabled: (settings as { kiosk_enabled: boolean }).kiosk_enabled,
+    saturday_logic_enabled: (settings as { saturday_logic_enabled: boolean | null }).saturday_logic_enabled ?? false,
+    managerPasswordSet: Boolean((settings as { manager_password: string | null }).manager_password),
+  });
+}
+
+// PUT /api/manager/settings
+// Body: { currentPassword?, newPassword?, kioskEnabled?, saturday_logic_enabled? }
+// Password change requires currentPassword; feature toggles do not.
+export async function PUT(req: NextRequest) {
+  const resolved = await resolveOrgId(req);
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  const { orgId, supabase } = resolved;
+
+  const body = await req.json();
+  const { currentPassword, newPassword, kioskEnabled, saturday_logic_enabled } = body as {
+    currentPassword?: string;
+    newPassword?: string;
+    kioskEnabled?: boolean;
+    saturday_logic_enabled?: boolean;
+  };
+
+  const updates: Record<string, unknown> = {};
+
+  // Password change requires current password verification
+  if (newPassword !== undefined) {
+    if (!currentPassword) {
+      return NextResponse.json({ error: 'Aktuální heslo je povinné pro změnu hesla.' }, { status: 400 });
+    }
+    const { data: settings } = await supabase
+      .from('company_settings')
+      .select('manager_password')
+      .eq('organization_id', orgId)
+      .single();
+    if (!settings || (settings as { manager_password: string }).manager_password !== currentPassword) {
+      return NextResponse.json({ error: 'Aktuální heslo je nesprávné.' }, { status: 401 });
+    }
+    if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+      return NextResponse.json({ error: 'Nové heslo nesmí být prázdné.' }, { status: 400 });
+    }
+    updates.manager_password = newPassword;
+  }
+
+  // Feature toggles — no password required (manager session is already authenticated)
+  if (kioskEnabled !== undefined) {
+    updates.kiosk_enabled = kioskEnabled;
+  }
+  if (saturday_logic_enabled !== undefined) {
+    updates.saturday_logic_enabled = saturday_logic_enabled;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Nebyla zadána žádná změna.' }, { status: 400 });
+  }
+
+  const { error: updateError } = await supabase
+    .from('company_settings')
+    .update(updates)
+    .eq('organization_id', orgId);
+
+  if (updateError) {
+    console.error('PUT /api/manager/settings error:', updateError);
+    return NextResponse.json({ error: 'Nepodařilo se uložit nastavení.' }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
