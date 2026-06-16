@@ -1,0 +1,47 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+
+export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
+  const { data: { user } } = await (supabase as any).auth.getUser();
+  if (!user) redirect('/login');
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Minimal header */}
+      <header className="bg-white border-b border-slate-200 h-14 flex items-center px-6">
+        <div className="flex items-center gap-2.5">
+          <svg width="28" height="28" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
+            <polygon points="25,72 125,130 125,244 25,187" fill="#E09828"/>
+            <polygon points="125,15 225,72 213,72 125,22" fill="#EDB84A"/>
+            <polygon points="25,72 125,15 125,22 37,72" fill="#E09828"/>
+            <polygon points="225,72 125,130 125,122 213,72" fill="#96560A"/>
+            <polygon points="125,130 25,72 37,72 125,122" fill="#AE6A10"/>
+            <polygon points="37,72 125,22 125,122" fill="#2A4878"/>
+            <polygon points="213,72 125,22 125,122" fill="#05080F"/>
+            <line x1="125" y1="22" x2="125" y2="122" stroke="#1A2E58" strokeWidth="1.5"/>
+            <polyline points="125,22 213,72 125,122 37,72 125,22" fill="none" stroke="#182840" strokeWidth="1.8"/>
+            <polygon points="35,98 115,145 115,163 35,117" fill="#7A4808"/>
+            <polygon points="61,139 89,155 89,210 61,194" fill="#7A4808"/>
+            <polygon points="135,145 215,98 215,117 135,163" fill="#6A3806"/>
+            <polygon points="135,170 153,159 153,211 135,221" fill="#6A3806"/>
+            <polygon points="157,171 200,146 200,163 157,188" fill="#6A3806"/>
+            <polyline points="25,72 125,15 225,72" fill="none" stroke="#C07010" strokeWidth="2.5" strokeLinejoin="round"/>
+            <line x1="25" y1="72" x2="25" y2="187" stroke="#C07010" strokeWidth="2"/>
+            <line x1="225" y1="72" x2="225" y2="187" stroke="#8A4A08" strokeWidth="2"/>
+            <line x1="25" y1="187" x2="125" y2="244" stroke="#B07010" strokeWidth="2"/>
+            <line x1="225" y1="187" x2="125" y2="244" stroke="#8A4A08" strokeWidth="2"/>
+            <line x1="125" y1="130" x2="125" y2="244" stroke="#9A5C10" strokeWidth="2.5"/>
+          </svg>
+          <span className="font-bold text-slate-800 text-base">TeamFlow</span>
+          <span className="text-slate-300 text-sm ml-1">— Průvodce nastavením</span>
+        </div>
+      </header>
+
+      <main className="py-10 px-4">
+        {children}
+      </main>
+    </div>
+  );
+}
