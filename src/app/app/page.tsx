@@ -30,7 +30,6 @@ const MANAGER_TABS: { id: Tab; label: string; icon: string }[] = [
 ]
 
 const MANAGER_SESSION_KEY = 'hris_manager_session'
-const ORG_ID_KEY = 'hris_org_id'
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
 
 function isManagerSessionValid(): boolean {
@@ -79,26 +78,16 @@ export default function HomePage() {
 
   // Load org + manager session on mount
   useEffect(() => {
-    // Check manager session
     setIsManagerMode(isManagerSessionValid())
-
-    // Try cached org id first
-    const cachedOrgId = localStorage.getItem(ORG_ID_KEY)
-    if (cachedOrgId) {
-      setOrgId(cachedOrgId)
-      setLoading(false)
-      // Refresh in background to keep name up to date
-      fetchOrg(false)
-    } else {
-      fetchOrg(true)
-    }
+    fetchOrg(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchOrg(showLoadingSpinner: boolean) {
     if (showLoadingSpinner) setLoading(true)
     try {
-      const res = await fetch('/api/public/org')
+      // Use authenticated endpoint — returns org for the logged-in user
+      const res = await fetch('/api/me/org')
       if (!res.ok) {
         setError('Systém není nastaven. Kontaktujte správce.')
         return
@@ -106,13 +95,12 @@ export default function HomePage() {
       const data = (await res.json()) as { id: string; name: string }
       setOrgId(data.id)
       setOrgName(data.name)
-      localStorage.setItem(ORG_ID_KEY, data.id)
-      // Load org logo (public, no auth needed)
+      // Load org logo
       fetch(`/api/public/org-logo?orgId=${data.id}`)
         .then(r => r.json())
         .then((d: { logoUrl: string | null }) => setOrgLogoUrl(d.logoUrl ?? null))
         .catch(() => {})
-      // Load theme from public settings
+      // Load theme
       fetch(`/api/public/company-settings?orgId=${data.id}`)
         .then(r => r.json())
         .then((d: Record<string, string>) => {
