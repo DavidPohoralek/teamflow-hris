@@ -5,6 +5,7 @@ import { managerFetch } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
 import ThemeSelector from './ThemeSelector';
+import NotificationsPanel from './NotificationsPanel';
 import { useT } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1463,77 +1464,6 @@ function inputCls(error?: string) {
 
 // ─── Notifications Tab ────────────────────────────────────────────────────────
 
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  read: boolean;
-  created_at: string;
-}
-
 function NotificationsTab({ onRead }: { onRead: () => void }) {
-  const t = useT();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    managerFetch('/api/notifications')
-      .then(r => r.json())
-      .then(d => {
-        setNotifications(d.notifications ?? []);
-        // Mark all as read
-        const hasUnread = (d.notifications ?? []).some((n: Notification) => !n.read);
-        if (hasUnread) {
-          managerFetch('/api/notifications', { method: 'PATCH' }).catch(() => {});
-          onRead();
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (loading) return <div className="p-6 text-slate-500 text-sm">{t('Načítám…', 'Loading…')}</div>;
-
-  return (
-    <div className="p-6 max-w-2xl">
-      <p className="text-sm text-slate-500 mb-4">
-        {t('Notifikace od zaměstnanců o přijatých a odmítnutých směnách.', 'Notifications from employees about accepted and declined shifts.')}
-      </p>
-
-      {notifications.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
-          <div className="text-4xl mb-3">🔔</div>
-          <p className="font-medium">{t('Žádné notifikace', 'No notifications')}</p>
-          <p className="text-sm mt-1">{t('Notifikace se zobrazí, když zaměstnanec přijme nebo odmítne nabídku směny.', 'Notifications appear when an employee accepts or declines a shift offer.')}</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {notifications.map(n => (
-            <div
-              key={n.id}
-              className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${
-                n.read ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'
-              }`}
-            >
-              <div className="text-xl mt-0.5">{n.title.startsWith('✅') ? '✅' : '❌'}</div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-800 text-sm">{n.title.replace(/^[✅❌]\s*/, '')}</p>
-                <p className="text-slate-600 text-sm mt-0.5">{n.message}</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {new Date(n.created_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-              {!n.read && (
-                <span className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-medium shrink-0">
-                  {t('Nové', 'New')}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return <NotificationsPanel onUnreadChange={(count) => { if (count === 0) onRead(); }} />;
 }

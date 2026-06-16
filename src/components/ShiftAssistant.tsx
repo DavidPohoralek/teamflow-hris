@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
+import NotificationsPanel from './NotificationsPanel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -251,6 +252,7 @@ export default function ShiftAssistant({ orgId, month, onOpenNotifications }: Pr
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: { id: string; reason: string }[] } | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     managerFetch('/api/notifications')
@@ -422,20 +424,18 @@ export default function ShiftAssistant({ orgId, month, onOpenNotifications }: Pr
         </div>
 
         <div className="flex items-center gap-3">
-          {onOpenNotifications && (
-            <button
-              onClick={() => { setUnreadCount(0); onOpenNotifications(); }}
-              className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"
-              title={t('Notifikace', 'Notifications')}
-            >
-              🔔
-              {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          )}
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"
+            title={t('Notifikace', 'Notifications')}
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold">
+                {unreadCount}
+              </span>
+            )}
+          </button>
           <label className="text-sm text-slate-600 font-medium">Draft:</label>
           <select
             value={draft}
@@ -670,6 +670,25 @@ export default function ShiftAssistant({ orgId, month, onOpenNotifications }: Pr
           <div className="font-semibold text-slate-600 text-lg">{t('Asistent směn připraven', 'Shift Assistant ready')}</div>
           <div className="text-sm mt-2 max-w-sm mx-auto">
             {t('Klikni na "Analyzovat měsíc" a bot najde chybějící směny...', 'Click "Analyze month" and the bot will find missing shifts and suggest optimal staffing.')}
+          </div>
+        </div>
+      )}
+
+      {/* Notifications drawer */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowNotifications(false)} />
+          <div className="relative bg-white w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold text-slate-800">🔔 {t('Notifikace', 'Notifications')}</h2>
+              <button
+                onClick={() => setShowNotifications(false)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <NotificationsPanel onUnreadChange={setUnreadCount} />
+            </div>
           </div>
         </div>
       )}
