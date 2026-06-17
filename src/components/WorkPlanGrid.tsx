@@ -578,7 +578,7 @@ function DayCard({
   return (
     <div
       onClick={isClosed ? undefined : handleCardClick}
-      className={`group rounded-xl border min-h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative ${
+      className={`group rounded-xl border h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative ${
         isClosed
           ? 'bg-slate-100 border-slate-200 cursor-default'
           : isPasteMode
@@ -630,8 +630,8 @@ function DayCard({
         </div>
       </div>
 
-      {/* Chips */}
-      <div className="flex flex-col gap-1">
+      {/* Chips — scrollable */}
+      <div className="flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 scrollbar-thin">
         {entries.map((entry, idx) => {
           const color = entry.workTypeColor ?? '#94a3b8';
           const timeLabel =
@@ -1007,6 +1007,10 @@ export default function WorkPlanGrid({
   const calendarDays = buildCalendarDays(month);
   const firstDayOffset = calendarDays.length > 0 ? mondayWeekday(calendarDays[0]) : 0;
 
+  // Build sort order map from work types
+  const workTypeSortOrder = new Map<string, number>();
+  workTypes.forEach((wt, idx) => workTypeSortOrder.set(wt.id, wt.sort_order ?? idx));
+
   const entriesByDate = new Map<string, WorkPlanEntry[]>();
   const metaByDate = new Map<string, ScheduleDayMeta>();
 
@@ -1016,6 +1020,11 @@ export default function WorkPlanGrid({
       list.push(entry);
       entriesByDate.set(entry.date, list);
     }
+    // Sort each day's entries by work type sort_order
+    entriesByDate.forEach((list: WorkPlanEntry[], date: string) => {
+      list.sort((a: WorkPlanEntry, b: WorkPlanEntry) => (workTypeSortOrder.get(a.workTypeId ?? '') ?? 999) - (workTypeSortOrder.get(b.workTypeId ?? '') ?? 999));
+      entriesByDate.set(date, list);
+    });
     for (const meta of data.scheduleDays) {
       metaByDate.set(meta.date, meta);
     }

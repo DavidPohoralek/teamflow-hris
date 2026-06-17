@@ -514,6 +514,22 @@ function WorkTypesTab() {
     }
   };
 
+  const handleReorder = async (id: string, direction: 'up' | 'down') => {
+    const idx = workTypes.findIndex((w) => w.id === id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= workTypes.length) return;
+    const updated = [...workTypes];
+    [updated[idx], updated[swapIdx]] = [updated[swapIdx], updated[idx]];
+    // Assign sort_order by position
+    const patches = updated.map((wt, i) => managerFetch(`/api/work-types/${wt.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sort_order: i }),
+    }));
+    setWorkTypes(updated); // optimistic
+    await Promise.all(patches);
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
@@ -543,7 +559,21 @@ function WorkTypesTab() {
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[wt.category]}`}>
                   {wt.category === 'shift' ? t('Směna', 'Shift') : wt.category === 'presence' ? t('Docházka', 'Attendance') : t('Absence', 'Absence')}
                 </span>
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Reorder buttons */}
+                  <button
+                    onClick={() => handleReorder(wt.id, 'up')}
+                    disabled={workTypes.indexOf(wt) === 0}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed"
+                    title={t('Posunout výš', 'Move up')}
+                  >▲</button>
+                  <button
+                    onClick={() => handleReorder(wt.id, 'down')}
+                    disabled={workTypes.indexOf(wt) === workTypes.length - 1}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed"
+                    title={t('Posunout níž', 'Move down')}
+                  >▼</button>
+                  <div className="w-px h-4 bg-gray-200 mx-1" />
                   <button onClick={() => { setEditingWT(wt); setShowForm(true); }} className="text-blue-600 hover:text-blue-800 text-sm">{t('Upravit', 'Edit')}</button>
                   {deleteConfirm === wt.id ? (
                     <>
