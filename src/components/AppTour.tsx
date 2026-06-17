@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-const PRICING_URL = 'https://selbickylabs.com/#teamflow';
+const PRICING_URL = 'https://tmflw.com/#cenik';
 
 // ─── CS video steps ────────────────────────────────────────────────────────────
 // 5 videos → 7 total steps (welcome + 5 videos + done)
@@ -167,9 +167,10 @@ function VideoPlayer({ src }: { src: string }) {
 interface Props {
   lang: 'cs' | 'en';
   onClose: () => void;
+  canClose?: boolean;
 }
 
-export default function AppTour({ lang, onClose }: Props) {
+export default function AppTour({ lang, onClose, canClose }: Props) {
   const steps = lang === 'cs' ? CS_STEPS : EN_STEPS;
   const [stepIndex, setStepIndex] = useState(0);
   const total = steps.length;
@@ -188,7 +189,7 @@ export default function AppTour({ lang, onClose }: Props) {
       });
     } catch { /* ignore — will be caught on next load */ }
     onClose();
-    window.location.href = PRICING_URL;
+    window.location.replace(PRICING_URL);
   }
 
   function handleNext() {
@@ -213,6 +214,15 @@ export default function AppTour({ lang, onClose }: Props) {
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] pointer-events-auto" />
 
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl pointer-events-auto border border-slate-200 overflow-hidden">
+        {canClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors text-sm"
+            aria-label="Zavřít"
+          >
+            ✕
+          </button>
+        )}
         {/* Progress bar */}
         <div className="h-1 bg-slate-100">
           <div
@@ -311,6 +321,9 @@ export default function AppTour({ lang, onClose }: Props) {
                   <div className="bg-white/15 rounded-lg p-3">
                     <p className="font-bold text-sm">Standard</p>
                     <p className="opacity-80 mt-1 leading-relaxed">
+                      {t('1 190 Kč / měs.', '1,190 CZK / mo.')}
+                    </p>
+                    <p className="opacity-60 mt-0.5 leading-relaxed">
                       {t('Plánování, docházka, analytika', 'Scheduling, attendance, analytics')}
                     </p>
                   </div>
@@ -318,8 +331,11 @@ export default function AppTour({ lang, onClose }: Props) {
                     <span className="absolute -top-2 -right-1 bg-amber-400 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                       {t('Doporučeno', 'Recommended')}
                     </span>
-                    <p className="font-bold text-sm flex items-center gap-1">Pro + AI <span className="text-amber-300">✦</span></p>
+                    <p className="font-bold text-sm flex items-center gap-1">StoreForce <span className="text-amber-300">✦</span></p>
                     <p className="opacity-80 mt-1 leading-relaxed">
+                      {t('1 680 Kč / měs.', '1,680 CZK / mo.')}
+                    </p>
+                    <p className="opacity-60 mt-0.5 leading-relaxed">
                       {t('Vše + AI asistent směn', 'Everything + AI shift assistant')}
                     </p>
                   </div>

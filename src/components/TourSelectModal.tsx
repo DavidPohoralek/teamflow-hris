@@ -1,13 +1,15 @@
 'use client';
 
-const PRICING_URL = 'https://selbickylabs.com/#teamflow';
+const PRICING_URL = 'https://tmflw.com/#cenik';
 
 interface Props {
   onStart: (lang: 'cs' | 'en') => void;
   onSkip: () => void;
+  canClose?: boolean;
+  onClose?: () => void;
 }
 
-export default function TourSelectModal({ onStart, onSkip }: Props) {
+export default function TourSelectModal({ onStart, onSkip, canClose, onClose }: Props) {
   async function handleSkip() {
     localStorage.setItem('tf_tour_seen', '1');
     try {
@@ -18,13 +20,22 @@ export default function TourSelectModal({ onStart, onSkip }: Props) {
       });
     } catch { /* ignore */ }
     onSkip();
-    window.location.href = PRICING_URL;
+    window.location.replace(PRICING_URL);
   }
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {canClose && onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+            aria-label="Zavřít"
+          >
+            ✕
+          </button>
+        )}
         {/* Header gradient */}
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 px-8 py-8 text-white text-center">
           <div className="text-4xl mb-3">🎓</div>

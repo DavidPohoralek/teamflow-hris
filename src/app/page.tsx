@@ -67,6 +67,12 @@ export default function LandingPage() {
             <span className="font-bold text-lg tracking-tight">TeamFlow</span>
           </div>
           <div className="flex items-center gap-3">
+            <a
+              href="#cenik"
+              className="text-sm font-medium text-slate-400 hover:text-white transition px-3 py-2 hidden sm:block"
+            >
+              Ceník
+            </a>
             <Link
               href="/login"
               className="text-sm font-medium text-slate-300 hover:text-white transition px-4 py-2"
@@ -135,6 +141,72 @@ export default function LandingPage() {
               <p className="text-sm text-slate-400 leading-relaxed">{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="cenik" className="max-w-6xl mx-auto px-6 pb-24 w-full">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl font-semibold text-slate-200 mb-3">Transparentní ceník</h2>
+          <p className="text-slate-400 text-sm">Pevná cena pro celou firmu. Žádné skryté poplatky.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto mb-8">
+
+          {/* Standard */}
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-7 flex flex-col">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Standard</p>
+            <p className="text-3xl font-bold text-white mb-0.5">1 190 Kč<span className="text-base font-normal text-slate-400"> / měs.</span></p>
+            <p className="text-xs text-slate-500 mb-6">nebo <span className="text-white font-medium">11 900 Kč / rok</span> <span className="text-emerald-400">(2 měsíce zdarma)</span></p>
+            <ul className="space-y-2.5 text-sm text-slate-300 flex-1 mb-6">
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Pokročilý kalendář směn</li>
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Docházkový PIN terminál</li>
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Žádosti a schvalování dovolených</li>
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Přehledy hodin & export</li>
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Portál zaměstnance</li>
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Analytika</li>
+            </ul>
+            <Link
+              href="/register"
+              className="block w-full py-2.5 text-center bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition text-sm"
+            >
+              Vyzkoušet zdarma
+            </Link>
+          </div>
+
+          {/* StoreForce */}
+          <div className="bg-gradient-to-b from-blue-950 to-indigo-950 border border-blue-700/50 rounded-2xl p-7 flex flex-col relative overflow-hidden">
+            <div className="absolute top-4 right-4 bg-amber-400 text-slate-900 text-[11px] font-bold px-2.5 py-1 rounded-full">
+              Doporučeno
+            </div>
+            <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-2">StoreForce ✦</p>
+            <p className="text-3xl font-bold text-white mb-0.5">1 680 Kč<span className="text-base font-normal text-blue-300"> / měs.</span></p>
+            <p className="text-xs text-blue-500/80 mb-6">nebo <span className="text-white font-medium">15 900 Kč / rok</span> <span className="text-emerald-400">(2 měsíce zdarma)</span></p>
+            <ul className="space-y-2.5 text-sm text-slate-200 flex-1 mb-6">
+              <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span> Vše ze Standard</li>
+              <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">✦</span> AI asistent — autonomní doplňování směn</li>
+              <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">✦</span> Notifikace přes Slack & e-mail</li>
+              <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">✦</span> Potvrzení jedním kliknutím bez přihlášení</li>
+              <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">✦</span> Pro kamenné prodejny a retail</li>
+            </ul>
+            <Link
+              href="/register"
+              className="block w-full py-2.5 text-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition text-sm shadow-lg shadow-blue-900/50"
+            >
+              Vyzkoušet zdarma
+            </Link>
+          </div>
+        </div>
+
+        {/* Download PDFs */}
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-xs text-slate-600">Stáhnout ceník:</span>
+          <a href="/teamflow-cenik-cs.pdf" download className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-400 transition">
+            🇨🇿 CS PDF
+          </a>
+          <a href="/teamflow-pricing-en.pdf" download className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-400 transition">
+            🇬🇧 EN PDF
+          </a>
         </div>
       </section>
 

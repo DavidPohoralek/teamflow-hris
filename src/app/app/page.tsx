@@ -89,15 +89,27 @@ export default function HomePage() {
 
   // Check subscription status — drives tour gate and paywall
   useEffect(() => {
-    fetch('/api/subscription')
-      .then(r => r.json())
-      .then((d: { status: string }) => {
-        setSubscriptionStatus(d.status)
-        if (d.status === 'trial') {
-          setShowTourSelect(true)
-        }
-      })
-      .catch(() => setSubscriptionStatus('active'))
+    function checkSubscription() {
+      setSubscriptionStatus(null) // reset to trigger loading block
+      fetch('/api/subscription')
+        .then(r => r.json())
+        .then((d: { status: string }) => {
+          setSubscriptionStatus(d.status)
+          if (d.status === 'trial') {
+            setShowTourSelect(true)
+          }
+        })
+        .catch(() => setSubscriptionStatus('active'))
+    }
+
+    checkSubscription()
+
+    // bfcache restore (browser back button) — re-check without trusting cached state
+    function handlePageShow(e: PageTransitionEvent) {
+      if (e.persisted) checkSubscription()
+    }
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
   // Load org + manager session on mount
@@ -172,6 +184,15 @@ export default function HomePage() {
     if (activeTab === 'management') {
       setActiveTab('schedule')
     }
+  }
+
+  // Block ALL render until subscription status is confirmed — prevents back-button bypass
+  if (subscriptionStatus === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   // Paywall — pending or expired subscription
@@ -379,6 +400,8 @@ export default function HomePage() {
         <TourSelectModal
           onStart={(l) => { setTourLang(l); setShowTourSelect(false); setShowTour(true); }}
           onSkip={() => setShowTourSelect(false)}
+          canClose={subscriptionStatus === 'active'}
+          onClose={() => setShowTourSelect(false)}
         />
       )}
 
@@ -387,6 +410,7 @@ export default function HomePage() {
         <AppTour
           lang={tourLang}
           onClose={() => setShowTour(false)}
+          canClose={subscriptionStatus === 'active'}
         />
       )}
 
