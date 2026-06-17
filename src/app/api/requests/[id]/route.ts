@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { createClient } from '@supabase/supabase-js';
+
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // PUT /api/requests/[id]
 // Body: { status: 'approved' | 'rejected', note? }
@@ -64,10 +72,13 @@ export async function PUT(
     if (match) {
       const [, timeIn, timeOut] = match;
       const date: string = existing.date_from; // YYYY-MM-DD
-      const checkIn = `${date}T${timeIn}:00`;
-      const checkOut = `${date}T${timeOut}:00`;
+      // Store as ISO 8601 with explicit seconds — analytics uses new Date() to parse
+      const checkIn = new Date(`${date}T${timeIn}:00`).toISOString();
+      const checkOut = new Date(`${date}T${timeOut}:00`).toISOString();
 
-      const { error: logError } = await sb.from('attendance_logs').insert({
+      // Use service role to bypass RLS on attendance_logs
+      const svc = getServiceClient();
+      const { error: logError } = await svc.from('attendance_logs').insert({
         organization_id: orgId,
         employee_id: existing.employee_id,
         date,
@@ -77,7 +88,6 @@ export async function PUT(
       });
 
       if (logError) {
-        // Don't fail the whole request — approval is still saved
         console.error('Correction: failed to create attendance_log:', logError);
       }
     }
