@@ -116,10 +116,7 @@ export async function GET(req: NextRequest) {
   // Legacy keys → display label; custom types stored as-is
   const LEGACY: Record<string, string> = { hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO' };
 
-  const fmt = (n: number) => {
-    const s = n.toFixed(2);
-    return isEn ? s : s.replace('.', ',');
-  };
+  const fmt = (n: number) => n.toFixed(2);
 
   const header = isEn
     ? ['Name', 'Employment type', 'Data source', 'Hours worked', 'Of which Saturday', 'Saturday bonus (h)', 'Overtime bonus (h)', 'Total bonus (h)', 'Target hours', 'Difference', 'Vacation days used'].join(';')
