@@ -161,7 +161,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       );
       if (res.ok) {
         const json = await res.json();
-        setRequests(json.requests ?? json ?? []);
+        // normalize snake_case from API to camelCase
+        const raw: { id: string; type: string; date_from: string; date_to?: string; note?: string; status: RequestStatus; created_at: string }[] = json.requests ?? json ?? [];
+        setRequests(raw.map((r) => ({ id: r.id, type: r.type, dateFrom: r.date_from, dateTo: r.date_to, note: r.note, status: r.status, createdAt: r.created_at })));
       }
     } catch {
       // silently ignore
