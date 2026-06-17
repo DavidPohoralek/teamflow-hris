@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
-export const DEFAULT_TYPES = ['HPP', 'DPP', 'DPČ', 'IČO'];
+const DEFAULT_TYPES = ['HPP', 'DPP', 'DPČ', 'IČO'];
 
 // GET — returns array of employment type strings for this org
 export async function GET(req: NextRequest) {
