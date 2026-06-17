@@ -59,27 +59,14 @@ export async function GET(req: NextRequest) {
     const empPlans = plans.filter((p) => p.employee_id === emp.id);
     const hasAttendance = empLogs.length > 0;
 
-    // — same calculation as /api/analytics —
+    // Only actual check-ins count — matches the "Odpracováno" column in the dashboard
     let workedMinutes = 0;
     let saturdayMinutes = 0;
 
-    if (hasAttendance) {
-      for (const l of empLogs) {
-        const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
-        workedMinutes += mins;
-        if (isSat(l.date)) saturdayMinutes += mins;
-      }
-    } else {
-      for (const p of empPlans) {
-        let mins = 8 * 60;
-        if (p.start_time && p.end_time) {
-          const [sh, sm] = p.start_time.split(':').map(Number);
-          const [eh, em] = p.end_time.split(':').map(Number);
-          mins = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
-        }
-        workedMinutes += mins;
-        if (isSat(p.date)) saturdayMinutes += mins;
-      }
+    for (const l of empLogs) {
+      const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
+      workedMinutes += mins;
+      if (isSat(l.date)) saturdayMinutes += mins;
     }
 
     const workedHours = workedMinutes / 60;
@@ -98,7 +85,7 @@ export async function GET(req: NextRequest) {
     return {
       name: emp.name,
       employmentType: emp.employment_type ?? '',
-      source: hasAttendance ? (lang === 'en' ? 'attendance' : 'docházka') : (lang === 'en' ? 'plan' : 'plán'),
+      source: hasAttendance ? (lang === 'en' ? 'attendance' : 'docházka') : (lang === 'en' ? 'no data' : 'bez dat'),
       workedHours: Math.round(workedHours * 100) / 100,
       saturdayHours: Math.round(saturdayHours * 100) / 100,
       satBonusHours: Math.round(satBonusHours * 100) / 100,
