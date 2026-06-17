@@ -66,17 +66,25 @@ export async function PUT(
 
   // When a correction request is approved, create an attendance_log entry
   if (status === 'approved' && existing.type === 'correction') {
-    const noteText: string = existing.note ?? '';
-    // Parse "Příchod: HH:MM – Odchod: HH:MM" from note
-    const match = noteText.match(/Příchod:\s*(\d{2}:\d{2})\s*[–-]\s*Odchod:\s*(\d{2}:\d{2})/);
-    if (match) {
-      const [, timeIn, timeOut] = match;
-      const date: string = existing.date_from; // YYYY-MM-DD
-      // Store as ISO 8601 with explicit seconds — analytics uses new Date() to parse
-      const checkIn = new Date(`${date}T${timeIn}:00`).toISOString();
-      const checkOut = new Date(`${date}T${timeOut}:00`).toISOString();
+    let timeIn: string | null = null;
+    let timeOut: string | null = null;
 
-      // Use service role to bypass RLS on attendance_logs
+    // Note is stored as JSON: { timeIn, timeOut, userNote }
+    try {
+      const parsed = JSON.parse(existing.note ?? '');
+      timeIn = parsed.timeIn ?? null;
+      timeOut = parsed.timeOut ?? null;
+    } catch {
+      // Legacy format fallback: "Příchod: HH:MM – Odchod: HH:MM"
+      const m = (existing.note ?? '').match(/(\d{2}:\d{2}).*?(\d{2}:\d{2})/);
+      if (m) { timeIn = m[1]; timeOut = m[2]; }
+    }
+
+    if (timeIn && timeOut) {
+      const date: string = existing.date_from;
+      const checkIn = `${date}T${timeIn}:00`;
+      const checkOut = `${date}T${timeOut}:00`;
+
       const svc = getServiceClient();
       const { error: logError } = await svc.from('attendance_logs').insert({
         organization_id: orgId,
@@ -88,7 +96,7 @@ export async function PUT(
       });
 
       if (logError) {
-        console.error('Correction: failed to create attendance_log:', logError);
+        console.error('Correction attendance_log insert error:', logError.message, logError);
       }
     }
   }

@@ -310,7 +310,15 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                           {formatDate(req.dateFrom)}{req.dateTo ? ` — ${formatDate(req.dateTo)}` : ''}
                         </span>
                         {req.note && (
-                          <span className="text-xs text-slate-400 truncate">{req.note}</span>
+                          <span className="text-xs text-slate-400 truncate">
+                            {(() => {
+                              try {
+                                const p = JSON.parse(req.note!);
+                                if (p.timeIn && p.timeOut) return `Příchod: ${p.timeIn} – Odchod: ${p.timeOut}${p.userNote ? ' · ' + p.userNote : ''}`;
+                              } catch { /* not JSON */ }
+                              return req.note;
+                            })()}
+                          </span>
                         )}
                       </div>
                       <span className={`ml-3 flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${badge.className}`}>

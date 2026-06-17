@@ -57,11 +57,6 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
     setLoading(true);
     setError('');
 
-    // For correction: encode times into note so manager sees them clearly
-    const fullNote = isCorrection
-      ? `Příchod: ${timeIn} – Odchod: ${timeOut}${note ? '\n\n' + note : ''}`
-      : note || undefined;
-
     try {
       const res = await fetch('/api/public/requests', {
         method: 'POST',
@@ -72,7 +67,9 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
           type: selectedType,
           dateFrom,
           dateTo: showDateTo ? dateTo || undefined : undefined,
-          note: fullNote,
+          note: note || undefined,
+          // Correction times sent as dedicated fields
+          ...(isCorrection ? { timeIn, timeOut } : {}),
         }),
       });
 
