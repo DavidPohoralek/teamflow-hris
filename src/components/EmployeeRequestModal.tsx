@@ -39,19 +39,28 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
   const [selectedType, setSelectedType] = useState<RequestType | null>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [timeIn, setTimeIn] = useState('');
+  const [timeOut, setTimeOut] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const showDateTo = selectedType === 'sick';
+  const isCorrection = selectedType === 'correction';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedType || !dateFrom) return;
+    if (isCorrection && (!timeIn || !timeOut)) return;
 
     setLoading(true);
     setError('');
+
+    // For correction: encode times into note so manager sees them clearly
+    const fullNote = isCorrection
+      ? `Příchod: ${timeIn} – Odchod: ${timeOut}${note ? '\n\n' + note : ''}`
+      : note || undefined;
 
     try {
       const res = await fetch('/api/public/requests', {
@@ -63,7 +72,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
           type: selectedType,
           dateFrom,
           dateTo: showDateTo ? dateTo || undefined : undefined,
-          note: note || undefined,
+          note: fullNote,
         }),
       });
 
@@ -156,6 +165,36 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
             />
           </div>
 
+          {/* Time fields — only for correction */}
+          {isCorrection && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Příchod <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={timeIn}
+                  onChange={(e) => setTimeIn(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Odchod <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={timeOut}
+                  onChange={(e) => setTimeOut(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Date to — only for vacation/sick */}
           {showDateTo && (
             <div>
@@ -206,7 +245,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
           <button
             type="submit"
             form=""
-            disabled={loading || !selectedType || !dateFrom}
+            disabled={loading || !selectedType || !dateFrom || (isCorrection && (!timeIn || !timeOut))}
             onClick={handleSubmit}
             className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition flex items-center justify-center gap-2"
           >
