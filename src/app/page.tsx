@@ -210,6 +210,32 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="max-w-6xl mx-auto px-6 pb-24 w-full">
+        <h2 className="text-center text-2xl font-semibold text-slate-200 mb-12">Co říkají zákazníci</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {[
+            { quote: 'Konečně vím, kdo je v práci, bez papírování a telefonátů.', author: 'Petra S.', role: 'vedoucí prodejny' },
+            { quote: 'Zavedení trvalo odpoledne, ne měsíc.', author: 'Martin H.', role: 'majitel kavárny' },
+            { quote: '—', author: '', role: '' },
+          ].map((t, i) => (
+            <div key={i} className={`bg-slate-900 border rounded-2xl p-6 flex flex-col gap-4 ${t.author ? 'border-slate-800' : 'border-dashed border-slate-800 opacity-40'}`}>
+              {t.author ? (
+                <>
+                  <p className="text-slate-300 text-sm leading-relaxed flex-1">„{t.quote}"</p>
+                  <div className="border-t border-slate-800 pt-4">
+                    <p className="text-white font-semibold text-sm">{t.author}</p>
+                    <p className="text-slate-500 text-xs">{t.role}</p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-slate-600 text-sm text-center m-auto">Vaše reference zde</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* CTA banner */}
       <section className="border-t border-slate-800 py-16 px-6 text-center">
         <h2 className="text-2xl font-semibold mb-4">Připraveni začít?</h2>
