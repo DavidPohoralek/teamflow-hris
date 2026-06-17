@@ -10,17 +10,33 @@ import { useT } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const EMPLOYMENT_TYPES = [
-  { value: 'hpp', label: 'HPP – Hlavní pracovní poměr' },
-  { value: 'dpp', label: 'DPP – Dohoda o provedení práce' },
-  { value: 'dpc', label: 'DPČ – Dohoda o pracovní činnosti' },
-  { value: 'ico', label: 'IČO – Živnostník / OSVČ' },
-] as const;
+const DEFAULT_EMPLOYMENT_TYPES = ['HPP', 'DPP', 'DPČ', 'IČO'];
 
-type EmploymentType = typeof EMPLOYMENT_TYPES[number]['value'];
+// Legacy value→label map for employees created before dynamic types
+const LEGACY_LABELS: Record<string, string> = {
+  hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO',
+};
+
+type EmploymentType = string;
 
 function employmentLabel(value?: string | null) {
-  return EMPLOYMENT_TYPES.find((t) => t.value === value)?.label.split(' – ')[0] ?? '—';
+  if (!value) return '—';
+  return LEGACY_LABELS[value] ?? value;
+}
+
+function useEmploymentTypes() {
+  const [types, setTypes] = useState<string[]>(DEFAULT_EMPLOYMENT_TYPES);
+  const refresh = useCallback(async () => {
+    try {
+      const res = await managerFetch('/api/manager/employment-types');
+      if (res.ok) {
+        const d = await res.json();
+        if (Array.isArray(d.types) && d.types.length > 0) setTypes(d.types);
+      }
+    } catch { /* keep defaults */ }
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+  return { types, refresh };
 }
 
 interface Employee {
@@ -329,6 +345,7 @@ interface EmployeeFormProps {
 
 function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeFormProps) {
   const t = useT();
+  const { types: empTypes } = useEmploymentTypes();
   const [form, setForm] = useState({
     name: employee?.name ?? '',
     pin: employee?.pin_code ?? employee?.pin ?? '',
@@ -339,7 +356,7 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
     labels: (employee?.labels ?? []).join(','),
     target_hours: employee?.target_hours ?? 160,
     vacation_days_per_year: employee?.vacation_days_per_year ?? 20,
-    employment_type: (employee?.employment_type ?? 'hpp') as EmploymentType,
+    employment_type: (employee?.employment_type ? (LEGACY_LABELS[employee.employment_type] ?? employee.employment_type) : empTypes[0] ?? 'HPP') as EmploymentType,
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -416,12 +433,15 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
             <select
               className={inputCls()}
               value={form.employment_type}
-              onChange={(e) => set('employment_type', e.target.value as EmploymentType)}
+              onChange={(e) => set('employment_type', e.target.value)}
             >
-              <option value="hpp">{t('HPP – Hlavní pracovní poměr', 'Full-time employment')}</option>
-              <option value="dpp">{t('DPP – Dohoda o provedení práce', 'Agreement to complete work')}</option>
-              <option value="dpc">{t('DPČ – Dohoda o pracovní činnosti', 'Agreement on work activity')}</option>
-              <option value="ico">{t('IČO – Živnostník / OSVČ', 'Self-employed / Contractor')}</option>
+              {empTypes.map((et) => (
+                <option key={et} value={et}>{et}</option>
+              ))}
+              {/* show legacy value if not in current list */}
+              {form.employment_type && !empTypes.includes(form.employment_type) && (
+                <option value={form.employment_type}>{form.employment_type}</option>
+              )}
             </select>
           </FormField>
           <div className="grid grid-cols-2 gap-4">
@@ -894,6 +914,23 @@ function SettingsTab() {
   const [savingPwd, setSavingPwd] = useState(false);
   const [pwdMsg, setPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [kioskEnabled, setKioskEnabled] = useState(false);
+  const { types: empTypes, refresh: refreshEmpTypes } = useEmploymentTypes();
+  const [newEmpType, setNewEmpType] = useState('');
+  const [savingEmpTypes, setSavingEmpTypes] = useState(false);
+
+  const saveEmpTypes = async (updated: string[]) => {
+    setSavingEmpTypes(true);
+    try {
+      await managerFetch('/api/manager/employment-types', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ types: updated }),
+      });
+      await refreshEmpTypes();
+    } finally {
+      setSavingEmpTypes(false);
+    }
+  };
 
   const handlePasswordSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -975,6 +1012,54 @@ function SettingsTab() {
           <input className={inputCls() + ' bg-gray-50'} disabled value="" placeholder={t('(načítá se…)', '(loading…)')} />
         </FormField>
         <p className="text-xs text-gray-400 mt-2">{t('Název firmy je nyní jen pro čtení.', 'Company name is read-only.')}</p>
+      </section>
+
+      {/* Employment types */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">{t('Pracovní poměry', 'Employment types')}</h3>
+        <p className="text-xs text-gray-400 mb-4">{t('Typy pracovního poměru, které budou dostupné při přidávání zaměstnance.', 'Employment types available when adding an employee.')}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {empTypes.map((et) => (
+            <span key={et} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm font-medium">
+              {et}
+              {empTypes.length > 1 && (
+                <button
+                  type="button"
+                  className="ml-1 text-blue-400 hover:text-red-500 transition-colors leading-none"
+                  onClick={() => saveEmpTypes(empTypes.filter((x) => x !== et))}
+                  disabled={savingEmpTypes}
+                  aria-label={`${t('Odebrat', 'Remove')} ${et}`}
+                >✕</button>
+              )}
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder={t('Přidat typ (např. DPP)', 'Add type (e.g. DPP)')}
+            value={newEmpType}
+            onChange={(e) => setNewEmpType(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const v = newEmpType.trim();
+                if (v && !empTypes.includes(v)) { saveEmpTypes([...empTypes, v]); setNewEmpType(''); }
+              }
+            }}
+          />
+          <button
+            type="button"
+            disabled={savingEmpTypes || !newEmpType.trim() || empTypes.includes(newEmpType.trim())}
+            onClick={() => {
+              const v = newEmpType.trim();
+              if (v && !empTypes.includes(v)) { saveEmpTypes([...empTypes, v]); setNewEmpType(''); }
+            }}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+          >
+            {savingEmpTypes ? '…' : t('Přidat', 'Add')}
+          </button>
+        </div>
       </section>
 
       {/* Attendance */}

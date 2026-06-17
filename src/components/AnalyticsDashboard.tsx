@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
+import { useLang } from '@/lib/i18n';
 
 interface EmployeeStat {
   id: string;
@@ -61,6 +62,7 @@ function PunctualityBadge({ min }: { min: number | null }) {
 }
 
 export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
+  const { lang } = useLang();
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -82,12 +84,12 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   const handleExport = async () => {
     setExportLoading(true);
     try {
-      const res = await managerFetch(`/api/analytics/export?month=${month}`);
+      const res = await managerFetch(`/api/analytics/export?month=${month}&lang=${lang}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `export-${month}.csv`;
+      a.download = `export-${month}${lang === 'en' ? '-en' : ''}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch { /* ignore */ }
