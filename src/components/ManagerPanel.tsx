@@ -54,6 +54,7 @@ interface Employee {
   employment_type?: EmploymentType | null;
   can_saturday?: boolean;
   max_saturdays?: number;
+  tier?: number;
   active: boolean;
 }
 
@@ -257,7 +258,7 @@ function EmployeesTab() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), t('Štítky', 'Tags'), t('Cíl. hodiny', 'Target hours'), t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
+                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), t('Štítky', 'Tags'), t('Cíl. hodiny', 'Target hours'), 'Tier', t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -283,6 +284,13 @@ function EmployeesTab() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{emp.department ?? '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{emp.position ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {emp.tier ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                          T{emp.tier}{emp.max_saturdays ? ` · ${emp.max_saturdays}So` : ''}
+                        </span>
+                      ) : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       <div className="flex flex-wrap gap-1">
                         {(emp.labels ?? []).map((l) => (
@@ -366,6 +374,9 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
     target_hours: employee?.target_hours ?? 160,
     vacation_days_per_year: employee?.vacation_days_per_year ?? 20,
     employment_type: (employee?.employment_type ? (LEGACY_LABELS[employee.employment_type] ?? employee.employment_type) : empTypes[0] ?? 'HPP') as EmploymentType,
+    tier: employee?.tier ?? 0,
+    can_saturday: employee?.can_saturday ?? false,
+    max_saturdays: employee?.max_saturdays ?? 0,
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -393,6 +404,9 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
       const payload = {
         ...form,
         labels: form.labels.split(',').map((l) => l.trim()).filter(Boolean),
+        tier: form.tier,
+        can_saturday: form.can_saturday,
+        max_saturdays: form.max_saturdays,
       };
 
       const url = employee ? `/api/employees/${employee.id}` : '/api/employees';
@@ -489,6 +503,70 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
               <input className={inputCls()} type="number" min={0} max={365} value={form.vacation_days_per_year} onChange={(e) => set('vacation_days_per_year', Number(e.target.value))} />
             </FormField>
           </div>
+          {/* Tier + Soboty */}
+          <div className="border-t pt-4 space-y-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('Asistent směn (DLC)', 'Shift assistant (DLC)')}</p>
+            <FormField label={t('Tier zaměstnance', 'Employee tier')}>
+              <div className="flex gap-2">
+                {([0, 1, 2, 3] as const).map((t_) => {
+                  const labels = [t('Bez tieru', 'No tier'), 'Tier 1', 'Tier 2', 'Tier 3'];
+                  const descs = [
+                    t('Neřazeno', 'Unranked'),
+                    t('Full-time prodejna', 'Full-time store'),
+                    t('~4× / měsíc', '~4× / month'),
+                    t('Výpomoc ~1×', 'Occasional ~1×'),
+                  ];
+                  const active = form.tier === t_;
+                  return (
+                    <button
+                      key={t_}
+                      type="button"
+                      onClick={() => set('tier', t_)}
+                      title={descs[t_]}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${active ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-600 hover:border-blue-300'}`}
+                    >
+                      {labels[t_]}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.tier > 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  {[
+                    '',
+                    t('Full-time prodejna — priorita každá sobota', 'Full-time store — priority every Saturday'),
+                    t('Částečný úvazek — cca 4 soboty měsíčně', 'Part-time — approx. 4 Saturdays/month'),
+                    t('Výpomoc — cca 1 sobota měsíčně', 'Occasional — approx. 1 Saturday/month'),
+                  ][form.tier]}
+                </p>
+              )}
+            </FormField>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label={t('Max sobot / měsíc', 'Max Saturdays / month')}>
+                <input
+                  className={inputCls()}
+                  type="number"
+                  min={0}
+                  max={5}
+                  value={form.max_saturdays}
+                  onChange={(e) => set('max_saturdays', Number(e.target.value))}
+                  placeholder="0"
+                />
+              </FormField>
+              <FormField label={t('Může pracovat v sobotu', 'Can work Saturday')}>
+                <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.can_saturday}
+                    onChange={(e) => set('can_saturday', e.target.checked)}
+                    className="w-4 h-4 rounded accent-blue-600"
+                  />
+                  <span className="text-sm text-slate-700">{form.can_saturday ? t('Ano', 'Yes') : t('Ne', 'No')}</span>
+                </label>
+              </FormField>
+            </div>
+          </div>
+
           <div className="flex gap-3 pt-2 justify-end">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">{t('Zrušit', 'Cancel')}</button>
             <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
