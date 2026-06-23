@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
-// Keys stored in JSONB extra_settings column (not direct columns)
-const EXTRA_KEYS = [
-  'bonus_saturday_pct',
-  'bonus_overtime_threshold',
-  'bonus_overtime_pct',
-  'sick_leave_pct',
-  'hours_mon',
-  'hours_tue',
-  'hours_wed',
-  'hours_thu',
-  'hours_fri',
-  'hours_sat',
-  'hours_sun',
-];
+// Keys that are booleans (stored as 'true'/'false' strings)
+const BOOL_KEYS = new Set(['kiosk_enabled', 'saturday_logic_enabled', 'weekend_open']);
+
+// Keys that are numbers
+const NUM_KEYS = new Set([
+  'bonus_saturday_pct', 'bonus_overtime_threshold', 'bonus_overtime_pct', 'sick_leave_pct',
+  'benefit_blood_hours', 'benefit_blood_max', 'benefit_english_hours', 'benefit_english_max',
+  'benefit_gym_hours', 'benefit_gym_max',
+]);
+
+function parseValue(key: string, raw: string): unknown {
+  if (BOOL_KEYS.has(key)) return raw === 'true';
+  if (NUM_KEYS.has(key)) return parseFloat(raw) || 0;
+  return raw;
+}
 
 // GET /api/manager/settings
 export async function GET(req: NextRequest) {
@@ -22,70 +23,64 @@ export async function GET(req: NextRequest) {
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   const { orgId, supabase } = resolved;
 
-  // Use * so the query doesn't fail if extra_settings column hasn't been migrated yet
-  const { data: settings, error: settingsError } = await supabase
+  const { data: rows, error } = await supabase
     .from('company_settings')
-    .select('*')
-    .eq('organization_id', orgId)
-    .single();
+    .select('key, value')
+    .eq('organization_id', orgId);
 
-  if (settingsError || !settings) {
+  if (error) {
     return NextResponse.json({ error: 'Nastavení nenalezeno.' }, { status: 404 });
   }
 
-  const s = settings as {
-    kiosk_enabled: boolean;
-    saturday_logic_enabled: boolean | null;
-    manager_password: string | null;
-    ui_theme: string | null;
-    closed_dates: string | null;
-    extra_settings?: Record<string, unknown> | null;
+  const settings: Record<string, unknown> = {
+    kioskEnabled: false,
+    saturday_logic_enabled: false,
+    weekend_open: false,
+    managerPasswordSet: false,
+    ui_theme: 'slate',
+    closed_dates: '',
   };
 
-  const extra = s.extra_settings ?? {};
+  for (const row of rows ?? []) {
+    if (row.key === 'manager_password') {
+      settings.managerPasswordSet = Boolean(row.value);
+    } else if (row.key === 'kiosk_enabled') {
+      settings.kioskEnabled = row.value === 'true';
+    } else {
+      settings[row.key] = parseValue(row.key, row.value ?? '');
+    }
+  }
 
-  return NextResponse.json({
-    kioskEnabled: s.kiosk_enabled,
-    saturday_logic_enabled: s.saturday_logic_enabled ?? false,
-    managerPasswordSet: Boolean(s.manager_password),
-    ui_theme: s.ui_theme ?? 'slate',
-    closed_dates: s.closed_dates ?? '',
-    // Spread extra_settings so NumberSetting / OperatingHoursSetting can read them by key
-    ...extra,
-  });
+  return NextResponse.json(settings);
 }
 
 // PUT /api/manager/settings
-// Body: { currentPassword?, newPassword?, kioskEnabled?, saturday_logic_enabled?, ui_theme?, closed_dates?, ...extraKeys }
 export async function PUT(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   const { orgId, supabase } = resolved;
 
   const body = await req.json() as Record<string, unknown>;
-  const { currentPassword, newPassword, kioskEnabled, saturday_logic_enabled, ui_theme, closed_dates } = body as {
-    currentPassword?: string;
-    newPassword?: string;
-    kioskEnabled?: boolean;
-    saturday_logic_enabled?: boolean;
-    ui_theme?: string;
-    closed_dates?: string;
-  };
 
-  const updates: Record<string, unknown> = {};
+  // Password change handled separately
+  if (body.new_password !== undefined || body.newPassword !== undefined) {
+    const newPassword = (body.new_password ?? body.newPassword) as string;
+    const currentPassword = (body.current_password ?? body.currentPassword) as string | undefined;
 
-  // Password change
-  if (newPassword !== undefined) {
-    if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+    if (!newPassword?.trim()) {
       return NextResponse.json({ error: 'Nové heslo nesmí být prázdné.' }, { status: 400 });
     }
-    const { data: settings } = await supabase
+
+    const { data: existingRow } = await supabase
       .from('company_settings')
-      .select('manager_password')
+      .select('value')
       .eq('organization_id', orgId)
-      .single();
-    const existing = (settings as { manager_password: string | null } | null)?.manager_password ?? null;
+      .eq('key', 'manager_password')
+      .maybeSingle();
+
+    const existing = existingRow?.value ?? null;
     const isDefaultOrUnset = existing === null || existing === 'manager123';
+
     if (!isDefaultOrUnset) {
       if (!currentPassword) {
         return NextResponse.json({ error: 'Aktuální heslo je povinné pro změnu hesla.' }, { status: 400 });
@@ -94,57 +89,35 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ error: 'Aktuální heslo je nesprávné.' }, { status: 401 });
       }
     }
-    updates.manager_password = newPassword;
+
+    await supabase.from('company_settings').upsert(
+      { organization_id: orgId, key: 'manager_password', value: newPassword },
+      { onConflict: 'organization_id,key' }
+    );
+    return NextResponse.json({ ok: true });
   }
 
-  if (kioskEnabled !== undefined) updates.kiosk_enabled = kioskEnabled;
-  if (saturday_logic_enabled !== undefined) updates.saturday_logic_enabled = saturday_logic_enabled;
-  if (ui_theme !== undefined) updates.ui_theme = ui_theme;
-  if (closed_dates !== undefined) updates.closed_dates = closed_dates;
+  // All other settings: upsert each key-value pair
+  const SKIP_KEYS = new Set(['current_password', 'currentPassword', 'new_password', 'newPassword']);
+  const pairs: { organization_id: string; key: string; value: string }[] = [];
 
-  // Any EXTRA_KEYS in the body go into extra_settings JSONB via merge
-  const extraUpdates: Record<string, unknown> = {};
-  for (const key of EXTRA_KEYS) {
-    if (key in body) extraUpdates[key] = body[key];
+  for (const [key, val] of Object.entries(body)) {
+    if (SKIP_KEYS.has(key)) continue;
+    // Map camelCase legacy keys
+    const dbKey = key === 'kioskEnabled' ? 'kiosk_enabled' : key;
+    pairs.push({ organization_id: orgId, key: dbKey, value: String(val) });
   }
 
-  if (Object.keys(updates).length === 0 && Object.keys(extraUpdates).length === 0) {
+  if (pairs.length === 0) {
     return NextResponse.json({ error: 'Nebyla zadána žádná změna.' }, { status: 400 });
   }
 
-  // If we have extra keys, fetch current extra_settings and merge
-  if (Object.keys(extraUpdates).length > 0) {
-    const { data: current } = await supabase
-      .from('company_settings')
-      .select('*')
-      .eq('organization_id', orgId)
-      .single();
-
-    const currentExtra = (current as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
-    updates.extra_settings = { ...currentExtra, ...extraUpdates };
-  }
-
-  const { error: updateError } = await supabase
+  const { error: upsertError } = await supabase
     .from('company_settings')
-    .upsert({ organization_id: orgId, ...updates }, { onConflict: 'organization_id' });
+    .upsert(pairs, { onConflict: 'organization_id,key' });
 
-  if (updateError) {
-    // If extra_settings column doesn't exist yet, retry without it (migration pending)
-    if (updateError.message?.includes('extra_settings') && updates.extra_settings !== undefined) {
-      const { extra_settings: _dropped, ...updatesWithoutExtra } = updates;
-      if (Object.keys(updatesWithoutExtra).length === 0) {
-        return NextResponse.json({ ok: true, warning: 'extra_settings column missing — run migration' });
-      }
-      const { error: retryError } = await supabase
-        .from('company_settings')
-        .upsert({ organization_id: orgId, ...updatesWithoutExtra }, { onConflict: 'organization_id' });
-      if (retryError) {
-        console.error('PUT /api/manager/settings retry error:', retryError);
-        return NextResponse.json({ error: 'Nepodařilo se uložit nastavení.' }, { status: 500 });
-      }
-      return NextResponse.json({ ok: true });
-    }
-    console.error('PUT /api/manager/settings error:', updateError);
+  if (upsertError) {
+    console.error('PUT /api/manager/settings error:', upsertError);
     return NextResponse.json({ error: 'Nepodařilo se uložit nastavení.' }, { status: 500 });
   }
 

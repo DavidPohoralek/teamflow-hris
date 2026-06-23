@@ -9,11 +9,12 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabase
     .from('company_settings')
-    .select('subscription_status')
+    .select('value')
     .eq('organization_id', orgId)
-    .single();
+    .eq('key', 'subscription_status')
+    .maybeSingle();
 
-  const status = (data as { subscription_status?: string } | null)?.subscription_status ?? 'trial';
+  const status = (data as { value?: string } | null)?.value ?? 'trial';
   return NextResponse.json({ status });
 }
 
@@ -31,7 +32,7 @@ export async function PATCH(req: NextRequest) {
 
   await supabase
     .from('company_settings')
-    .upsert({ organization_id: orgId, subscription_status: status }, { onConflict: 'organization_id' });
+    .upsert({ organization_id: orgId, key: 'subscription_status', value: status }, { onConflict: 'organization_id,key' });
 
   return NextResponse.json({ ok: true });
 }
