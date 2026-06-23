@@ -662,14 +662,16 @@ function DayCard({
                 <span className="font-semibold">{(() => {
                   const name = entry.employeeName ?? '—';
                   const parts = name.trim().split(/\s+/);
-                  // Show initials of all parts: "Monika Ditrichová" → "M.D."
-                  return parts.map(p => p[0]?.toUpperCase() ?? '').join('.');
+                  // "Monika Ditrichová" → "Monika D."
+                  if (parts.length < 2) return name;
+                  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
                 })()}</span>
                 {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
               </span>
-              {(isManagerMode || (onCopyEntry && (!sessionEmployeeId || entry.employeeId === sessionEmployeeId))) && (
+              {/* Copy: only for PIN-logged employee on their own shift. Remove: manager always, employee only own shift. */}
+              {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
                 <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">
-                  {onCopyEntry && (isManagerMode || !sessionEmployeeId || entry.employeeId === sessionEmployeeId) && (
+                  {onCopyEntry && !isManagerMode && sessionEmployeeId && entry.employeeId === sessionEmployeeId && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
                       className="text-slate-400 hover:text-blue-500 p-0.5"
@@ -682,7 +684,7 @@ function DayCard({
                       </svg>
                     </button>
                   )}
-                  {onRemoveEmployee && (
+                  {onRemoveEmployee && (isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.employeeId); }}
                       className="text-slate-400 hover:text-red-500"
