@@ -22,9 +22,10 @@ export async function GET(req: NextRequest) {
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   const { orgId, supabase } = resolved;
 
+  // Use * so the query doesn't fail if extra_settings column hasn't been migrated yet
   const { data: settings, error: settingsError } = await supabase
     .from('company_settings')
-    .select('kiosk_enabled, manager_password, saturday_logic_enabled, ui_theme, closed_dates, extra_settings')
+    .select('*')
     .eq('organization_id', orgId)
     .single();
 
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
     manager_password: string | null;
     ui_theme: string | null;
     closed_dates: string | null;
-    extra_settings: Record<string, unknown> | null;
+    extra_settings?: Record<string, unknown> | null;
   };
 
   const extra = s.extra_settings ?? {};
@@ -115,11 +116,11 @@ export async function PUT(req: NextRequest) {
   if (Object.keys(extraUpdates).length > 0) {
     const { data: current } = await supabase
       .from('company_settings')
-      .select('extra_settings')
+      .select('*')
       .eq('organization_id', orgId)
       .single();
 
-    const currentExtra = (current as { extra_settings: Record<string, unknown> | null } | null)?.extra_settings ?? {};
+    const currentExtra = (current as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
     updates.extra_settings = { ...currentExtra, ...extraUpdates };
   }
 
@@ -128,6 +129,21 @@ export async function PUT(req: NextRequest) {
     .upsert({ organization_id: orgId, ...updates }, { onConflict: 'organization_id' });
 
   if (updateError) {
+    // If extra_settings column doesn't exist yet, retry without it (migration pending)
+    if (updateError.message?.includes('extra_settings') && updates.extra_settings !== undefined) {
+      const { extra_settings: _dropped, ...updatesWithoutExtra } = updates;
+      if (Object.keys(updatesWithoutExtra).length === 0) {
+        return NextResponse.json({ ok: true, warning: 'extra_settings column missing — run migration' });
+      }
+      const { error: retryError } = await supabase
+        .from('company_settings')
+        .upsert({ organization_id: orgId, ...updatesWithoutExtra }, { onConflict: 'organization_id' });
+      if (retryError) {
+        console.error('PUT /api/manager/settings retry error:', retryError);
+        return NextResponse.json({ error: 'Nepodařilo se uložit nastavení.' }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
     console.error('PUT /api/manager/settings error:', updateError);
     return NextResponse.json({ error: 'Nepodařilo se uložit nastavení.' }, { status: 500 });
   }
