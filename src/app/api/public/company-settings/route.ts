@@ -11,14 +11,16 @@ export async function GET(req: NextRequest) {
   );
   const { data } = await supabase
     .from('company_settings')
-    .select('kiosk_enabled, ui_theme, closed_dates')
+    .select('kiosk_enabled, ui_theme, closed_dates, extra_settings')
     .eq('organization_id', orgId)
     .single();
   if (!data) return NextResponse.json({});
-  const row = data as { kiosk_enabled: boolean | null; ui_theme: string | null; closed_dates: string | null };
+  const row = data as { kiosk_enabled: boolean | null; ui_theme: string | null; closed_dates: string | null; extra_settings: Record<string, unknown> | null };
   return NextResponse.json({
     kiosk_enabled: row.kiosk_enabled ?? false,
     ui_theme: row.ui_theme ?? 'slate',
     closed_dates: row.closed_dates ?? '',
+    // Spread extra_settings (hours_*, bonus_*) so WorkPlanGrid can read hours_mon etc.
+    ...(row.extra_settings ?? {}),
   });
 }

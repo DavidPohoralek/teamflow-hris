@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       .neq('type', 'draft')
       .gte('date', `${month}-01`)
       .lte('date', `${month}-31`),
-    sb.from('company_settings').select('key, value').eq('organization_id', orgId),
+    sb.from('company_settings').select('extra_settings, closed_dates, saturday_logic_enabled').eq('organization_id', orgId).single(),
   ]);
 
   const employees = (empRes.data ?? []).map((e: Record<string, unknown>) => ({
@@ -79,7 +79,8 @@ export async function GET(req: NextRequest) {
   // Build draft days from schedules — use calendar-style approach
   const draftDays = buildDraftDays(month, draftRes.data ?? [], draft);
 
-  const settings = buildSettings(settingsRes.data ?? []);
+  const rawSettings = settingsRes.data as { extra_settings: Record<string, unknown> | null; closed_dates: string | null; saturday_logic_enabled: boolean | null } | null;
+  const settings = buildSettings(rawSettings);
 
   const absences = buildAbsences(absenceRes.data ?? []);
 
@@ -164,14 +165,13 @@ function buildDraftDays(month: string, draftRows: Record<string, unknown>[], _dr
   return days;
 }
 
-function buildSettings(rows: Array<{ key: string; value: string }>) {
+function buildSettings(row: { extra_settings: Record<string, unknown> | null; closed_dates: string | null; saturday_logic_enabled: boolean | null } | null) {
   const s: Record<string, unknown> = {};
-  for (const row of rows) {
-    const v = row.value;
-    if (v === 'true') s[row.key] = true;
-    else if (v === 'false') s[row.key] = false;
-    else if (!isNaN(Number(v))) s[row.key] = Number(v);
-    else s[row.key] = v;
+  if (!row) return s;
+  if (row.saturday_logic_enabled != null) s.saturday_logic_enabled = row.saturday_logic_enabled;
+  if (row.closed_dates) s.closed_dates = row.closed_dates;
+  for (const [k, v] of Object.entries(row.extra_settings ?? {})) {
+    s[k] = v;
   }
   return s;
 }

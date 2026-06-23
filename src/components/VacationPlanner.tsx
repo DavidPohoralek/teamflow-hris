@@ -331,15 +331,25 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [myShiftDays, setMyShiftDays] = useState<Set<string>>(new Set());
   const [myShiftsLoading, setMyShiftsLoading] = useState(false);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
+  const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
   const portalRootRef = useRef<HTMLElement | null>(null);
   useEffect(() => { portalRootRef.current = document.body; }, []);
 
   useEffect(() => {
     fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
-      .then((s) => {
+      .then((s: Record<string, string>) => {
         const dates = (s.closed_dates ?? '').split(',').map((d: string) => d.trim()).filter(Boolean);
         setClosedDates(new Set(dates));
+        const keyMap: Record<string, number> = {
+          hours_mon: 1, hours_tue: 2, hours_wed: 3, hours_thu: 4,
+          hours_fri: 5, hours_sat: 6, hours_sun: 0,
+        };
+        const closed = new Set<number>();
+        for (const [key, wd] of Object.entries(keyMap)) {
+          if (key in s && !s[key]) closed.add(wd);
+        }
+        setClosedWeekdays(closed);
       })
       .catch(() => {});
   }, [orgId]);
@@ -572,7 +582,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           {days.map((dateStr) => {
             const wd = mondayWeekday(dateStr);
             const isWeekend = wd >= 5;
-            const isClosed = closedDates.has(dateStr);
+            const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
             const dayNum = new Date(dateStr + 'T00:00:00').getDate();
             const count = dayCountMap.get(dateStr) ?? 0;
             const onVacation = employees.filter((e) => empVacMap.get(e.id)?.has(dateStr));
