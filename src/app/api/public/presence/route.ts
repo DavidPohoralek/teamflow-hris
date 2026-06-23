@@ -71,7 +71,8 @@ export async function GET(req: NextRequest) {
     )
     .eq('organization_id', orgId)
     .eq('date', today)
-    .not('check_in', 'is', null);
+    .not('check_in', 'is', null)
+    .is('check_out', null);
 
   if (error) {
     console.error('GET public/presence error:', error);
