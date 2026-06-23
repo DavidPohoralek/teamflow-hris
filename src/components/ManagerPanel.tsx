@@ -114,7 +114,7 @@ export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps 
 
   const tabs = [
     { id: 'employees' as const, label: t('Zaměstnanci', 'Employees'), icon: '👥' },
-    { id: 'work-types' as const, label: t('Typy práce', 'Work Types'), icon: '🏷️' },
+    { id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' },
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     { id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' },
@@ -187,7 +187,7 @@ export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps 
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'employees' && <EmployeesTab />}
           {activeTab === 'work-types' && <WorkTypesTab />}
-          {activeTab === 'requests' && <RequestsTab />}
+          {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && <SettingsTab />}
         </div>
@@ -343,9 +343,18 @@ interface EmployeeFormProps {
   onSaved: () => void;
 }
 
+function useWorkTypes() {
+  const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
+  useEffect(() => {
+    managerFetch('/api/work-types').then((r) => r.json()).then((d) => setWorkTypes(d.workTypes ?? [])).catch(() => {});
+  }, []);
+  return workTypes;
+}
+
 function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeFormProps) {
   const t = useT();
   const { types: empTypes } = useEmploymentTypes();
+  const deptOptions = useWorkTypes().filter((wt) => wt.category === 'shift');
   const [form, setForm] = useState({
     name: employee?.name ?? '',
     pin: employee?.pin_code ?? employee?.pin ?? '',
@@ -446,7 +455,24 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label={t('Oddělení', 'Department')}>
-              <input className={inputCls()} value={form.department} onChange={(e) => set('department', e.target.value)} placeholder="Prodejna" />
+              {deptOptions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {deptOptions.map((wt) => (
+                    <button
+                      key={wt.id}
+                      type="button"
+                      onClick={() => set('department', form.department === wt.name ? '' : wt.name)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all ${form.department === wt.name ? 'border-current shadow-sm' : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      style={form.department === wt.name ? { borderColor: wt.color, backgroundColor: `${wt.color}22`, color: wt.color } : {}}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
+                      {wt.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <input className={inputCls()} value={form.department} onChange={(e) => set('department', e.target.value)} placeholder="Prodejna" />
+              )}
             </FormField>
             <FormField label={t('Pozice', 'Position')}>
               <input className={inputCls()} value={form.position} onChange={(e) => set('position', e.target.value)} placeholder="Prodavač" />
@@ -538,7 +564,7 @@ function WorkTypesTab() {
           onClick={() => { setEditingWT(null); setShowForm(true); }}
           className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium"
         >
-          {t('+ Přidat typ', '+ Add type')}
+          {t('+ Přidat oddělení', '+ Add department')}
         </button>
       </div>
 
@@ -548,7 +574,7 @@ function WorkTypesTab() {
       {!loading && !error && (
         <div className="space-y-2">
           {workTypes.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">{t('Žádné typy práce', 'No work types')}</p>
+            <p className="text-sm text-gray-400 text-center py-8">{t('Žádná oddělení', 'No departments')}</p>
           ) : (
             workTypes.map((wt) => (
               <div key={wt.id} className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
@@ -648,7 +674,7 @@ function WorkTypeForm({ workType, onClose, onSaved }: WorkTypeFormProps) {
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h3 className="font-semibold text-gray-900">{workType ? t('Upravit typ práce', 'Edit work type') : t('Přidat typ práce', 'Add work type')}</h3>
+          <h3 className="font-semibold text-gray-900">{workType ? t('Upravit oddělení', 'Edit department') : t('Přidat oddělení', 'Add department')}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -793,7 +819,7 @@ function VacationOverviewPanel() {
 
 // ─── Requests Tab ─────────────────────────────────────────────────────────────
 
-function RequestsTab() {
+function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void }) {
   const t = useT();
   const [subTab, setSubTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [requests, setRequests] = useState<Request[]>([]);
@@ -827,6 +853,8 @@ function RequestsTab() {
       });
       if (!res.ok) throw new Error('Nepodařilo se zpracovat žádost.');
       fetchRequests(subTab);
+      // Refresh badge count
+      managerFetch('/api/requests?status=pending').then((r) => r.json()).then((d) => onCountChange?.((d.requests ?? []).length)).catch(() => {});
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Chyba');
     }

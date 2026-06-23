@@ -650,7 +650,12 @@ function DayCard({
               title={`${entry.employeeName ?? '—'} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
             >
               <span className="truncate">
-                <span className="font-semibold">{entry.employeeName ?? '—'}</span>
+                <span className="font-semibold truncate">{(() => {
+                  const name = entry.employeeName ?? '—';
+                  const parts = name.trim().split(' ');
+                  if (parts.length < 2) return name;
+                  return `${parts[0][0]}.${parts.slice(1).join(' ')}`;
+                })()}{timeLabel && <span className="font-normal text-slate-500 ml-1">{timeLabel}</span>}</span>
                 {timeLabel && <span style={{ color: '#94a3b8' }}>{timeLabel}</span>}
               </span>
               {(isManagerMode || (onCopyEntry && (!sessionEmployeeId || entry.employeeId === sessionEmployeeId))) && (
