@@ -577,33 +577,26 @@ function DayCard({
 
   return (
     <div
-      onClick={isClosed ? undefined : handleCardClick}
-      className={`group rounded-xl border h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative ${
-        isClosed
-          ? 'border-slate-300 cursor-default overflow-hidden'
-          : isPasteMode
+      onClick={handleCardClick}
+      className={`group rounded-xl border h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative overflow-hidden ${
+        isPasteMode
           ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
           : isWeekend
           ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
           : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
       }`}
     >
+      {/* Closed day hatching — purely decorative, sits behind content */}
       {isClosed && (
-        <>
-          <div
-            className="absolute inset-0 rounded-xl pointer-events-none"
-            style={{
-              background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.18) 0px, rgba(148,163,184,0.18) 3px, transparent 3px, transparent 10px)',
-              backgroundColor: 'rgb(241 245 249)',
-            }}
-          />
-          <span className="relative z-10 self-end text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-            {t('Zavřeno', 'Closed')}
-          </span>
-        </>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.15) 0px, rgba(148,163,184,0.15) 3px, transparent 3px, transparent 10px)',
+          }}
+        />
       )}
       {/* Manager edit button */}
-      {!isClosed && isManagerMode && !isPasteMode && onEditDay && (
+      {isManagerMode && !isPasteMode && onEditDay && (
         <button
           onClick={(e) => { e.stopPropagation(); onEditDay(dateStr); }}
           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600"
@@ -617,9 +610,9 @@ function DayCard({
       )}
 
       {/* Header row */}
-      <div className="flex items-center justify-between mb-0.5">
+      <div className="relative z-10 flex items-center justify-between mb-0.5">
         <span className={`text-xs font-semibold ${isWeekend ? 'text-slate-400' : 'text-slate-500'}`}>
-          {dayName}
+          {dayName}{isClosed && <span className="ml-1 text-[9px] font-bold text-slate-400 bg-slate-200 px-1 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
         </span>
         <div className="flex items-center gap-1.5">
           {isManagerMode && scheduleMeta && (
@@ -639,8 +632,8 @@ function DayCard({
         </div>
       </div>
 
-      {/* Chips — scrollable */}
-      <div className="flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 scrollbar-thin">
+      {/* Chips — scrollable, above hatching */}
+      <div className="relative z-10 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 scrollbar-thin">
         {entries.map((entry, idx) => {
           const color = entry.workTypeColor ?? '#94a3b8';
           const timeLabel =
