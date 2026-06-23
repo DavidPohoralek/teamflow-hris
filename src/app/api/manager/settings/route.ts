@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
-// Keys that are booleans (stored as 'true'/'false' strings)
-const BOOL_KEYS = new Set(['kiosk_enabled', 'saturday_logic_enabled', 'weekend_open']);
-
-// Keys that are numbers
-const NUM_KEYS = new Set([
-  'bonus_saturday_pct', 'bonus_overtime_threshold', 'bonus_overtime_pct', 'sick_leave_pct',
-  'benefit_blood_hours', 'benefit_blood_max', 'benefit_english_hours', 'benefit_english_max',
-  'benefit_gym_hours', 'benefit_gym_max',
-]);
-
-function parseValue(key: string, raw: string): unknown {
-  if (BOOL_KEYS.has(key)) return raw === 'true';
-  if (NUM_KEYS.has(key)) return parseFloat(raw) || 0;
-  return raw;
-}
+// Keys stored in extra_settings JSONB (not direct columns on the table)
+const EXTRA_KEYS = [
+  'closed_dates',
+  'bonus_saturday_pct',
+  'bonus_overtime_threshold',
+  'bonus_overtime_pct',
+  'sick_leave_pct',
+  'hours_mon',
+  'hours_tue',
+  'hours_wed',
+  'hours_thu',
+  'hours_fri',
+  'hours_sat',
+  'hours_sun',
+  'benefit_blood_hours',
+  'benefit_blood_max',
+  'benefit_english_hours',
+  'benefit_english_max',
+  'benefit_gym_hours',
+  'benefit_gym_max',
+];
 
 // GET /api/manager/settings
 export async function GET(req: NextRequest) {
@@ -23,35 +29,34 @@ export async function GET(req: NextRequest) {
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   const { orgId, supabase } = resolved;
 
-  const { data: rows, error } = await supabase
+  const { data: row, error } = await supabase
     .from('company_settings')
-    .select('key, value')
-    .eq('organization_id', orgId);
+    .select('*')
+    .eq('organization_id', orgId)
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: 'Nastavení nenalezeno.' }, { status: 404 });
   }
 
-  const settings: Record<string, unknown> = {
-    kioskEnabled: false,
-    saturday_logic_enabled: false,
-    weekend_open: false,
-    managerPasswordSet: false,
-    ui_theme: 'slate',
-    closed_dates: '',
+  const s = (row ?? {}) as {
+    kiosk_enabled?: boolean | null;
+    saturday_logic_enabled?: boolean | null;
+    weekend_open?: boolean | null;
+    manager_password?: string | null;
+    ui_theme?: string | null;
+    extra_settings?: Record<string, unknown> | null;
   };
 
-  for (const row of rows ?? []) {
-    if (row.key === 'manager_password') {
-      settings.managerPasswordSet = Boolean(row.value);
-    } else if (row.key === 'kiosk_enabled') {
-      settings.kioskEnabled = row.value === 'true';
-    } else {
-      settings[row.key] = parseValue(row.key, row.value ?? '');
-    }
-  }
-
-  return NextResponse.json(settings);
+  return NextResponse.json({
+    kioskEnabled: s.kiosk_enabled ?? false,
+    saturday_logic_enabled: s.saturday_logic_enabled ?? false,
+    weekend_open: s.weekend_open ?? false,
+    managerPasswordSet: Boolean(s.manager_password),
+    ui_theme: s.ui_theme ?? 'slate',
+    // Spread extra_settings so NumberSetting / OperatingHoursSetting can read by key
+    ...(s.extra_settings ?? {}),
+  });
 }
 
 // PUT /api/manager/settings
@@ -61,60 +66,61 @@ export async function PUT(req: NextRequest) {
   const { orgId, supabase } = resolved;
 
   const body = await req.json() as Record<string, unknown>;
+  const { new_password, newPassword, current_password, currentPassword, kioskEnabled, kiosk_enabled, saturday_logic_enabled, weekend_open, ui_theme } = body as Record<string, unknown>;
 
-  // Password change handled separately
-  if (body.new_password !== undefined || body.newPassword !== undefined) {
-    const newPassword = (body.new_password ?? body.newPassword) as string;
-    const currentPassword = (body.current_password ?? body.currentPassword) as string | undefined;
+  const updates: Record<string, unknown> = {};
 
-    if (!newPassword?.trim()) {
+  // Password change
+  const incomingNew = (new_password ?? newPassword) as string | undefined;
+  if (incomingNew !== undefined) {
+    if (!incomingNew?.trim()) {
       return NextResponse.json({ error: 'Nové heslo nesmí být prázdné.' }, { status: 400 });
     }
-
+    const incomingCurrent = (current_password ?? currentPassword) as string | undefined;
     const { data: existingRow } = await supabase
       .from('company_settings')
-      .select('value')
+      .select('manager_password')
       .eq('organization_id', orgId)
-      .eq('key', 'manager_password')
       .maybeSingle();
-
-    const existing = existingRow?.value ?? null;
+    const existing = (existingRow as { manager_password: string | null } | null)?.manager_password ?? null;
     const isDefaultOrUnset = existing === null || existing === 'manager123';
-
     if (!isDefaultOrUnset) {
-      if (!currentPassword) {
-        return NextResponse.json({ error: 'Aktuální heslo je povinné pro změnu hesla.' }, { status: 400 });
-      }
-      if (existing !== currentPassword) {
-        return NextResponse.json({ error: 'Aktuální heslo je nesprávné.' }, { status: 401 });
-      }
+      if (!incomingCurrent) return NextResponse.json({ error: 'Aktuální heslo je povinné.' }, { status: 400 });
+      if (existing !== incomingCurrent) return NextResponse.json({ error: 'Aktuální heslo je nesprávné.' }, { status: 401 });
     }
-
-    await supabase.from('company_settings').upsert(
-      { organization_id: orgId, key: 'manager_password', value: newPassword },
-      { onConflict: 'organization_id,key' }
-    );
-    return NextResponse.json({ ok: true });
+    updates.manager_password = incomingNew;
   }
 
-  // All other settings: upsert each key-value pair
-  const SKIP_KEYS = new Set(['current_password', 'currentPassword', 'new_password', 'newPassword']);
-  const pairs: { organization_id: string; key: string; value: string }[] = [];
+  // Direct boolean/string columns
+  const kioskVal = kioskEnabled ?? kiosk_enabled;
+  if (kioskVal !== undefined) updates.kiosk_enabled = Boolean(kioskVal);
+  if (saturday_logic_enabled !== undefined) updates.saturday_logic_enabled = Boolean(saturday_logic_enabled);
+  if (weekend_open !== undefined) updates.weekend_open = Boolean(weekend_open);
+  if (ui_theme !== undefined) updates.ui_theme = String(ui_theme);
 
-  for (const [key, val] of Object.entries(body)) {
-    if (SKIP_KEYS.has(key)) continue;
-    // Map camelCase legacy keys
-    const dbKey = key === 'kioskEnabled' ? 'kiosk_enabled' : key;
-    pairs.push({ organization_id: orgId, key: dbKey, value: String(val) });
+  // Keys that go into extra_settings JSONB
+  const extraUpdates: Record<string, unknown> = {};
+  for (const key of EXTRA_KEYS) {
+    if (key in body) extraUpdates[key] = body[key];
   }
 
-  if (pairs.length === 0) {
+  if (Object.keys(updates).length === 0 && Object.keys(extraUpdates).length === 0) {
     return NextResponse.json({ error: 'Nebyla zadána žádná změna.' }, { status: 400 });
+  }
+
+  if (Object.keys(extraUpdates).length > 0) {
+    const { data: current } = await supabase
+      .from('company_settings')
+      .select('extra_settings')
+      .eq('organization_id', orgId)
+      .maybeSingle();
+    const currentExtra = (current as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
+    updates.extra_settings = { ...currentExtra, ...extraUpdates };
   }
 
   const { error: upsertError } = await supabase
     .from('company_settings')
-    .upsert(pairs, { onConflict: 'organization_id,key' });
+    .upsert({ organization_id: orgId, ...updates }, { onConflict: 'organization_id' });
 
   if (upsertError) {
     console.error('PUT /api/manager/settings error:', upsertError);

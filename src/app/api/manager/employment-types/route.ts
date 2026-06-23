@@ -11,15 +11,11 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabase
     .from('company_settings')
-    .select('value')
+    .select('employment_types')
     .eq('organization_id', orgId)
-    .eq('key', 'employment_types')
     .maybeSingle();
 
-  let types = DEFAULT_TYPES;
-  if (data?.value) {
-    try { types = JSON.parse(data.value); } catch { /* use default */ }
-  }
+  const types = (data as { employment_types: string[] | null } | null)?.employment_types ?? DEFAULT_TYPES;
   return NextResponse.json({ types });
 }
 
@@ -37,7 +33,7 @@ export async function PUT(req: NextRequest) {
 
   const { error } = await supabase
     .from('company_settings')
-    .upsert({ organization_id: orgId, key: 'employment_types', value: JSON.stringify(cleaned) }, { onConflict: 'organization_id,key' });
+    .upsert({ organization_id: orgId, employment_types: cleaned }, { onConflict: 'organization_id' });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, types: cleaned });

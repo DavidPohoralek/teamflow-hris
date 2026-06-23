@@ -56,13 +56,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Create default company_settings rows — trial status + kiosk enabled for new orgs
+  // Create default company_settings row — trial status + kiosk enabled for new orgs
   await supabaseAdmin
     .from('company_settings')
-    .upsert([
-      { organization_id: org.id, key: 'subscription_status', value: 'trial' },
-      { organization_id: org.id, key: 'kiosk_enabled', value: 'true' },
-    ], { onConflict: 'organization_id,key' });
+    .upsert({ organization_id: org.id, kiosk_enabled: true, subscription_status: 'trial' }, { onConflict: 'organization_id' });
 
   return NextResponse.json({ ok: true, organizationId: org.id });
 }

@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       .neq('type', 'draft')
       .gte('date', `${month}-01`)
       .lte('date', `${month}-31`),
-    sb.from('company_settings').select('key, value').eq('organization_id', orgId),
+    sb.from('company_settings').select('extra_settings, saturday_logic_enabled').eq('organization_id', orgId).maybeSingle(),
   ]);
 
   const employees = (empRes.data ?? []).map((e: Record<string, unknown>) => ({
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
   // Build draft days from schedules — use calendar-style approach
   const draftDays = buildDraftDays(month, draftRes.data ?? [], draft);
 
-  const settings = buildSettings(settingsRes.data ?? []);
+  const settings = buildSettings(settingsRes.data);
 
   const absences = buildAbsences(absenceRes.data ?? []);
 
@@ -164,16 +164,11 @@ function buildDraftDays(month: string, draftRows: Record<string, unknown>[], _dr
   return days;
 }
 
-function buildSettings(rows: Array<{ key: string; value: string | null }>) {
+function buildSettings(row: { extra_settings: Record<string, unknown> | null; saturday_logic_enabled: boolean | null } | null) {
   const s: Record<string, unknown> = {};
-  const NUM_KEYS = new Set(['bonus_saturday_pct', 'bonus_overtime_threshold', 'bonus_overtime_pct', 'sick_leave_pct']);
-  const BOOL_KEYS = new Set(['saturday_logic_enabled', 'weekend_open', 'kiosk_enabled']);
-  for (const row of rows) {
-    if (!row.key || row.value == null) continue;
-    if (BOOL_KEYS.has(row.key)) s[row.key] = row.value === 'true';
-    else if (NUM_KEYS.has(row.key)) s[row.key] = parseFloat(row.value) || 0;
-    else s[row.key] = row.value;
-  }
+  if (!row) return s;
+  if (row.saturday_logic_enabled != null) s.saturday_logic_enabled = row.saturday_logic_enabled;
+  for (const [k, v] of Object.entries(row.extra_settings ?? {})) { s[k] = v; }
   return s;
 }
 

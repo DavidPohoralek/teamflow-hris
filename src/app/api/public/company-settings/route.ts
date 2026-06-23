@@ -1,14 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-const NUM_KEYS = new Set([
-  'bonus_saturday_pct', 'bonus_overtime_threshold', 'bonus_overtime_pct', 'sick_leave_pct',
-  'benefit_blood_hours', 'benefit_blood_max', 'benefit_english_hours', 'benefit_english_max',
-  'benefit_gym_hours', 'benefit_gym_max',
-]);
-
-const BOOL_KEYS = new Set(['kiosk_enabled', 'saturday_logic_enabled', 'weekend_open']);
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const orgId = searchParams.get('orgId');
@@ -19,27 +11,18 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: rows } = await supabase
+  const { data: row } = await supabase
     .from('company_settings')
-    .select('key, value')
-    .eq('organization_id', orgId);
+    .select('kiosk_enabled, ui_theme, extra_settings')
+    .eq('organization_id', orgId)
+    .maybeSingle();
 
-  const result: Record<string, unknown> = {
-    kiosk_enabled: false,
-    ui_theme: 'slate',
-    closed_dates: '',
-  };
+  const r = (row ?? {}) as { kiosk_enabled?: boolean | null; ui_theme?: string | null; extra_settings?: Record<string, unknown> | null };
 
-  for (const row of rows ?? []) {
-    if (row.key === 'manager_password') continue;
-    if (BOOL_KEYS.has(row.key)) {
-      result[row.key] = row.value === 'true';
-    } else if (NUM_KEYS.has(row.key)) {
-      result[row.key] = parseFloat(row.value ?? '') || 0;
-    } else {
-      result[row.key] = row.value ?? '';
-    }
-  }
-
-  return NextResponse.json(result);
+  return NextResponse.json({
+    kiosk_enabled: r.kiosk_enabled ?? false,
+    ui_theme: r.ui_theme ?? 'slate',
+    // Spread extra_settings so WorkPlanGrid can read hours_mon, closed_dates, etc.
+    ...(r.extra_settings ?? {}),
+  });
 }

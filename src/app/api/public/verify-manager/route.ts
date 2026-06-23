@@ -19,14 +19,13 @@ export async function POST(req: NextRequest) {
 
     const supabase = getServiceClient()
 
-    const { data: pwRow } = await supabase
+    const { data: settings } = await supabase
       .from('company_settings')
-      .select('value')
+      .select('manager_password')
       .eq('organization_id', orgId)
-      .eq('key', 'manager_password')
       .maybeSingle()
 
-    const storedPassword = pwRow?.value ?? 'manager123'
+    const storedPassword = (settings as { manager_password?: string | null } | null)?.manager_password ?? 'manager123'
 
     if (storedPassword !== password) {
       return NextResponse.json({ ok: false, error: 'Nesprávné heslo' }, { status: 401 })
