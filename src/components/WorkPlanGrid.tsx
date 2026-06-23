@@ -580,7 +580,7 @@ function DayCard({
       onClick={isClosed ? undefined : handleCardClick}
       className={`group rounded-xl border h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative ${
         isClosed
-          ? 'bg-slate-100 border-slate-200 cursor-default'
+          ? 'border-slate-300 cursor-default overflow-hidden'
           : isPasteMode
           ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
           : isWeekend
@@ -589,9 +589,18 @@ function DayCard({
       }`}
     >
       {isClosed && (
-        <span className="absolute top-1.5 right-1.5 text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-          {t('Zavřeno', 'Closed')}
-        </span>
+        <>
+          <div
+            className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{
+              background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.18) 0px, rgba(148,163,184,0.18) 3px, transparent 3px, transparent 10px)',
+              backgroundColor: 'rgb(241 245 249)',
+            }}
+          />
+          <span className="relative z-10 self-end text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+            {t('Zavřeno', 'Closed')}
+          </span>
+        </>
       )}
       {/* Manager edit button */}
       {!isClosed && isManagerMode && !isPasteMode && onEditDay && (
@@ -641,7 +650,7 @@ function DayCard({
           return (
             <div
               key={idx}
-              className="group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1"
+              className="group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1 min-w-0"
               style={{
                 borderLeft: `3px solid ${color}`,
                 backgroundColor: `${color}22`,
@@ -649,14 +658,14 @@ function DayCard({
               }}
               title={`${entry.employeeName ?? '—'} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
             >
-              <span className="truncate">
-                <span className="font-semibold truncate">{(() => {
+              <span className="truncate min-w-0">
+                <span className="font-semibold">{(() => {
                   const name = entry.employeeName ?? '—';
-                  const parts = name.trim().split(' ');
-                  if (parts.length < 2) return name;
-                  return `${parts[0][0]}.${parts.slice(1).join(' ')}`;
-                })()}{timeLabel && <span className="font-normal text-slate-500 ml-1">{timeLabel}</span>}</span>
-                {timeLabel && <span style={{ color: '#94a3b8' }}>{timeLabel}</span>}
+                  const parts = name.trim().split(/\s+/);
+                  // Show initials of all parts: "Monika Ditrichová" → "M.D."
+                  return parts.map(p => p[0]?.toUpperCase() ?? '').join('.');
+                })()}</span>
+                {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
               </span>
               {(isManagerMode || (onCopyEntry && (!sessionEmployeeId || entry.employeeId === sessionEmployeeId))) && (
                 <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">

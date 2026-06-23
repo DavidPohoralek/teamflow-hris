@@ -330,8 +330,19 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [showMyShifts, setShowMyShifts] = useState(false);
   const [myShiftDays, setMyShiftDays] = useState<Set<string>>(new Set());
   const [myShiftsLoading, setMyShiftsLoading] = useState(false);
+  const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const portalRootRef = useRef<HTMLElement | null>(null);
   useEffect(() => { portalRootRef.current = document.body; }, []);
+
+  useEffect(() => {
+    fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
+      .then((r) => r.json())
+      .then((s) => {
+        const dates = (s.closed_dates ?? '').split(',').map((d: string) => d.trim()).filter(Boolean);
+        setClosedDates(new Set(dates));
+      })
+      .catch(() => {});
+  }, [orgId]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -561,6 +572,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           {days.map((dateStr) => {
             const wd = mondayWeekday(dateStr);
             const isWeekend = wd >= 5;
+            const isClosed = closedDates.has(dateStr);
             const dayNum = new Date(dateStr + 'T00:00:00').getDate();
             const count = dayCountMap.get(dateStr) ?? 0;
             const onVacation = employees.filter((e) => empVacMap.get(e.id)?.has(dateStr));
@@ -571,15 +583,25 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
               <div
                 key={dateStr}
                 onClick={() => {
-                  if (!isManagerMode && sessionEmployee) {
+                  if (!isClosed && !isManagerMode && sessionEmployee) {
                     setClickedDate(dateStr);
                     setShowEmployeeVacModal(true);
                   }
                 }}
-                className={`min-h-[80px] p-2 flex flex-col gap-1 ${isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${hasMyShift ? 'ring-2 ring-inset ring-blue-400' : ''} ${!isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
+                className={`min-h-[80px] p-2 flex flex-col gap-1 relative overflow-hidden ${isClosed ? 'cursor-default' : isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${hasMyShift && !isClosed ? 'ring-2 ring-inset ring-blue-400' : ''} ${!isClosed && !isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
               >
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className={`text-xs font-bold ${isWeekend ? 'text-blue-400' : 'text-slate-700'}`}>{dayNum}</span>
+                {isClosed && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.18) 0px, rgba(148,163,184,0.18) 3px, transparent 3px, transparent 10px)',
+                      backgroundColor: 'rgb(241 245 249)',
+                    }}
+                  />
+                )}
+                <div className="relative z-10 flex items-center justify-between mb-0.5">
+                  <span className={`text-xs font-bold ${isClosed ? 'text-slate-400' : isWeekend ? 'text-blue-400' : 'text-slate-700'}`}>{dayNum}</span>
+                  {isClosed && <span className="text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
                   <div className="flex items-center gap-1">
                     {hasMyShift && (
                       <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1 py-0.5 rounded">{t('směna', 'shift')}</span>
@@ -594,7 +616,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-0.5">
+                <div className="relative z-10 flex flex-col gap-0.5">
                   {onVacation.map((emp) => {
                     const st = empStatusMap.get(emp.id)?.get(dateStr) ?? 'pending';
                     return (

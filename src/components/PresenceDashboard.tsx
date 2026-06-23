@@ -3,14 +3,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useT } from '@/lib/i18n';
 
-type WorkType = 'Prodejna' | 'HO' | 'Kancelář' | string;
-
 interface PresenceRecord {
   id: string;
   employeeId: string;
   name: string;
-  workType: WorkType;
+  workType: string;
   checkInTime: string; // ISO string
+}
+
+interface WorkTypeInfo {
+  name: string;
+  color: string;
+  sort_order: number;
 }
 
 interface PresenceDashboardProps {
@@ -18,40 +22,25 @@ interface PresenceDashboardProps {
   isManagerMode: boolean;
 }
 
-const WORK_TYPE_COLORS: Record<string, { border: string; badge: string; summary: string; avatar: string; summaryCard: string }> = {
-  Prodejna: {
-    border: 'border-l-blue-500',
-    badge: 'bg-blue-100 text-blue-800',
-    summary: 'bg-blue-100 text-blue-800',
-    avatar: 'from-blue-500 to-blue-600',
-    summaryCard: 'bg-blue-50 border-blue-200 text-blue-700',
-  },
-  HO: {
-    border: 'border-l-purple-500',
-    badge: 'bg-purple-100 text-purple-800',
-    summary: 'bg-purple-100 text-purple-800',
-    avatar: 'from-purple-500 to-purple-600',
-    summaryCard: 'bg-purple-50 border-purple-200 text-purple-700',
-  },
-  Kancelář: {
-    border: 'border-l-amber-500',
-    badge: 'bg-amber-100 text-amber-800',
-    summary: 'bg-amber-100 text-amber-800',
-    avatar: 'from-amber-500 to-orange-500',
-    summaryCard: 'bg-amber-50 border-amber-200 text-amber-700',
-  },
-};
+// Darken a hex color slightly for text
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
 
-const DEFAULT_COLORS = {
-  border: 'border-l-slate-400',
-  badge: 'bg-slate-100 text-slate-700',
-  summary: 'bg-slate-100 text-slate-700',
-  avatar: 'from-slate-500 to-slate-600',
-  summaryCard: 'bg-slate-50 border-slate-200 text-slate-600',
-};
-
-function getColors(workType: string) {
-  return WORK_TYPE_COLORS[workType] ?? DEFAULT_COLORS;
+function colorStyles(hex: string) {
+  const [r, g, b] = hexToRgb(hex);
+  return {
+    border: `4px solid ${hex}`,
+    badge: { backgroundColor: `${hex}22`, color: hex, border: `1px solid ${hex}55` },
+    summaryCard: { backgroundColor: `${hex}15`, border: `1px solid ${hex}55`, color: hex },
+    avatar: { background: `linear-gradient(135deg, ${hex}, ${hex}cc)` },
+    dot: hex,
+  };
 }
 
 function getInitials(name: string): string {
@@ -87,11 +76,11 @@ function formatDuration(checkInTime: string): { since: string; duration: string 
   return { since, duration };
 }
 
-function sortRecords(records: PresenceRecord[]): PresenceRecord[] {
-  const workTypeOrder: Record<string, number> = { Prodejna: 0, HO: 1, Kancelář: 2 };
+function sortRecords(records: PresenceRecord[], workTypes: WorkTypeInfo[]): PresenceRecord[] {
+  const orderMap = new Map(workTypes.map((wt, i) => [wt.name, wt.sort_order ?? i]));
   return [...records].sort((a, b) => {
-    const orderA = workTypeOrder[a.workType] ?? 99;
-    const orderB = workTypeOrder[b.workType] ?? 99;
+    const orderA = orderMap.get(a.workType) ?? 99;
+    const orderB = orderMap.get(b.workType) ?? 99;
     if (orderA !== orderB) return orderA - orderB;
     return a.name.localeCompare(b.name, 'cs');
   });
@@ -100,10 +89,21 @@ function sortRecords(records: PresenceRecord[]): PresenceRecord[] {
 export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDashboardProps) {
   const t = useT();
   const [records, setRecords] = useState<PresenceRecord[]>([]);
+  const [workTypes, setWorkTypes] = useState<WorkTypeInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/work-types?orgId=${encodeURIComponent(orgId)}`)
+      .then((r) => r.json())
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((json) => setWorkTypes((json.workTypes ?? []).map((wt: any) => ({ name: wt.name, color: wt.color ?? '#94a3b8', sort_order: wt.sort_order ?? 0 }))))
+      .catch(() => {});
+  }, [orgId]);
+
+  const workTypeColorMap = new Map(workTypes.map((wt) => [wt.name, wt.color]));
 
   const fetchPresence = useCallback(async () => {
     try {
@@ -122,12 +122,12 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
       setRecords(data);
       setError(null);
       setLastUpdated(new Date());
-    } catch (err) {
+    } catch {
       setError(t('Nepodařilo se načíst data o přítomnosti.', 'Failed to load presence data.'));
     } finally {
       setLoading(false);
     }
-  }, [orgId]);
+  }, [orgId, t]);
 
   useEffect(() => {
     fetchPresence();
@@ -135,7 +135,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
     return () => clearInterval(interval);
   }, [fetchPresence]);
 
-  const sorted = sortRecords(records);
+  const sorted = sortRecords(records, workTypes);
 
   const totalCount = records.length;
   const countByType = records.reduce<Record<string, number>>((acc, r) => {
@@ -143,7 +143,10 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
     return acc;
   }, {});
 
-  const summaryTypes = ['Prodejna', 'HO', 'Kancelář'];
+  // Show all work types that have at least someone present, plus all configured ones
+  const summaryTypes = workTypes.length > 0
+    ? workTypes.map((wt) => wt.name)
+    : Object.keys(countByType);
 
   return (
     <div className="w-full px-6 py-5 space-y-6">
@@ -179,11 +182,13 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
         </div>
         {summaryTypes.map((type) => {
           const count = countByType[type] ?? 0;
-          const colors = getColors(type);
+          const hex = workTypeColorMap.get(type) ?? '#94a3b8';
+          const styles = colorStyles(hex);
           return (
             <div
               key={type}
-              className={`flex items-center gap-3 border rounded-xl px-4 py-3 min-w-[120px] ${colors.summaryCard}`}
+              className="flex items-center gap-3 rounded-xl px-4 py-3 min-w-[120px]"
+              style={styles.summaryCard}
             >
               <div>
                 <div className="text-xl font-bold leading-none">{count}</div>
@@ -240,21 +245,26 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
       {!loading && sorted.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((record) => {
-            const colors = getColors(record.workType);
+            const hex = workTypeColorMap.get(record.workType) ?? '#94a3b8';
+            const styles = colorStyles(hex);
             const { since, duration } = formatDuration(record.checkInTime);
             const isEditing = editingId === record.id;
 
             return (
               <div
                 key={record.id}
-                className={`relative rounded-lg border border-l-4 border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${colors.border}`}
+                className="relative rounded-lg border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                style={{ borderLeft: styles.border, borderColor: '#e2e8f0' }}
               >
                 <div className="flex items-start justify-between gap-3">
                   {/* Avatar + info */}
                   <div className="flex items-center gap-3">
                     {/* Avatar circle */}
                     <div className="relative flex-shrink-0">
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${colors.avatar} text-sm font-bold text-white shadow-sm`}>
+                      <div
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm"
+                        style={styles.avatar}
+                      >
                         {getInitials(record.name)}
                       </div>
                       {/* Green presence dot */}
@@ -273,7 +283,8 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
 
                   {/* Work type badge */}
                   <span
-                    className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${colors.badge}`}
+                    className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={styles.badge}
                   >
                     {record.workType}
                   </span>

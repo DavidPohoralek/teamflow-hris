@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const { data: settings, error: settingsError } = await supabase
     .from('company_settings')
-    .select('kiosk_enabled, manager_password, saturday_logic_enabled, ui_theme')
+    .select('kiosk_enabled, manager_password, saturday_logic_enabled, ui_theme, closed_dates')
     .eq('organization_id', orgId)
     .single();
 
@@ -18,12 +18,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Nastavení nenalezeno.' }, { status: 404 });
   }
 
-  const s = settings as { kiosk_enabled: boolean; saturday_logic_enabled: boolean | null; manager_password: string | null; ui_theme: string | null };
+  const s = settings as { kiosk_enabled: boolean; saturday_logic_enabled: boolean | null; manager_password: string | null; ui_theme: string | null; closed_dates: string | null };
   return NextResponse.json({
     kioskEnabled: s.kiosk_enabled,
     saturday_logic_enabled: s.saturday_logic_enabled ?? false,
     managerPasswordSet: Boolean(s.manager_password),
     ui_theme: s.ui_theme ?? 'slate',
+    closed_dates: s.closed_dates ?? '',
   });
 }
 
@@ -36,12 +37,13 @@ export async function PUT(req: NextRequest) {
   const { orgId, supabase } = resolved;
 
   const body = await req.json();
-  const { currentPassword, newPassword, kioskEnabled, saturday_logic_enabled, ui_theme } = body as {
+  const { currentPassword, newPassword, kioskEnabled, saturday_logic_enabled, ui_theme, closed_dates } = body as {
     currentPassword?: string;
     newPassword?: string;
     kioskEnabled?: boolean;
     saturday_logic_enabled?: boolean;
     ui_theme?: string;
+    closed_dates?: string;
   };
 
   const updates: Record<string, unknown> = {};
@@ -79,6 +81,9 @@ export async function PUT(req: NextRequest) {
   }
   if (ui_theme !== undefined) {
     updates.ui_theme = ui_theme;
+  }
+  if (closed_dates !== undefined) {
+    updates.closed_dates = closed_dates;
   }
 
   if (Object.keys(updates).length === 0) {
