@@ -1063,6 +1063,80 @@ function Legend({ workTypes, isManagerMode, onChanged }: LegendProps) {
   );
 }
 
+// ─── ICS helpers ──────────────────────────────────────────────────────────────
+
+function icsEscape(s: string) {
+  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function toIcsDateTime(date: string, time: string): string {
+  // date = YYYY-MM-DD, time = HH:MM → 20260601T090000
+  return `${date.replace(/-/g, '')}T${time.replace(':', '')}00`;
+}
+
+function toIcsDate(date: string): string {
+  return date.replace(/-/g, '');
+}
+
+/** Generate and trigger .ics download for an employee's shifts */
+async function downloadShiftsIcs(orgId: string, employeeId: string, employeeName: string, currentMonth: string) {
+  // Fetch shifts for current month + next 5 months
+  const [y, m] = currentMonth.split('-').map(Number);
+  const months: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(y, m - 1 + i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  const allPlans: { date: string; start_time: string | null; end_time: string | null; work_type: string | null }[] = [];
+  await Promise.all(months.map(async (mo) => {
+    try {
+      const res = await fetch(`/api/public/work-plans?orgId=${encodeURIComponent(orgId)}&employeeId=${encodeURIComponent(employeeId)}&month=${encodeURIComponent(mo)}`);
+      if (res.ok) {
+        const json = await res.json() as { plans?: { date: string; start_time: string | null; end_time: string | null; work_type: string | null }[] };
+        allPlans.push(...(json.plans ?? []));
+      }
+    } catch { /* ignore */ }
+  }));
+
+  allPlans.sort((a, b) => a.date.localeCompare(b.date));
+
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TeamFlow HRIS//CS',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsEscape(`Směny — ${employeeName}`)}`,
+    'X-WR-TIMEZONE:Europe/Prague',
+  ];
+
+  for (const plan of allPlans) {
+    const start = plan.start_time ? toIcsDateTime(plan.date, plan.start_time) : `${toIcsDate(plan.date)}T080000`;
+    const end   = plan.end_time   ? toIcsDateTime(plan.date, plan.end_time)   : `${toIcsDate(plan.date)}T160000`;
+    const summary = icsEscape(plan.work_type ?? 'Směna');
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:teamflow-shift-${plan.date}-${employeeId}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${summary}`,
+      `DESCRIPTION:${icsEscape(`${employeeName} · ${summary}`)}`,
+      'END:VEVENT',
+    );
+  }
+
+  lines.push('END:VCALENDAR');
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `smeny-${employeeName.replace(/\s+/g, '-').toLowerCase()}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── WorkPlanGrid ─────────────────────────────────────────────────────────────
 
 export default function WorkPlanGrid({
@@ -1108,6 +1182,8 @@ export default function WorkPlanGrid({
   const [pinInputLoading, setPinInputLoading] = useState(false);
   // Day detail — shown when clicking a day without PIN (read-only overview)
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
+  // "Pouze mé směny" — filter grid to show only session employee's entries
+  const [myShiftsOnly, setMyShiftsOnly] = useState(false);
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
@@ -1371,17 +1447,34 @@ export default function WorkPlanGrid({
           {/* Employee PIN session widget */}
           {!isManagerMode && (
             sessionEmployee ? (
-              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* "Pouze mé směny" toggle */}
                 <button
-                  onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); }}
-                  className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs"
-                  title={t('Odhlásit', 'Log out')}
+                  onClick={() => setMyShiftsOnly((v) => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${myShiftsOnly ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+                  📅 {t('Pouze mé směny', 'My shifts only')}
                 </button>
+                {/* .ics download */}
+                {myShiftsOnly && (
+                  <button
+                    onClick={() => downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-600 transition-all"
+                    title={t('Stáhnout jako kalendář (.ics)', 'Download as calendar (.ics)')}
+                  >
+                    ⬇ .ics
+                  </button>
+                )}
+                {/* Session badge */}
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
+                  <button
+                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); }}
+                    className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs"
+                    title={t('Odhlásit', 'Log out')}
+                  >✕</button>
+                </div>
               </div>
             ) : (
               <form
@@ -1466,11 +1559,15 @@ export default function WorkPlanGrid({
               const wd = mondayWeekday(dateStr);
               const isWeekend = wd === 5 || wd === 6;
               const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
+              const allEntries = entriesByDate.get(dateStr) ?? [];
+              const visibleEntries = myShiftsOnly && sessionEmployee
+                ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                : allEntries;
               return (
                 <DayCard
                   key={dateStr}
                   dateStr={dateStr}
-                  entries={entriesByDate.get(dateStr) ?? []}
+                  entries={visibleEntries}
                   scheduleMeta={metaByDate.get(dateStr)}
                   isManagerMode={isManagerMode}
                   isWeekend={isWeekend}

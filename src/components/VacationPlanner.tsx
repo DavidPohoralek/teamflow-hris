@@ -309,6 +309,58 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
   );
 }
 
+// ─── ICS helpers ──────────────────────────────────────────────────────────────
+
+function icsEscapeVac(s: string) {
+  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+function downloadVacationIcs(myRequests: VacationRequest[], employeeName: string) {
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TeamFlow HRIS//CS',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsEscapeVac(`Dovolená — ${employeeName}`)}`,
+    'X-WR-TIMEZONE:Europe/Prague',
+  ];
+
+  const approved = myRequests.filter((r) => r.status === 'approved');
+  for (const req of approved) {
+    const dtStart = req.date_from.replace(/-/g, '');
+    // DTEND in all-day events = exclusive (date_to + 1 day)
+    const dtEnd = req.date_to ? addDays(req.date_to, 1) : addDays(req.date_from, 1);
+    const summary = icsEscapeVac('Dovolená');
+    const desc = req.note ? icsEscapeVac(req.note) : '';
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:teamflow-vacation-${req.id}`,
+      `DTSTART;VALUE=DATE:${dtStart}`,
+      `DTEND;VALUE=DATE:${dtEnd}`,
+      `SUMMARY:${summary}`,
+      ...(desc ? [`DESCRIPTION:${desc}`] : []),
+      'END:VEVENT',
+    );
+  }
+
+  lines.push('END:VCALENDAR');
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `dovolena-${employeeName.replace(/\s+/g, '-').toLowerCase()}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function VacationPlanner({ orgId, isManagerMode }: VacationPlannerProps) {
   const t = useT();
   const now = new Date();
@@ -330,6 +382,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [showMyShifts, setShowMyShifts] = useState(false);
   const [myShiftDays, setMyShiftDays] = useState<Set<string>>(new Set());
   const [myShiftsLoading, setMyShiftsLoading] = useState(false);
+  // "Pouze má dovolená" filter
+  const [myVacationOnly, setMyVacationOnly] = useState(false);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
   const portalRootRef = useRef<HTMLElement | null>(null);
@@ -419,10 +473,15 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [year, mo] = month.split('-').map(Number);
   const firstOffset = days.length > 0 ? mondayWeekday(days[0]) : 0;
 
+  // Apply "Pouze má dovolená" filter
+  const visibleRequests = myVacationOnly && sessionEmployee
+    ? requests.filter((r) => r.employee_id === sessionEmployee.id)
+    : requests;
+
   // For each employee, collect their vacation days in this month
   const empVacMap = new Map<string, Set<string>>();
   const empStatusMap = new Map<string, Map<string, string>>();
-  for (const req of requests) {
+  for (const req of visibleRequests) {
     for (const day of days) {
       if (dateInRange(day, req.date_from, req.date_to)) {
         if (!empVacMap.has(req.employee_id)) empVacMap.set(req.employee_id, new Set());
@@ -511,6 +570,23 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           {!isManagerMode && (
             sessionEmployee ? (
               <div className="flex items-center gap-2 flex-wrap">
+                {/* "Pouze má dovolená" toggle */}
+                <button
+                  onClick={() => setMyVacationOnly((v) => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${myVacationOnly ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20' : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'}`}
+                >
+                  🏖️ {t('Pouze má dovolená', 'My vacation only')}
+                </button>
+                {/* .ics download for vacation */}
+                {myVacationOnly && (
+                  <button
+                    onClick={() => downloadVacationIcs(requests.filter((r) => r.employee_id === sessionEmployee.id), sessionEmployee.name)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-600 transition-all"
+                    title={t('Stáhnout jako kalendář (.ics)', 'Download as calendar (.ics)')}
+                  >
+                    ⬇ .ics
+                  </button>
+                )}
                 <button
                   onClick={handleToggleMyShifts}
                   disabled={myShiftsLoading}
@@ -522,7 +598,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
                   <button
-                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); }}
+                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); setMyVacationOnly(false); }}
                     className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1"
                     title="Odhlásit"
                   >✕</button>
