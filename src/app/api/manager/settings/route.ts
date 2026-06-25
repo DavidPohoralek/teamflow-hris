@@ -21,6 +21,11 @@ const EXTRA_KEYS = [
   'benefit_english_max',
   'benefit_gym_hours',
   'benefit_gym_max',
+  'evening_shift_enabled',
+  'evening_shift_start',
+  'evening_shift_end',
+  'evening_shift_min_staff',
+  'evening_shift_label',
 ];
 
 // GET /api/manager/settings

@@ -1258,6 +1258,13 @@ function SettingsTab() {
         <ClosedDatesSetting />
       </section>
 
+      {/* Večerní směna */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">{t('Večerní směna', 'Evening shift')}</h3>
+        <p className="text-xs text-gray-400 mb-4">{t('Konfigurace odpolední/večerní směny — asistent navrhne naplánované zaměstnance se štítkem jako kandidáty.', 'Configure the evening shift — the assistant will suggest already-scheduled employees with the matching label as candidates.')}</p>
+        <EveningShiftSetting />
+      </section>
+
       {/* Absence a benefity */}
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-1">{t('Absence a benefity', 'Absences and benefits')}</h3>
@@ -1644,6 +1651,108 @@ function BenefitsSetting() {
           {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit benefity', 'Save benefits')}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── EveningShiftSetting ──────────────────────────────────────────────────────
+
+function EveningShiftSetting() {
+  const t = useT();
+  const [enabled, setEnabled] = useState(false);
+  const [startTime, setStartTime] = useState('17:00');
+  const [endTime, setEndTime] = useState('19:00');
+  const [minStaff, setMinStaff] = useState('2');
+  const [label, setLabel] = useState('Prodejna');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    managerFetch('/api/manager/settings')
+      .then((r) => r.json())
+      .then((d: Record<string, unknown>) => {
+        if (typeof d.evening_shift_enabled === 'boolean') setEnabled(d.evening_shift_enabled);
+        else if (d.evening_shift_enabled === 'true') setEnabled(true);
+        if (typeof d.evening_shift_start === 'string' && d.evening_shift_start) setStartTime(d.evening_shift_start);
+        if (typeof d.evening_shift_end === 'string' && d.evening_shift_end) setEndTime(d.evening_shift_end);
+        if (d.evening_shift_min_staff != null) setMinStaff(String(d.evening_shift_min_staff));
+        if (typeof d.evening_shift_label === 'string' && d.evening_shift_label) setLabel(d.evening_shift_label);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evening_shift_enabled: enabled,
+          evening_shift_start: startTime,
+          evening_shift_end: endTime,
+          evening_shift_min_staff: parseInt(minStaff) || 2,
+          evening_shift_label: label,
+        }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => setEnabled((v) => !v)}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+        >
+          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+        <span className="text-sm font-medium text-gray-700">{t('Večerní směna aktivní', 'Evening shift active')}</span>
+      </label>
+
+      {enabled && (
+        <div className="space-y-3 pl-2 border-l-2 border-blue-100">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">{t('Od', 'From')}</p>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">{t('Do', 'To')}</p>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">{t('Min. lidí', 'Min. staff')}</p>
+              <input type="number" min={1} max={20} value={minStaff} onChange={(e) => setMinStaff(e.target.value)}
+                className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">{t('Štítek zaměstnanců pro večerní směnu', 'Employee label for evening shift')}</p>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Prodejna"
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">{t('Zaměstnanci s tímto štítkem budou navrhováni pro večerní směnu.', 'Employees with this label will be suggested for the evening shift.')}</p>
+          </div>
+        </div>
+      )}
+
+      <button onClick={handleSave} disabled={saving}
+        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}>
+        {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
+      </button>
     </div>
   );
 }

@@ -524,6 +524,158 @@ interface ClipboardEntry {
   endTime: string | null;
 }
 
+// ─── EveningCandidatesModal ───────────────────────────────────────────────────
+
+interface EveningCandidate {
+  id: string;
+  name: string;
+  tier: number;
+  targetHours: number;
+  monthlyHours: number;
+  scheduledToday: boolean;
+  todayShift: { start_time: string | null; end_time: string | null; work_type: string | null } | null;
+}
+
+function EveningCandidatesModal({
+  orgId, dateStr, eveningConfig, onClose, onSuccess,
+}: {
+  orgId: string;
+  dateStr: string;
+  eveningConfig: { enabled: boolean; start: string; end: string; minStaff: number; label: string };
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const t = useT();
+  const [candidates, setCandidates] = useState<EveningCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [workTypes, setWorkTypes] = useState<{ id: string; name: string; color: string | null }[]>([]);
+  const [selectedWorkTypeId, setSelectedWorkTypeId] = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      managerFetch(`/api/manager/evening-candidates?date=${dateStr}`).then((r) => r.json()),
+      fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`).then((r) => r.json()),
+    ])
+      .then(([candData, wtData]) => {
+        setCandidates(candData.candidates ?? []);
+        const wts = wtData.workTypes ?? [];
+        setWorkTypes(wts);
+        if (wts.length > 0) setSelectedWorkTypeId(wts[0].id);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [dateStr, orgId]);
+
+  const handleAdd = async (candidate: EveningCandidate) => {
+    if (!selectedWorkTypeId) return;
+    setAdding(candidate.id);
+    try {
+      const wt = workTypes.find((w) => w.id === selectedWorkTypeId);
+      await managerFetch('/api/work-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId,
+          employeeId: candidate.id,
+          date: dateStr,
+          workTypeId: selectedWorkTypeId,
+          workType: wt?.name ?? '',
+          startTime: eveningConfig.start,
+          endTime: eveningConfig.end,
+        }),
+      });
+      setCandidates((prev) => prev.filter((c) => c.id !== candidate.id));
+      onSuccess();
+    } catch { /* ignore */ }
+    finally { setAdding(null); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-800">
+              🌙 {t('Večerní směna', 'Evening shift')} — {eveningConfig.start}–{eveningConfig.end}
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">{dateStr} · {t('Min.', 'Min.')} {eveningConfig.minStaff} {t('lidí', 'staff')}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        {/* Work type selector */}
+        {workTypes.length > 0 && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('Typ práce', 'Work type')}</label>
+            <select
+              value={selectedWorkTypeId}
+              onChange={(e) => setSelectedWorkTypeId(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+            >
+              {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : candidates.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6 italic">
+            {t('Žádní dostupní kandidáti se štítkem', 'No available candidates with label')} &quot;{eveningConfig.label}&quot;
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {candidates.map((c) => (
+              <div key={c.id} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${c.scheduledToday ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'}`}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-800 truncate">{c.name}</span>
+                    {c.scheduledToday && (
+                      <span className="text-[9px] font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        ✓ {t('dnes plánovaný', 'scheduled today')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-0.5 text-[10px] text-gray-400">
+                    {c.scheduledToday && c.todayShift?.start_time && (
+                      <span>
+                        {c.todayShift.start_time.slice(0,5)}–{c.todayShift.end_time?.slice(0,5) ?? '?'}
+                        {' → '}
+                        <span className="text-orange-500 font-medium">+{eveningConfig.end}</span>
+                      </span>
+                    )}
+                    <span>{c.monthlyHours}h / {c.targetHours}h {t('měsíc', 'month')}</span>
+                    {c.tier > 0 && <span>T{c.tier}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleAdd(c)}
+                  disabled={adding === c.id}
+                  className="ml-2 shrink-0 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {adding === c.id ? '…' : t('+ Přidat', '+ Add')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface EveningConfig {
+  enabled: boolean;
+  start: string; // "17:00"
+  end: string;   // "19:00"
+  minStaff: number;
+  label: string;
+}
+
 interface DayCardProps {
   dateStr: string;
   entries: WorkPlanEntry[];
@@ -534,6 +686,8 @@ interface DayCardProps {
   clipboard: ClipboardEntry | null;
   sessionEmployeeId?: string;
   dayNamesShort: string[];
+  eveningConfig?: EveningConfig | null;
+  orgId?: string;
   onClickDay?: (dateStr: string) => void;
   onEditDay?: (dateStr: string) => void;
   onRemoveEmployee?: (dateStr: string, employeeId: string) => void;
@@ -551,6 +705,8 @@ function DayCard({
   clipboard,
   sessionEmployeeId,
   dayNamesShort,
+  eveningConfig,
+  orgId,
   onClickDay,
   onEditDay,
   onRemoveEmployee,
@@ -564,6 +720,18 @@ function DayCard({
   const isEmpty = entries.length === 0;
   const isWeekendEmpty = isWeekend && isEmpty;
   const isPasteMode = !!clipboard;
+  const [showEveningPanel, setShowEveningPanel] = useState(false);
+
+  // Split entries into morning / evening based on start_time
+  const eveningStartH = eveningConfig?.enabled
+    ? parseInt((eveningConfig.start ?? '17:00').split(':')[0])
+    : null;
+  const morningEntries = eveningStartH !== null
+    ? entries.filter((e) => !e.startTime || parseInt(e.startTime.split(':')[0]) < eveningStartH)
+    : entries;
+  const eveningEntries = eveningStartH !== null
+    ? entries.filter((e) => e.startTime && parseInt(e.startTime.split(':')[0]) >= eveningStartH)
+    : [];
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking a button inside
@@ -634,67 +802,135 @@ function DayCard({
 
       {/* Chips — scrollable, above hatching */}
       <div className="relative z-10 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 scrollbar-thin">
-        {entries.map((entry, idx) => {
-          const color = entry.workTypeColor ?? '#94a3b8';
-          const timeLabel =
-            entry.startTime && entry.endTime
-              ? ` ${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
-              : '';
-          return (
-            <div
-              key={idx}
-              className="group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1 min-w-0"
-              style={{
-                borderLeft: `3px solid ${color}`,
-                backgroundColor: `${color}22`,
-                color: '#1e293b',
-              }}
-              title={`${entry.employeeName ?? '—'} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
+        {/* Morning entries */}
+        {morningEntries.map((entry, idx) => (
+          <EntryChip
+            key={`m-${idx}`}
+            entry={entry}
+            isManagerMode={isManagerMode}
+            sessionEmployeeId={sessionEmployeeId}
+            dateStr={dateStr}
+            onRemoveEmployee={onRemoveEmployee}
+            onCopyEntry={onCopyEntry}
+            t={t}
+          />
+        ))}
+
+        {/* Evening divider — only when evening shift is enabled */}
+        {eveningConfig?.enabled && (
+          <div className="flex items-center gap-1 my-0.5">
+            <div className="flex-1 border-t border-orange-200" />
+            <button
+              onClick={(e) => { e.stopPropagation(); if (isManagerMode && orgId) setShowEveningPanel(true); }}
+              className={`flex items-center gap-0.5 text-[9px] font-semibold px-1 py-0.5 rounded ${
+                eveningEntries.length >= eveningConfig.minStaff
+                  ? 'text-orange-500 bg-orange-50'
+                  : 'text-orange-400 bg-orange-50 hover:bg-orange-100'
+              } ${isManagerMode ? 'cursor-pointer' : 'cursor-default'}`}
+              title={isManagerMode ? t('Zobrazit kandidáty pro večerní směnu', 'Show evening shift candidates') : ''}
             >
-              <span className="truncate min-w-0">
-                <span className="font-semibold">{(() => {
-                  const name = entry.employeeName ?? '—';
-                  const parts = name.trim().split(/\s+/);
-                  // "Monika Ditrichová" → "Monika D."
-                  if (parts.length < 2) return name;
-                  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
-                })()}</span>
-                {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
-              </span>
-              {/* Copy: only for PIN-logged employee on their own shift. Remove: manager always, employee only own shift. */}
-              {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
-                <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">
-                  {onCopyEntry && !isManagerMode && sessionEmployeeId && entry.employeeId === sessionEmployeeId && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
-                      className="text-slate-400 hover:text-blue-500 p-0.5"
-                      aria-label={t('Kopírovat směnu', 'Copy shift')}
-                      title={t('Kopírovat na jiné dny', 'Copy to other days')}
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                      </svg>
-                    </button>
-                  )}
-                  {onRemoveEmployee && (isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.employeeId); }}
-                      className="text-slate-400 hover:text-red-500"
-                      aria-label={`Odebrat ${entry.employeeName ?? entry.employeeId}`}
-                      title={t('Odebrat ze dne', 'Remove from day')}
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  )}
-                </span>
-              )}
-            </div>
-          );
-        })}
+              🌙 {eveningEntries.length}/{eveningConfig.minStaff}
+            </button>
+            <div className="flex-1 border-t border-orange-200" />
+          </div>
+        )}
+
+        {/* Evening entries */}
+        {eveningEntries.map((entry, idx) => (
+          <EntryChip
+            key={`e-${idx}`}
+            entry={entry}
+            isManagerMode={isManagerMode}
+            sessionEmployeeId={sessionEmployeeId}
+            dateStr={dateStr}
+            onRemoveEmployee={onRemoveEmployee}
+            onCopyEntry={onCopyEntry}
+            t={t}
+            isEvening
+          />
+        ))}
       </div>
+
+      {/* Evening candidates panel */}
+      {showEveningPanel && orgId && eveningConfig && (
+        <EveningCandidatesModal
+          orgId={orgId}
+          dateStr={dateStr}
+          eveningConfig={eveningConfig}
+          onClose={() => setShowEveningPanel(false)}
+          onSuccess={() => { setShowEveningPanel(false); /* parent will refresh via onClickDay */ }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── EntryChip ────────────────────────────────────────────────────────────────
+
+function EntryChip({
+  entry, isManagerMode, sessionEmployeeId, dateStr, onRemoveEmployee, onCopyEntry, t, isEvening,
+}: {
+  entry: WorkPlanEntry;
+  isManagerMode: boolean;
+  sessionEmployeeId?: string;
+  dateStr: string;
+  onRemoveEmployee?: (dateStr: string, employeeId: string) => void;
+  onCopyEntry?: (entry: ClipboardEntry) => void;
+  t: (cz: string, en: string) => string;
+  isEvening?: boolean;
+}) {
+  const color = isEvening ? '#f97316' : (entry.workTypeColor ?? '#94a3b8');
+  const timeLabel =
+    entry.startTime && entry.endTime
+      ? ` ${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
+      : '';
+  const name = entry.employeeName ?? '—';
+  const parts = name.trim().split(/\s+/);
+  const shortName = parts.length < 2 ? name : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+
+  return (
+    <div
+      className="group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1 min-w-0"
+      style={{
+        borderLeft: `3px solid ${color}`,
+        backgroundColor: `${color}22`,
+        color: '#1e293b',
+      }}
+      title={`${name} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
+    >
+      <span className="truncate min-w-0">
+        <span className="font-semibold">{shortName}</span>
+        {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
+      </span>
+      {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
+        <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">
+          {onCopyEntry && !isManagerMode && sessionEmployeeId && entry.employeeId === sessionEmployeeId && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
+              className="text-slate-400 hover:text-blue-500 p-0.5"
+              aria-label={t('Kopírovat směnu', 'Copy shift')}
+              title={t('Kopírovat na jiné dny', 'Copy to other days')}
+            >
+              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+              </svg>
+            </button>
+          )}
+          {onRemoveEmployee && (isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.employeeId); }}
+              className="text-slate-400 hover:text-red-500"
+              aria-label={`Odebrat ${entry.employeeName ?? entry.employeeId}`}
+              title={t('Odebrat ze dne', 'Remove from day')}
+            >
+              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
+        </span>
+      )}
     </div>
   );
 }
@@ -862,6 +1098,8 @@ export default function WorkPlanGrid({
   // Closed days from company settings
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
+  // Evening shift config from company settings
+  const [eveningConfig, setEveningConfig] = useState<{ enabled: boolean; start: string; end: string; minStaff: number; label: string } | null>(null);
   // Employee PIN session — set once in header, unlocks actions
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
@@ -909,8 +1147,8 @@ export default function WorkPlanGrid({
     if (!orgId) return;
     fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
-      .then((s: Record<string, string>) => {
-        const dates = (s.closed_dates ?? '').split(',').map((d) => d.trim()).filter(Boolean);
+      .then((s: Record<string, unknown>) => {
+        const dates = (typeof s.closed_dates === 'string' ? s.closed_dates : '').split(',').map((d) => d.trim()).filter(Boolean);
         setClosedDates(new Set(dates));
         const keyMap: Record<string, number> = {
           hours_mon: 1, hours_tue: 2, hours_wed: 3, hours_thu: 4,
@@ -921,6 +1159,15 @@ export default function WorkPlanGrid({
           if (key in s && !s[key]) closed.add(wd);
         }
         setClosedWeekdays(closed);
+        // Evening shift config
+        const enabled = s.evening_shift_enabled === true || s.evening_shift_enabled === 'true';
+        setEveningConfig({
+          enabled,
+          start: typeof s.evening_shift_start === 'string' && s.evening_shift_start ? s.evening_shift_start : '17:00',
+          end: typeof s.evening_shift_end === 'string' && s.evening_shift_end ? s.evening_shift_end : '19:00',
+          minStaff: Number(s.evening_shift_min_staff) || 2,
+          label: typeof s.evening_shift_label === 'string' && s.evening_shift_label ? s.evening_shift_label : 'Prodejna',
+        });
       })
       .catch(() => {});
   }, [orgId]);
@@ -1211,6 +1458,8 @@ export default function WorkPlanGrid({
                   clipboard={clipboard}
                   sessionEmployeeId={sessionEmployee?.id}
                   dayNamesShort={DAY_NAMES_SHORT}
+                  eveningConfig={eveningConfig}
+                  orgId={orgId}
                   onClickDay={handleClickDay}
                   onEditDay={isManagerMode ? setEditingDate : undefined}
                   onRemoveEmployee={isManagerMode ? handleRemoveEmployee : undefined}
