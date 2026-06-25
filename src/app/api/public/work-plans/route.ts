@@ -114,27 +114,69 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, id: data.id })
 }
 
-// DELETE /api/public/work-plans?workPlanId=UUID&orgId=UUID
+// DELETE /api/public/work-plans?workPlanId=UUID&orgId=UUID[&pin=XXXX]
+// Manager-Token in header → full manager delete
+// pin query param → employee can only delete their own shift
 export async function DELETE(req: NextRequest) {
-  const rawToken = req.headers.get('Manager-Token')
-  const tokenResult = isTokenValid(rawToken ?? '')
-  if (!tokenResult.valid) {
-    return NextResponse.json({ error: 'Neplatný nebo expirovaný token.' }, { status: 401 })
-  }
-
   const { searchParams } = new URL(req.url)
   const workPlanId = searchParams.get('workPlanId')
   const orgId = searchParams.get('orgId')
+  const pin = searchParams.get('pin')
 
   if (!workPlanId || !orgId) {
     return NextResponse.json({ error: 'Chybí parametry workPlanId nebo orgId.' }, { status: 400 })
   }
 
+  const supabase = getServiceClient()
+
+  // ── PIN-authenticated delete (employee removes their own shift) ──────────────
+  if (pin) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: emp } = await (supabase as any)
+      .from('employees')
+      .select('id')
+      .eq('organization_id', orgId)
+      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('active', true)
+      .maybeSingle()
+
+    if (!emp) {
+      return NextResponse.json({ error: 'Neplatný PIN.' }, { status: 401 })
+    }
+
+    // Verify the work plan belongs to this employee
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: plan } = await (supabase as any)
+      .from('work_plans')
+      .select('id, employee_id')
+      .eq('id', workPlanId)
+      .eq('organization_id', orgId)
+      .maybeSingle()
+
+    if (!plan || plan.employee_id !== emp.id) {
+      return NextResponse.json({ error: 'Nemáte oprávnění smazat tuto směnu.' }, { status: 403 })
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('work_plans')
+      .update({ active: false })
+      .eq('id', workPlanId)
+      .eq('organization_id', orgId)
+
+    if (error) return NextResponse.json({ error: 'Nepodařilo se odebrat směnu.' }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Manager-Token authenticated delete ──────────────────────────────────────
+  const rawToken = req.headers.get('Manager-Token')
+  const tokenResult = isTokenValid(rawToken ?? '')
+  if (!tokenResult.valid) {
+    return NextResponse.json({ error: 'Neplatný nebo expirovaný token.' }, { status: 401 })
+  }
   if (tokenResult.orgId !== orgId) {
     return NextResponse.json({ error: 'Token neodpovídá organizaci.' }, { status: 403 })
   }
-
-  const supabase = getServiceClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)

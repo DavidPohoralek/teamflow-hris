@@ -1106,6 +1106,8 @@ export default function WorkPlanGrid({
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinInputError, setPinInputError] = useState(false);
   const [pinInputLoading, setPinInputLoading] = useState(false);
+  // Day detail — shown when clicking a day without PIN (read-only overview)
+  const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
@@ -1179,9 +1181,15 @@ export default function WorkPlanGrid({
   }, [fetchSchedule, t]);
 
   const handleClickDay = useCallback((dateStr: string) => {
-    setAddShiftDate(dateStr);
-    setShowModal(true);
-  }, []);
+    if (isManagerMode || sessionEmployee) {
+      // Manager or PIN-authenticated employee → open add-shift modal
+      setAddShiftDate(dateStr);
+      setShowModal(true);
+    } else {
+      // Read-only visitor → show day detail overview
+      setDayDetailDate(dateStr);
+    }
+  }, [isManagerMode, sessionEmployee]);
 
   const handleCopyEntry = useCallback((entry: ClipboardEntry) => {
     setClipboard(entry);
@@ -1259,6 +1267,18 @@ export default function WorkPlanGrid({
     });
     if (res.ok) await fetchSchedule();
   }, [data, orgId, fetchSchedule]);
+
+  // PIN-authenticated delete: employee removes only their own shift
+  const handleRemoveEmployeeSelf = useCallback(async (dateStr: string, employeeId: string) => {
+    if (!sessionPin || !sessionEmployee || sessionEmployee.id !== employeeId) return;
+    const entry = data?.workPlans.find((wp) => wp.date === dateStr && wp.employeeId === employeeId);
+    if (!entry?.id) return;
+    const res = await fetch(
+      `/api/public/work-plans?workPlanId=${entry.id}&orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}`,
+      { method: 'DELETE' }
+    );
+    if (res.ok) await fetchSchedule();
+  }, [data, orgId, sessionPin, sessionEmployee, fetchSchedule]);
 
   const calendarDays = buildCalendarDays(month);
   const firstDayOffset = calendarDays.length > 0 ? mondayWeekday(calendarDays[0]) : 0;
@@ -1462,7 +1482,7 @@ export default function WorkPlanGrid({
                   orgId={orgId}
                   onClickDay={handleClickDay}
                   onEditDay={isManagerMode ? setEditingDate : undefined}
-                  onRemoveEmployee={isManagerMode ? handleRemoveEmployee : undefined}
+                  onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
                   onCopyEntry={handleCopyEntry}
                   onPaste={handlePaste}
                 />
@@ -1498,6 +1518,124 @@ export default function WorkPlanGrid({
           onSuccess={fetchSchedule}
         />
       )}
+
+      {/* Day detail modal — read-only, shown when no PIN */}
+      {dayDetailDate && (
+        <DayDetailModal
+          dateStr={dayDetailDate}
+          entries={entriesByDate.get(dayDetailDate) ?? []}
+          workTypes={workTypes}
+          dayNamesShort={DAY_NAMES_SHORT}
+          onClose={() => setDayDetailDate(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── DayDetailModal ───────────────────────────────────────────────────────────
+
+const CZ_MONTHS_LONG = ['ledna', 'února', 'března', 'dubna', 'května', 'června',
+  'července', 'srpna', 'září', 'října', 'listopadu', 'prosince'];
+const DAY_NAMES_LONG_CZ = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
+
+function DayDetailModal({
+  dateStr, entries, workTypes, dayNamesShort, onClose,
+}: {
+  dateStr: string;
+  entries: WorkPlanEntry[];
+  workTypes: WorkType[];
+  dayNamesShort: string[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const d = new Date(dateStr + 'T00:00:00');
+  const dayLong = DAY_NAMES_LONG_CZ[d.getDay()];
+  const dateLabel = `${d.getDate()}. ${CZ_MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+
+  // Group entries by work type
+  const byType = new Map<string, WorkPlanEntry[]>();
+  for (const e of entries) {
+    const key = e.workTypeName ?? e.workType ?? t('Ostatní', 'Other');
+    byType.set(key, [...(byType.get(key) ?? []), e]);
+  }
+
+  // Sort groups by work type sort_order
+  const wtOrder = new Map(workTypes.map((wt, i) => [wt.name, wt.sort_order ?? i]));
+  const groups = Array.from(byType.entries()).sort(
+    (a: [string, WorkPlanEntry[]], b: [string, WorkPlanEntry[]]) =>
+      (wtOrder.get(a[0]) ?? 999) - (wtOrder.get(b[0]) ?? 999)
+  );
+
+  const colorFor = (typeName: string | null) =>
+    workTypes.find((wt) => wt.name === typeName)?.color ?? '#94a3b8';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
+          <div>
+            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">{dayLong}</p>
+            <h2 className="text-white text-xl font-bold">{dateLabel}</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-lg leading-none">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          {entries.length === 0 ? (
+            <p className="text-center text-slate-400 text-sm py-8">{t('Žádné směny tento den.', 'No shifts this day.')}</p>
+          ) : (
+            groups.map(([typeName, groupEntries]) => {
+              const color = colorFor(typeName);
+              return (
+                <div key={typeName}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{typeName}</span>
+                    <span className="text-xs text-slate-400">({groupEntries.length})</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {groupEntries
+                      .slice()
+                      .sort((a: WorkPlanEntry, b: WorkPlanEntry) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+                      .map((e: WorkPlanEntry) => {
+                        const timeLabel = e.startTime && e.endTime
+                          ? `${e.startTime.slice(0, 5)} – ${e.endTime.slice(0, 5)}`
+                          : null;
+                        return (
+                          <div
+                            key={e.id}
+                            className="flex items-center justify-between px-3 py-2 rounded-xl"
+                            style={{ backgroundColor: `${color}18`, borderLeft: `3px solid ${color}` }}
+                          >
+                            <span className="text-sm font-semibold text-slate-800">{e.employeeName ?? '—'}</span>
+                            {timeLabel && (
+                              <span className="text-xs font-mono text-slate-500 bg-white/60 px-2 py-0.5 rounded-lg">
+                                {timeLabel}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer hint */}
+        <div className="px-6 py-3 border-t bg-slate-50 rounded-b-2xl">
+          <p className="text-xs text-slate-400 text-center">
+            {t('Zadejte kód pro přidání nebo odebrání vlastní směny', 'Enter your code to add or remove your own shift')}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
