@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
@@ -334,6 +334,7 @@ function EmployeesTab() {
         <EmployeeForm
           employee={editingEmployee}
           existingPins={employees.filter((e) => e.id !== editingEmployee?.id).map((e) => e.pin_code ?? e.pin ?? '')}
+          allLabels={Array.from(new Set(employees.flatMap((e) => e.labels ?? [])))}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); fetchEmployees(); }}
         />
@@ -347,8 +348,85 @@ function EmployeesTab() {
 interface EmployeeFormProps {
   employee: Employee | null;
   existingPins: string[];
+  allLabels: string[];
   onClose: () => void;
   onSaved: () => void;
+}
+
+function TagInput({ value, onChange, suggestions }: { value: string[]; onChange: (v: string[]) => void; suggestions: string[] }) {
+  const [input, setInput] = useState('');
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = suggestions.filter(
+    (s) => s.toLowerCase().includes(input.toLowerCase()) && !value.includes(s)
+  );
+
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim();
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed]);
+    }
+    setInput('');
+    setOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const removeTag = (tag: string) => onChange(value.filter((v) => v !== tag));
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filtered.length > 0 && input.length > 0) {
+        addTag(filtered[0]);
+      } else if (input.trim()) {
+        addTag(input);
+      }
+    } else if (e.key === 'Backspace' && !input && value.length > 0) {
+      removeTag(value[value.length - 1]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div
+        className="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-text focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {value.map((tag) => (
+          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-xs font-medium">
+            {tag}
+            <button type="button" onClick={(e) => { e.stopPropagation(); removeTag(tag); }} className="hover:text-blue-900 leading-none">✕</button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setOpen(true); }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          className="flex-1 min-w-[80px] outline-none text-sm bg-transparent"
+          placeholder={value.length === 0 ? 'Prodejna…' : ''}
+        />
+      </div>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {filtered.map((s) => (
+            <li
+              key={s}
+              onMouseDown={(e) => { e.preventDefault(); addTag(s); }}
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700"
+            >
+              {s}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function useWorkTypes() {
@@ -359,7 +437,7 @@ function useWorkTypes() {
   return workTypes;
 }
 
-function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeFormProps) {
+function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved }: EmployeeFormProps) {
   const t = useT();
   const { types: empTypes } = useEmploymentTypes();
   const deptOptions = useWorkTypes().filter((wt) => wt.category === 'shift');
@@ -370,7 +448,7 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
     phone: employee?.phone ?? '',
     department: employee?.department ?? '',
     position: employee?.position ?? '',
-    labels: (employee?.labels ?? []).join(','),
+    labels: employee?.labels ?? [],
     target_hours: employee?.target_hours ?? 160,
     vacation_days_per_year: employee?.vacation_days_per_year ?? 20,
     employment_type: (employee?.employment_type ? (LEGACY_LABELS[employee.employment_type] ?? employee.employment_type) : empTypes[0] ?? 'HPP') as EmploymentType,
@@ -403,7 +481,7 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
     try {
       const payload = {
         ...form,
-        labels: form.labels.split(',').map((l) => l.trim()).filter(Boolean),
+        labels: form.labels,
         tier: form.tier,
         can_saturday: form.can_saturday,
         max_saturdays: form.max_saturdays,
@@ -492,8 +570,8 @@ function EmployeeForm({ employee, existingPins, onClose, onSaved }: EmployeeForm
               <input className={inputCls()} value={form.position} onChange={(e) => set('position', e.target.value)} placeholder="Prodavač" />
             </FormField>
           </div>
-          <FormField label={t('Štítky (oddělené čárkou)', 'Tags (comma-separated)')}>
-            <input className={inputCls()} value={form.labels} onChange={(e) => set('labels', e.target.value)} placeholder="Prodejna,Kancelář" />
+          <FormField label={t('Štítky', 'Tags')}>
+            <TagInput value={form.labels as string[]} onChange={(v) => set('labels', v)} suggestions={allLabels} />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label={t('Cílové hodiny / měsíc', 'Target hours / month')}>
