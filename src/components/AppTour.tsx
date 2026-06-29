@@ -248,9 +248,10 @@ interface Props {
   lang: 'cs' | 'en';
   onClose: () => void;
   canClose?: boolean;
+  paid?: boolean;
 }
 
-export default function AppTour({ lang, onClose, canClose }: Props) {
+export default function AppTour({ lang, onClose, canClose, paid }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [cardPos, setCardPos] = useState<CardPos>({ top: 0, left: 0, side: 'center' });
@@ -258,8 +259,10 @@ export default function AppTour({ lang, onClose, canClose }: Props) {
 
   const t = useCallback((cs: string, en: string) => lang === 'en' ? en : cs, [lang]);
 
-  const total = STEPS.length;
-  const step = STEPS[stepIndex];
+  // Paid users skip the pricing/Done step (last STEPS entry)
+  const steps = paid ? STEPS.slice(0, -1) : STEPS;
+  const total = steps.length;
+  const step = steps[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === total - 1;
 
@@ -311,7 +314,11 @@ export default function AppTour({ lang, onClose, canClose }: Props) {
   }
 
   function handleNext() {
-    if (isLast) { markAndRedirect(); return; }
+    if (isLast) {
+      if (paid) { onClose(); return; }
+      markAndRedirect();
+      return;
+    }
     setStepIndex(i => i + 1);
   }
 
@@ -353,7 +360,7 @@ export default function AppTour({ lang, onClose, canClose }: Props) {
             {/* Top row: dots + skip */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-1.5">
-                {STEPS.map((_, i) => (
+                {steps.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setStepIndex(i)}
