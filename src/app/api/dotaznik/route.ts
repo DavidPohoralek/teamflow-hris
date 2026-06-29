@@ -45,33 +45,43 @@ export async function POST(req: NextRequest) {
 
   const orgId = profile.organization_id;
 
-  // Check PIN uniqueness within org
+  // Find existing employee by name within org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existing } = await (supabase as any)
+  const { data: employee } = await (supabase as any)
+    .from('employees')
+    .select('id, name, pin_code')
+    .eq('organization_id', orgId)
+    .ilike('name', name.trim())
+    .maybeSingle();
+
+  if (!employee) {
+    return NextResponse.json({ error: `Zaměstnanec "${name.trim()}" nebyl nalezen. Zkontrolujte jméno.` }, { status: 404 });
+  }
+
+  // Check PIN uniqueness — allow reuse of own current PIN
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: pinConflict } = await (supabase as any)
     .from('employees')
     .select('id, name')
     .eq('organization_id', orgId)
     .or(`pin_code.eq.${pin},pin.eq.${pin}`)
-    .eq('active', true)
+    .neq('id', employee.id)
     .maybeSingle();
 
-  if (existing) {
-    return NextResponse.json({ error: `PIN ${pin} je již používán (${existing.name}). Zvolte jiný.` }, { status: 409 });
+  if (pinConflict) {
+    return NextResponse.json({ error: `PIN ${pin} je již použit jiným zaměstnancem. Zvolte jiný.` }, { status: 409 });
   }
 
-  // Build labels
   const labels: string[] = [];
   if (labelProdejna) labels.push('Prodejna');
 
-  // Build extra data for assistant (tier, saturdays)
   const tierNum = tier === 'Tier 1' ? 1 : tier === 'Tier 2' ? 2 : tier === 'Tier 3' ? 3 : 0;
 
+  // UPDATE existing employee
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('employees')
-    .insert({
-      organization_id: orgId,
-      name: name.trim(),
+    .update({
       pin_code: pin,
       pin: pin,
       email: email?.trim() || null,
@@ -83,11 +93,11 @@ export async function POST(req: NextRequest) {
       tier: tierNum,
       max_saturdays: tierNum > 0 ? (maxSaturdays ?? 0) : 0,
       can_work_saturday: tierNum > 0 ? canWorkSaturday : false,
-      active: true,
-    });
+    })
+    .eq('id', employee.id);
 
   if (error) {
-    console.error('dotaznik insert error:', error);
+    console.error('dotaznik update error:', error);
     return NextResponse.json({ error: 'Nepodařilo se uložit. Zkuste to znovu.' }, { status: 500 });
   }
 
