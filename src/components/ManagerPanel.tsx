@@ -1,12 +1,217 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
 import ThemeSelector from './ThemeSelector';
 import NotificationsPanel from './NotificationsPanel';
 import { useT } from '@/lib/i18n';
+
+// ─── ManagerTour ──────────────────────────────────────────────────────────────
+
+interface MTourStep {
+  target?: string;
+  icon: string;
+  titleCs: string;
+  titleEn: string;
+  descCs: string;
+  descEn: string;
+  hintCs?: string;
+  hintEn?: string;
+  side?: 'top' | 'bottom' | 'left' | 'right';
+  switchTab?: 'employees' | 'work-types' | 'requests' | 'notifications' | 'settings';
+}
+
+const MANAGER_STEPS: MTourStep[] = [
+  {
+    icon: '🔐',
+    titleCs: 'Vítejte v Manažerském panelu',
+    titleEn: 'Welcome to the Manager panel',
+    descCs: 'Toto je administrátorské rozhraní systému. Pojďme si projít jednotlivé sekce.',
+    descEn: 'This is the system administration interface. Let\'s walk through each section.',
+  },
+  {
+    target: 'mgr-tab-employees',
+    icon: '👥',
+    titleCs: 'Zaměstnanci',
+    titleEn: 'Employees',
+    descCs: 'Správa zaměstnanců — přidávání, úprava, nastavení PINu, přiřazení pracovního úvazku a štítků.',
+    descEn: 'Manage employees — add, edit, set PINs, assign employment types and labels.',
+    side: 'right',
+    switchTab: 'employees',
+  },
+  {
+    target: 'mgr-tab-work-types',
+    icon: '🏷️',
+    titleCs: 'Oddělení / Typy práce',
+    titleEn: 'Departments / Work types',
+    descCs: 'Definujte typy směn a oddělení — každý typ má název a barvu, která se zobrazí v kalendáři.',
+    descEn: 'Define shift types and departments — each has a name and color shown in the calendar.',
+    side: 'right',
+    switchTab: 'work-types',
+  },
+  {
+    target: 'mgr-tab-requests',
+    icon: '📋',
+    titleCs: 'Žádosti o dovolenou',
+    titleEn: 'Leave requests',
+    descCs: 'Přehled všech žádostí zaměstnanců o dovolenou. Jedním kliknutím schválíte nebo zamítnete.',
+    descEn: 'Overview of all employee leave requests. Approve or reject with a single click.',
+    side: 'right',
+    switchTab: 'requests',
+  },
+  {
+    target: 'mgr-tab-notifications',
+    icon: '🔔',
+    titleCs: 'Notifikace',
+    titleEn: 'Notifications',
+    descCs: 'Systémová upozornění — nové žádosti, změny v docházce, přihlášení do kiosku.',
+    descEn: 'System notifications — new requests, attendance changes, kiosk logins.',
+    side: 'right',
+    switchTab: 'notifications',
+  },
+  {
+    target: 'mgr-tab-settings',
+    icon: '⚙️',
+    titleCs: 'Nastavení',
+    titleEn: 'Settings',
+    descCs: 'Heslo manažera, provozní doby, bonusy, favicon, integrace a další konfigurace organizace.',
+    descEn: 'Manager password, business hours, bonuses, favicon, integrations and org configuration.',
+    side: 'right',
+    switchTab: 'settings',
+  },
+  {
+    icon: '✅',
+    titleCs: 'To je vše!',
+    titleEn: 'That\'s it!',
+    descCs: 'Nyní znáte Manažerský panel. Pokud budete mít otázky, klikněte na ? kdykoli znovu.',
+    descEn: 'You now know the Manager panel. If you have questions, click ? to reopen the tour anytime.',
+  },
+];
+
+const PAD_MT = 8;
+const CARD_W_MT = 300;
+
+function getRect(target: string) {
+  const el = document.querySelector<HTMLElement>(`[data-mgr-tour="${target}"]`);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { top: r.top, left: r.left, width: r.width, height: r.height };
+}
+
+function calcPos(rect: { top: number; left: number; width: number; height: number } | null, side?: MTourStep['side']) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (!rect) return { top: vh / 2 - 120, left: vw / 2 - CARD_W_MT / 2, side: 'center' as const };
+  const cx = rect.left + rect.width / 2;
+  const resolvedSide = side ?? 'bottom';
+  let top = 0, left = 0;
+  if (resolvedSide === 'right') { top = Math.max(12, rect.top); left = rect.left + rect.width + PAD_MT + 8; }
+  else if (resolvedSide === 'left') { top = Math.max(12, rect.top); left = rect.left - CARD_W_MT - PAD_MT - 8; }
+  else if (resolvedSide === 'top') { top = rect.top - 180 - PAD_MT; left = Math.max(12, cx - CARD_W_MT / 2); }
+  else { top = rect.top + rect.height + PAD_MT + 8; left = Math.max(12, Math.min(cx - CARD_W_MT / 2, vw - CARD_W_MT - 12)); }
+  return { top, left, side: resolvedSide };
+}
+
+function ManagerTour({ lang, onClose, onSwitchTab }: {
+  lang: 'cs' | 'en';
+  onClose: () => void;
+  onSwitchTab: (tab: MTourStep['switchTab']) => void;
+}) {
+  const [idx, setIdx] = useState(0);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; side: 'center' | 'top' | 'bottom' | 'left' | 'right' }>({ top: 0, left: 0, side: 'center' });
+  const [visible, setVisible] = useState(false);
+
+  const step = MANAGER_STEPS[idx];
+  const total = MANAGER_STEPS.length;
+  const isLast = idx === total - 1;
+  const t = (cs: string, en: string) => lang === 'en' ? en : cs;
+
+  const recalc = useCallback(() => {
+    const r = step.target ? getRect(step.target) : null;
+    setRect(r);
+    setPos(calcPos(r, step.side));
+  }, [step]);
+
+  useLayoutEffect(() => {
+    setVisible(false);
+    const id = requestAnimationFrame(() => { recalc(); setVisible(true); });
+    return () => cancelAnimationFrame(id);
+  }, [recalc]);
+
+  useEffect(() => { window.addEventListener('resize', recalc); return () => window.removeEventListener('resize', recalc); }, [recalc]);
+
+  function next() {
+    if (isLast) { onClose(); return; }
+    const nextStep = MANAGER_STEPS[idx + 1];
+    if (nextStep.switchTab) onSwitchTab(nextStep.switchTab);
+    setIdx(i => i + 1);
+  }
+  function back() { if (idx > 0) { const prev = MANAGER_STEPS[idx - 1]; if (prev.switchTab) onSwitchTab(prev.switchTab); setIdx(i => i - 1); } }
+
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+
+  return (
+    <>
+      {/* Overlay */}
+      {rect ? (
+        <svg className="fixed inset-0 pointer-events-none" style={{ zIndex: 9998, width: '100%', height: '100%' }}>
+          <defs>
+            <mask id="mgr-mask">
+              <rect x="0" y="0" width={vw} height={vh} fill="white"/>
+              <rect x={rect.left - PAD_MT} y={rect.top - PAD_MT} width={rect.width + PAD_MT * 2} height={rect.height + PAD_MT * 2} rx="6" fill="black"/>
+            </mask>
+          </defs>
+          <rect x="0" y="0" width={vw} height={vh} fill="rgba(0,0,0,0.55)" mask="url(#mgr-mask)"/>
+          <rect x={rect.left - PAD_MT - 1} y={rect.top - PAD_MT - 1} width={rect.width + PAD_MT * 2 + 2} height={rect.height + PAD_MT * 2 + 2} rx="7" fill="none" stroke="rgba(99,102,241,0.85)" strokeWidth="2">
+            <animate attributeName="opacity" values="0.5;1;0.5" dur="1.8s" repeatCount="indefinite"/>
+          </rect>
+        </svg>
+      ) : (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 9998, background: 'rgba(0,0,0,0.55)' }}/>
+      )}
+
+      {/* Card */}
+      <div className="fixed pointer-events-auto" style={{ zIndex: 9999, top: pos.top, left: pos.left, width: CARD_W_MT, opacity: visible ? 1 : 0, transform: visible ? 'translateY(0) scale(1)' : 'translateY(6px) scale(0.97)', transition: 'opacity 0.2s ease, transform 0.2s ease' }}>
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          <div className="h-1 bg-slate-100">
+            <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${((idx + 1) / total) * 100}%` }}/>
+          </div>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex gap-1">
+                {MANAGER_STEPS.map((_, i) => (
+                  <button key={i} onClick={() => setIdx(i)} className={`rounded-full transition-all ${i === idx ? 'w-4 h-2 bg-indigo-500' : 'w-2 h-2 bg-slate-200 hover:bg-slate-300'}`}/>
+                ))}
+              </div>
+              <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="flex gap-3 mb-3">
+              <span className="text-2xl flex-shrink-0">{step.icon}</span>
+              <div>
+                <p className="font-bold text-slate-900 text-sm">{t(step.titleCs, step.titleEn)}</p>
+                <p className="text-slate-500 text-xs mt-1 leading-relaxed">{t(step.descCs, step.descEn)}</p>
+              </div>
+            </div>
+            {(step.hintCs || step.hintEn) && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                <p className="text-amber-700 text-xs">💡 {t(step.hintCs ?? '', step.hintEn ?? '')}</p>
+              </div>
+            )}
+            <div className="flex gap-2">
+              {idx > 0 && <button onClick={back} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50">← {t('Zpět', 'Back')}</button>}
+              <button onClick={next} className="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 text-white transition-colors">
+                {isLast ? t('Hotovo ✓', 'Done ✓') : t('Další →', 'Next →')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +287,7 @@ interface Request {
 interface ManagerPanelProps {
   orgId: string;
   onClose: () => void;
+  lang?: 'cs' | 'en';
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -96,11 +302,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps & { initialTab?: 'notifications' }) {
+export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     managerFetch('/api/requests?status=pending')
@@ -133,6 +340,7 @@ export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps 
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-mgr-tour={`mgr-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === tab.id
@@ -173,15 +381,26 @@ export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps 
           <h2 className="text-xl font-semibold text-gray-900">
             {tabs.find((t) => t.id === activeTab)?.label}
           </h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            title={t('Zavřít', 'Close')}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowTour(true)}
+              className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+              title={t('Průvodce panelem', 'Panel tour')}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              title={t('Zavřít', 'Close')}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -193,6 +412,14 @@ export default function ManagerPanel({ onClose, initialTab }: ManagerPanelProps 
           {activeTab === 'settings' && <SettingsTab />}
         </div>
       </div>
+
+      {showTour && (
+        <ManagerTour
+          lang={lang ?? 'cs'}
+          onClose={() => setShowTour(false)}
+          onSwitchTab={(tab) => { if (tab) setActiveTab(tab); }}
+        />
+      )}
     </div>
   );
 }
