@@ -11,6 +11,8 @@ const TIERS = [
   { value: 'Tier 3', label: 'Tier 3 — 1× měsíčně dopomoc' },
 ];
 
+const RED = '#e30613';
+
 export default function DotaznikPage() {
   const [form, setForm] = useState({
     name: '',
@@ -35,10 +37,8 @@ export default function DotaznikPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
     if (!form.name.trim()) { setError('Zadejte prosím jméno.'); return; }
     if (!/^\d{4,8}$/.test(form.pin)) { setError('PIN musí mít 4–8 číslic.'); return; }
-
     setSubmitting(true);
     try {
       const res = await fetch('/api/dotaznik', {
@@ -57,79 +57,75 @@ export default function DotaznikPage() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: '#0a0a0a' }}>
-      {/* Background pattern — elegant dark watches feel */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: `radial-gradient(circle at 20% 50%, rgba(180,30,30,0.08) 0%, transparent 50%),
-                          radial-gradient(circle at 80% 20%, rgba(180,30,30,0.05) 0%, transparent 40%),
-                          radial-gradient(circle at 60% 80%, rgba(255,255,255,0.02) 0%, transparent 30%)`,
-      }} />
+    <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* Header */}
-      <header className="relative z-10 border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">H</span>
-            </div>
-            <div>
-              <p className="text-white font-semibold text-sm leading-none">helVeti</p>
-              <p className="text-white/40 text-xs">Specialisté na hodinky</p>
-            </div>
+      {/* Top bar */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e8e8e8' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 72 }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+            <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: -1, color: '#111' }}>
+              hel<span style={{ color: RED }}>V</span>eti
+            </span>
+            <span style={{ fontSize: 11, color: '#888', marginBottom: 4, marginLeft: 6, letterSpacing: 0.3 }}>Specialisté na hodinky</span>
           </div>
-          <p className="text-white/30 text-xs hidden sm:block">Interní registrační formulář · Pouze pro zaměstnance</p>
+          <div style={{ fontSize: 12, color: '#999' }}>
+            Interní registrační formulář · Pouze pro zaměstnance
+          </div>
         </div>
-      </header>
+      </div>
+
+      {/* Red accent line */}
+      <div style={{ height: 3, background: RED }} />
 
       {/* Main */}
-      <main className="relative z-10 max-w-2xl mx-auto px-4 py-12">
+      <main style={{ maxWidth: 760, margin: '0 auto', padding: '40px 24px 60px' }}>
+
         {done ? (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 8, padding: '60px 40px', textAlign: 'center' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#e8f5e9', border: `2px solid #4caf50`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#4caf50" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-white text-2xl font-bold mb-3">Registrace dokončena</h2>
-            <p className="text-white/50 text-sm leading-relaxed">
-              Vaše údaje byly úspěšně uloženy.<br/>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 10 }}>Registrace dokončena</h2>
+            <p style={{ color: '#666', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
+              Vaše údaje byly úspěšně uloženy.<br />
               Nyní se můžete přihlásit do systému TeamFlow pomocí svého PIN kódu.
             </p>
             <a
               href="https://tmflw.com/app"
-              className="inline-block mt-8 px-6 py-3 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors"
+              style={{ display: 'inline-block', padding: '12px 28px', background: RED, color: '#fff', borderRadius: 4, fontWeight: 600, fontSize: 14, textDecoration: 'none', letterSpacing: 0.3 }}
             >
               Přejít do aplikace →
             </a>
           </div>
         ) : (
           <>
-            <div className="text-center mb-10">
-              <h1 className="text-white text-3xl font-bold mb-3">Registrace zaměstnance</h1>
-              <p className="text-white/40 text-sm">Vyplňte formulář, aby vás manažer mohl přidat do systému plánování směn.</p>
+            <div style={{ marginBottom: 28 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111', marginBottom: 6 }}>Registrace zaměstnance</h1>
+              <div style={{ width: 40, height: 3, background: RED, marginBottom: 12 }} />
+              <p style={{ color: '#666', fontSize: 14 }}>Vyplňte formulář, aby vás manažer mohl přidat do systému plánování směn.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Card: Základní údaje */}
-              <section className="bg-white/[0.04] border border-white/10 rounded-2xl p-6 space-y-4">
-                <h2 className="text-white/80 text-xs font-semibold uppercase tracking-widest mb-4">Základní údaje</h2>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+              {/* Základní údaje */}
+              <Card title="Základní údaje">
                 <div>
-                  <label className="block text-white/60 text-xs mb-1.5">Jméno a první písmeno příjmení <span className="text-red-400">*</span></label>
-                  <input
+                  <Label>Jméno a první písmeno příjmení <Required /></Label>
+                  <Input
                     type="text"
                     value={form.name}
                     onChange={e => set('name', e.target.value)}
                     placeholder="David P."
                     required
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/20 text-sm focus:outline-none focus:border-red-500/60 focus:bg-white/8 transition-colors"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>
-                    <label className="block text-white/60 text-xs mb-1.5">PIN kód (4–8 číslic) <span className="text-red-400">*</span></label>
-                    <input
+                    <Label>PIN kód (4–8 číslic) <Required /></Label>
+                    <Input
                       type="password"
                       inputMode="numeric"
                       value={form.pin}
@@ -137,41 +133,44 @@ export default function DotaznikPage() {
                       placeholder="••••"
                       maxLength={8}
                       required
-                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/20 text-sm focus:outline-none focus:border-red-500/60 transition-colors text-center tracking-widest"
+                      style={{ textAlign: 'center', letterSpacing: 6 }}
                     />
-                    <p className="text-white/25 text-xs mt-1">Pod tímto kódem se budete přihlašovat</p>
+                    <Hint>Pod tímto kódem se budete přihlašovat</Hint>
                   </div>
                   <div>
-                    <label className="block text-white/60 text-xs mb-1.5">E-mail na notifikace</label>
-                    <input
+                    <Label>E-mail na notifikace</Label>
+                    <Input
                       type="email"
                       value={form.email}
                       onChange={e => set('email', e.target.value)}
                       placeholder="vas@email.cz"
-                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/20 text-sm focus:outline-none focus:border-red-500/60 transition-colors"
                     />
-                    <p className="text-white/25 text-xs mt-1">Schválení dovolené, žádosti</p>
+                    <Hint>Schválení dovolené, žádosti</Hint>
                   </div>
                 </div>
-              </section>
+              </Card>
 
-              {/* Card: Pracovní zařazení */}
-              <section className="bg-white/[0.04] border border-white/10 rounded-2xl p-6 space-y-4">
-                <h2 className="text-white/80 text-xs font-semibold uppercase tracking-widest mb-4">Pracovní zařazení</h2>
-
+              {/* Pracovní zařazení */}
+              <Card title="Pracovní zařazení">
                 <div>
-                  <label className="block text-white/60 text-xs mb-2">Oddělení</label>
-                  <div className="flex flex-wrap gap-2">
+                  <Label>Oddělení</Label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                     {DEPARTMENTS.map(d => (
                       <button
                         key={d}
                         type="button"
                         onClick={() => set('department', form.department === d ? '' : d)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          form.department === d
-                            ? 'bg-red-600 border-red-500 text-white'
-                            : 'bg-white/5 border-white/15 text-white/60 hover:border-white/30 hover:text-white/80'
-                        }`}
+                        style={{
+                          padding: '7px 16px',
+                          borderRadius: 4,
+                          border: form.department === d ? `2px solid ${RED}` : '1px solid #ddd',
+                          background: form.department === d ? RED : '#fff',
+                          color: form.department === d ? '#fff' : '#444',
+                          fontSize: 13,
+                          fontWeight: form.department === d ? 600 : 400,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
                       >
                         {d}
                       </button>
@@ -179,142 +178,234 @@ export default function DotaznikPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>
-                    <label className="block text-white/60 text-xs mb-1.5">Pozice (nepovinné)</label>
-                    <input
+                    <Label>Pozice (nepovinné)</Label>
+                    <Input
                       type="text"
                       value={form.position}
                       onChange={e => set('position', e.target.value)}
                       placeholder="Prodavač, Skladník…"
-                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/20 text-sm focus:outline-none focus:border-red-500/60 transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="block text-white/60 text-xs mb-1.5">Pracovní poměr</label>
+                    <Label>Pracovní poměr</Label>
                     <select
                       value={form.contract}
                       onChange={e => set('contract', e.target.value)}
-                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500/60 transition-colors"
-                      style={{ colorScheme: 'dark' }}
+                      style={{ width: '100%', padding: '9px 12px', border: '1px solid #ddd', borderRadius: 4, fontSize: 14, color: '#333', background: '#fff', outline: 'none' }}
                     >
                       {CONTRACTS.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'end' }}>
                   <div>
-                    <label className="block text-white/60 text-xs mb-1.5">Měsíční fond hodin</label>
-                    <input
+                    <Label>Měsíční fond hodin</Label>
+                    <Input
                       type="number"
                       value={form.targetHours}
                       onChange={e => set('targetHours', parseInt(e.target.value) || 0)}
                       min={0}
                       max={300}
-                      className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500/60 transition-colors"
-                      style={{ colorScheme: 'dark' }}
                     />
                   </div>
-                  <div className="flex items-end pb-1">
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={form.labelProdejna}
-                        onClick={() => set('labelProdejna', !form.labelProdejna)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.labelProdejna ? 'bg-red-600' : 'bg-white/20'}`}
-                      >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.labelProdejna ? 'translate-x-6' : 'translate-x-1'}`} />
-                      </button>
-                      <div>
-                        <p className="text-white/70 text-sm">Štítek Prodejna</p>
-                        <p className="text-white/30 text-xs">Chodím na prodejnu alespoň 1× měsíčně</p>
-                      </div>
-                    </label>
+                  <div style={{ paddingBottom: 4 }}>
+                    <Toggle
+                      checked={form.labelProdejna}
+                      onChange={() => set('labelProdejna', !form.labelProdejna)}
+                      label="Štítek Prodejna"
+                      hint="Chodím na prodejnu alespoň 1× měsíčně"
+                    />
                   </div>
                 </div>
-              </section>
+              </Card>
 
-              {/* Card: Tier prodejny */}
-              <section className="bg-white/[0.04] border border-white/10 rounded-2xl p-6 space-y-4">
-                <div>
-                  <h2 className="text-white/80 text-xs font-semibold uppercase tracking-widest mb-1">Tier prodejny</h2>
-                  <p className="text-white/30 text-xs mb-4">Jak často chodíte na prodejnu?</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {TIERS.map(tier => (
-                      <button
-                        key={tier.value}
-                        type="button"
-                        onClick={() => set('tier', tier.value)}
-                        className={`px-3 py-3 rounded-xl text-xs font-medium border transition-all text-center leading-snug ${
-                          form.tier === tier.value
-                            ? 'bg-red-600 border-red-500 text-white'
-                            : 'bg-white/5 border-white/15 text-white/50 hover:border-white/30 hover:text-white/70'
-                        }`}
-                      >
-                        {tier.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* Tier prodejny */}
+              <Card title="Tier prodejny" subtitle="Jak často chodíte na prodejnu?">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                  {TIERS.map(tier => (
+                    <button
+                      key={tier.value}
+                      type="button"
+                      onClick={() => set('tier', tier.value)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 4,
+                        border: form.tier === tier.value ? `2px solid ${RED}` : '1px solid #ddd',
+                        background: form.tier === tier.value ? RED : '#fff',
+                        color: form.tier === tier.value ? '#fff' : '#444',
+                        fontSize: 13,
+                        fontWeight: form.tier === tier.value ? 600 : 400,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {tier.label}
+                    </button>
+                  ))}
                 </div>
 
                 {showSaturdays && (
-                  <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-4">
+                  <div style={{ paddingTop: 16, borderTop: '1px solid #eee', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'end' }}>
                     <div>
-                      <label className="block text-white/60 text-xs mb-1.5">Max sobot na prodejně / měsíc</label>
-                      <input
+                      <Label>Max sobot na prodejně / měsíc</Label>
+                      <Input
                         type="number"
                         value={form.maxSaturdays}
                         onChange={e => set('maxSaturdays', parseInt(e.target.value) || 0)}
                         min={0}
                         max={5}
-                        className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500/60 transition-colors"
-                        style={{ colorScheme: 'dark' }}
                       />
                     </div>
-                    <div className="flex items-end pb-1">
-                      <label className="flex items-center gap-3 cursor-pointer select-none">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={form.canWorkSaturday}
-                          onClick={() => set('canWorkSaturday', !form.canWorkSaturday)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.canWorkSaturday ? 'bg-red-600' : 'bg-white/20'}`}
-                        >
-                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${form.canWorkSaturday ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
-                        <div>
-                          <p className="text-white/70 text-sm">Soboty OK</p>
-                          <p className="text-white/30 text-xs">Mohu pracovat v sobotu</p>
-                        </div>
-                      </label>
+                    <div style={{ paddingBottom: 4 }}>
+                      <Toggle
+                        checked={form.canWorkSaturday}
+                        onChange={() => set('canWorkSaturday', !form.canWorkSaturday)}
+                        label="Soboty OK"
+                        hint="Mohu pracovat v sobotu"
+                      />
                     </div>
                   </div>
                 )}
-              </section>
+              </Card>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
-                  <p className="text-red-400 text-sm">{error}</p>
+                <div style={{ background: '#fff3f3', border: `1px solid ${RED}`, borderRadius: 4, padding: '12px 16px' }}>
+                  <p style={{ color: RED, fontSize: 14, margin: 0 }}>{error}</p>
                 </div>
               )}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-all text-sm tracking-wide"
+                style={{
+                  padding: '14px 0',
+                  background: submitting ? '#999' : RED,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 4,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  letterSpacing: 0.5,
+                  transition: 'background 0.15s',
+                }}
               >
                 {submitting ? 'Odesílám…' : 'Odeslat registraci →'}
               </button>
 
-              <p className="text-center text-white/20 text-xs">
+              <p style={{ textAlign: 'center', color: '#aaa', fontSize: 12 }}>
                 Vaše údaje budou uloženy bezpečně a použity výhradně pro plánování směn v systému TeamFlow.
               </p>
             </form>
           </>
         )}
       </main>
+
+      {/* Footer */}
+      <div style={{ borderTop: '1px solid #e8e8e8', background: '#fff', padding: '16px 24px', textAlign: 'center' }}>
+        <p style={{ fontSize: 12, color: '#aaa', margin: 0 }}>
+          © helVeti · Specialisté na hodinky · <span style={{ color: RED }}>TeamFlow</span> interní systém
+        </p>
+      </div>
     </div>
+  );
+}
+
+/* ── helpers ── */
+
+function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #f0f0f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 3, height: 18, background: RED, borderRadius: 2, flexShrink: 0 }} />
+          <div>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#111', margin: 0, textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</h2>
+            {subtitle && <p style={{ fontSize: 12, color: '#999', margin: '2px 0 0' }}>{subtitle}</p>}
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: 'block', fontSize: 12, color: '#555', fontWeight: 500, marginBottom: 5 }}>{children}</label>;
+}
+
+function Required() {
+  return <span style={{ color: RED }}>*</span>;
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p style={{ fontSize: 11, color: '#aaa', margin: '4px 0 0' }}>{children}</p>;
+}
+
+function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      style={{
+        width: '100%',
+        padding: '9px 12px',
+        border: '1px solid #ddd',
+        borderRadius: 4,
+        fontSize: 14,
+        color: '#333',
+        background: '#fff',
+        outline: 'none',
+        boxSizing: 'border-box',
+        ...(props.style ?? {}),
+      }}
+      onFocus={e => { e.target.style.borderColor = RED; e.target.style.boxShadow = `0 0 0 2px ${RED}22`; }}
+      onBlur={e => { e.target.style.borderColor = '#ddd'; e.target.style.boxShadow = 'none'; }}
+    />
+  );
+}
+
+function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: () => void; label: string; hint?: string }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onChange}
+        style={{
+          width: 40,
+          height: 22,
+          borderRadius: 11,
+          border: 'none',
+          background: checked ? RED : '#ccc',
+          position: 'relative',
+          cursor: 'pointer',
+          flexShrink: 0,
+          transition: 'background 0.2s',
+        }}
+      >
+        <span style={{
+          position: 'absolute',
+          top: 3,
+          left: checked ? 20 : 3,
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 0.2s',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }} />
+      </button>
+      <div>
+        <p style={{ fontSize: 13, color: '#333', margin: 0, fontWeight: 500 }}>{label}</p>
+        {hint && <p style={{ fontSize: 11, color: '#aaa', margin: '2px 0 0' }}>{hint}</p>}
+      </div>
+    </label>
   );
 }
