@@ -215,6 +215,7 @@ interface LicenseState {
 interface Props {
   orgId: string;
   month: string;
+  onMonthChange?: (month: string) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ function confidenceColor(c: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ShiftAssistant({ orgId, month, onOpenNotifications }: Props & { onOpenNotifications?: () => void }) {
+export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNotifications }: Props & { onOpenNotifications?: () => void }) {
   const t = useT();
   const [license, setLicense] = useState<LicenseState>({ checked: false, licensed: false });
   const [draft, setDraft] = useState<'A' | 'B'>('A');
@@ -421,6 +422,20 @@ export default function ShiftAssistant({ orgId, month, onOpenNotifications }: Pr
           <p className="text-sm text-slate-500 mt-0.5">
             {t('Automatické doplnění chybějících směn na základě dostupnosti a preferencí', 'Automatic filling of missing shifts based on availability and preferences')}
           </p>
+          {/* Month switcher */}
+          {onMonthChange && (() => {
+            const [y, m] = month.split('-').map(Number);
+            const label = new Date(y, m - 1, 1).toLocaleDateString(t('cs-CZ', 'en-US'), { month: 'long', year: 'numeric' });
+            const prev = () => { const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); setResult(null); };
+            const next = () => { const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); setResult(null); };
+            return (
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={prev} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors">‹</button>
+                <span className="text-sm font-semibold text-slate-700 capitalize min-w-[130px] text-center">{label}</span>
+                <button onClick={next} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors">›</button>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex items-center gap-3">

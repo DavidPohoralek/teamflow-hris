@@ -385,6 +385,7 @@ export default function HomePage() {
           <ShiftAssistant
             orgId={orgId}
             month={currentMonth}
+            onMonthChange={(m) => setCurrentMonth(m)}
             onOpenNotifications={() => {
               setManagerPanelTab('notifications');
               setShowManagerPanel(true);
