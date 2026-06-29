@@ -1503,6 +1503,7 @@ export default function WorkPlanGrid({
 
           {/* Add shift button */}
           <button
+            data-tour="add-shift"
             onClick={() => { setAddShiftDate(todayISO()); setShowModal(true); }}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 active:scale-95"
           >
