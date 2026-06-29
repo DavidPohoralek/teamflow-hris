@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 const DEPARTMENTS = ['Prodejna', 'Expedice', 'Backoffice', 'Homeoffice', 'Jiné'];
 const CONTRACTS = ['HPP', 'DPP', 'DPČ', 'IČO'];
@@ -40,6 +40,11 @@ export default function DotaznikPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [names, setNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/dotaznik').then(r => r.json()).then(d => setNames(d.names ?? []));
+  }, []);
 
   // Running button state
   const [btnPos, setBtnPos] = useState<{ x: number; y: number } | null>(null);
@@ -197,8 +202,16 @@ export default function DotaznikPage() {
 
               <Card title="Základní údaje">
                 <div>
-                  <Label>Jméno a první písmeno příjmení <Required /></Label>
-                  <Input type="text" value={form.name} onChange={e => set('name', e.target.value)} placeholder="David P." required />
+                  <Label>Vaše jméno <Required /></Label>
+                  <select
+                    value={form.name}
+                    onChange={e => set('name', e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${form.name ? RED : '#ddd'}`, borderRadius: 4, fontSize: 14, color: form.name ? '#333' : '#999', background: '#fff', outline: 'none', boxSizing: 'border-box' as const }}
+                  >
+                    <option value="">— Vyberte své jméno —</option>
+                    {names.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>

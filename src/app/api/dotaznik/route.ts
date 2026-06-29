@@ -8,6 +8,32 @@ function getServiceClient() {
   );
 }
 
+export async function GET() {
+  const supabase = getServiceClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('organization_id')
+    .eq('email', 'info@helveti.cz')
+    .maybeSingle();
+
+  if (!profile?.organization_id) {
+    return NextResponse.json({ names: [] });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: employees } = await (supabase as any)
+    .from('employees')
+    .select('name')
+    .eq('organization_id', profile.organization_id)
+    .eq('active', true)
+    .order('name', { ascending: true });
+
+  const names = (employees ?? []).map((e: { name: string }) => e.name);
+  return NextResponse.json({ names });
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json() as {
     name: string;
