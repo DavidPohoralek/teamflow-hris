@@ -103,22 +103,19 @@ export async function POST(req: NextRequest) {
 
   const tierNum = tier === 'Tier 1' ? 1 : tier === 'Tier 2' ? 2 : tier === 'Tier 3' ? 3 : 0;
 
-  // UPDATE existing employee
+  // UPDATE existing employee (only columns that exist in schema)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
     .from('employees')
     .update({
-      pin_code: pin,
-      pin: pin,
       email: email?.trim() || null,
       department: department || null,
       position: position?.trim() || null,
       labels,
       target_hours: targetHours || 160,
-      contract_type: contract || 'HPP',
       tier: tierNum,
       max_saturdays: tierNum > 0 ? (maxSaturdays ?? 0) : 0,
-      can_work_saturday: tierNum > 0 ? canWorkSaturday : false,
+      can_saturday: tierNum > 0 ? canWorkSaturday : false,
     })
     .eq('id', employee.id);
 
