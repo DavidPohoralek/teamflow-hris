@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('dotaznik update error:', error);
-    return NextResponse.json({ error: 'Nepodařilo se uložit. Zkuste to znovu.' }, { status: 500 });
+    return NextResponse.json({ error: `DB chyba: ${error.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
