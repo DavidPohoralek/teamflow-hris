@@ -413,7 +413,7 @@ export default function HomePage() {
           lang={tourLang}
           onClose={() => setShowTour(false)}
           canClose={subscriptionStatus === 'active'}
-          paid={subscriptionStatus === 'active'}
+          paid={subscriptionStatus !== 'pending' && subscriptionStatus !== 'expired'}
         />
       )}
 
