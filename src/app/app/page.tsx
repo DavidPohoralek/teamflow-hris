@@ -161,6 +161,15 @@ export default function HomePage() {
         .then(r => r.json())
         .then((d: Record<string, string>) => {
           if (d.ui_theme) setTheme(getTheme(d.ui_theme))
+          // Apply custom favicon if set, otherwise fall back to default TeamFlow favicon
+          const faviconUrl = d.favicon_url || '/favicon.svg'
+          let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+          if (!link) {
+            link = document.createElement('link')
+            link.rel = 'icon'
+            document.head.appendChild(link)
+          }
+          link.href = faviconUrl
         })
         .catch(() => {})
     } catch {

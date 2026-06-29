@@ -1369,10 +1369,79 @@ function SettingsTab() {
         <ThemeSelector onThemeChange={key => window.dispatchEvent(new CustomEvent('tf:theme-change', { detail: key }))} />
       </section>
 
+      {/* Favicon */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <FaviconSetting />
+      </section>
+
       {/* Integrations */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <IntegrationSettings />
       </section>
+    </div>
+  );
+}
+
+function FaviconSetting() {
+  const t = useT();
+  const [url, setUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    managerFetch('/api/manager/settings')
+      .then((r) => r.json())
+      .then((d: Record<string, string>) => { if (d.favicon_url) setUrl(d.favicon_url); })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favicon_url: url.trim() || null }),
+      });
+      // Apply immediately in the current tab
+      const faviconHref = url.trim() || '/favicon.svg';
+      let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+      if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+      link.href = faviconHref;
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      <h3 className="font-semibold text-gray-900 mb-1">{t('Favicon', 'Favicon')}</h3>
+      <p className="text-xs text-gray-400 mb-4">
+        {t(
+          'URL obrázku, který se zobrazí jako ikona záložky v prohlížeči. Ponechte prázdné pro výchozí logo TeamFlow.',
+          'URL of the image shown as the browser tab icon. Leave empty to use the default TeamFlow logo.',
+        )}
+      </p>
+      <div className="flex gap-2 items-center">
+        {url && (
+          <img src={url} alt="favicon preview" className="w-6 h-6 rounded object-contain border border-gray-200" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        )}
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://example.com/icon.png"
+          className={inputCls('flex-1')}
+        />
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}
+        >
+          {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
+        </button>
+      </div>
     </div>
   );
 }

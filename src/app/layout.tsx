@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: 'TeamFlow',
   description: 'Plánování směn, docházka a správa zaměstnanců',
   authors: [{ name: 'SelbickyLabs' }],
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

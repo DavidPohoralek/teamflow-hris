@@ -26,6 +26,7 @@ const EXTRA_KEYS = [
   'evening_shift_end',
   'evening_shift_min_staff',
   'evening_shift_label',
+  'favicon_url',
 ];
 
 // GET /api/manager/settings
