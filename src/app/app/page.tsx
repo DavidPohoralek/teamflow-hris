@@ -423,6 +423,7 @@ export default function HomePage() {
           onClose={() => setShowTour(false)}
           canClose={subscriptionStatus === 'active'}
           paid={subscriptionStatus !== 'pending' && subscriptionStatus !== 'expired'}
+          onSwitchTab={(tab) => setActiveTab(tab as Tab)}
         />
       )}
 

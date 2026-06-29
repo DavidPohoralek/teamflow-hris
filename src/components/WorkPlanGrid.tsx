@@ -906,6 +906,7 @@ function EntryChip({
         <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">
           {onCopyEntry && !isManagerMode && sessionEmployeeId && entry.employeeId === sessionEmployeeId && (
             <button
+              data-tour="copy-shift"
               onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
               className="text-slate-400 hover:text-blue-500 p-0.5"
               aria-label={t('Kopírovat směnu', 'Copy shift')}
@@ -1482,6 +1483,7 @@ export default function WorkPlanGrid({
                 className="flex items-center gap-1.5"
               >
                 <input
+                  data-tour="pin-input"
                   type="password"
                   inputMode="numeric"
                   maxLength={8}

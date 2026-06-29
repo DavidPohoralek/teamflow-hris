@@ -8,7 +8,7 @@ const PAD = 10; // spotlight padding around element
 // ─── Step definitions ─────────────────────────────────────────────────────────
 
 interface TourStep {
-  target?: string;          // data-tour="…" selector (undefined = centered card)
+  target?: string;
   icon: string;
   titleCs: string;
   titleEn: string;
@@ -17,6 +17,7 @@ interface TourStep {
   hintCs?: string;
   hintEn?: string;
   preferSide?: 'top' | 'bottom' | 'left' | 'right';
+  switchTab?: string; // tab id to switch to before showing this step
 }
 
 const STEPS: TourStep[] = [
@@ -35,6 +36,19 @@ const STEPS: TourStep[] = [
     descCs: 'Záložka Směny zobrazuje plán celého týmu — každý den v měsíci jako buňka. Vidíte kdo a kdy pracuje.',
     descEn: 'The Shifts tab shows the full team plan — each day in the month as a cell. See who works when.',
     preferSide: 'bottom',
+    switchTab: 'schedule',
+  },
+  {
+    target: 'pin-input',
+    icon: '🔑',
+    titleCs: 'Přihlášení PIN kódem',
+    titleEn: 'PIN login',
+    descCs: 'Zadejte svůj osobní PIN a stiskněte OK. Od té chvíle vidíte vlastní jméno v záhlaví a máte přístup k vlastním směnám.',
+    descEn: 'Enter your personal PIN and press OK. From then on you see your name in the header and can manage your own shifts.',
+    hintCs: 'PIN dostanete od svého manažera. Po přihlášení stačí kliknout do políčka kdykoli znovu.',
+    hintEn: 'You receive your PIN from your manager. After login, just click the field to re-enter anytime.',
+    preferSide: 'bottom',
+    switchTab: 'schedule',
   },
   {
     target: 'add-shift',
@@ -44,6 +58,19 @@ const STEPS: TourStep[] = [
     descCs: 'Kliknutím na "+ Přidat směnu" nebo přímo na libovolný den v kalendáři přidáte novou směnu zaměstnanci.',
     descEn: 'Click "+ Add shift" or directly on any day in the calendar to assign a new shift to an employee.',
     preferSide: 'bottom',
+    switchTab: 'schedule',
+  },
+  {
+    target: 'copy-shift',
+    icon: '📋',
+    titleCs: 'Kopírování směny',
+    titleEn: 'Copy shift',
+    descCs: 'Po přihlášení PINem se u vaší směny zobrazí ikonka kopírování. Klikněte na ni a pak klikejte na dny, kam chcete směnu zkopírovat.',
+    descEn: 'After PIN login, a copy icon appears on your shift. Click it, then click the days you want to copy the shift to.',
+    hintCs: 'Kopírování je rychlý způsob, jak naplánovat opakující se směny bez ručního zadávání.',
+    hintEn: 'Copying is the fastest way to schedule recurring shifts without manual entry.',
+    preferSide: 'bottom',
+    switchTab: 'schedule',
   },
   {
     target: 'tab-overview',
@@ -53,6 +80,7 @@ const STEPS: TourStep[] = [
     descCs: 'Záložka Přehled ukazuje v reálném čase kdo je právě na směně, kdo přišel pozdě a celkový stav týmu.',
     descEn: 'The Overview tab shows in real time who is currently on shift, who came late, and the team status.',
     preferSide: 'bottom',
+    switchTab: 'overview',
   },
   {
     target: 'tab-attendance',
@@ -64,6 +92,7 @@ const STEPS: TourStep[] = [
     hintCs: 'Funguje skvěle na tabletu umístěném u dveří.',
     hintEn: 'Works great on a tablet placed by the entrance.',
     preferSide: 'bottom',
+    switchTab: 'attendance',
   },
   {
     target: 'tab-my-hours',
@@ -73,6 +102,7 @@ const STEPS: TourStep[] = [
     descCs: 'Záložka Zaměstnanec — každý pracovník vidí své hodiny, plánované směny a žádosti o dovolenou.',
     descEn: 'The Employee tab — each worker sees their hours, planned shifts and leave requests.',
     preferSide: 'bottom',
+    switchTab: 'my-hours',
   },
   {
     target: 'tab-vacation',
@@ -82,6 +112,7 @@ const STEPS: TourStep[] = [
     descCs: 'V záložce Dovolená zaměstnanci žádají o dovolenou přímo z aplikace. Manažer žádosti schvaluje jedním kliknutím.',
     descEn: 'In the Vacation tab employees request leave directly from the app. Managers approve with one click.',
     preferSide: 'bottom',
+    switchTab: 'vacation',
   },
   {
     target: 'btn-manager',
@@ -93,9 +124,9 @@ const STEPS: TourStep[] = [
     hintCs: 'Výchozí heslo je "manager123". Doporučujeme ho změnit v Nastavení.',
     hintEn: 'Default password is "manager123". We recommend changing it in Settings.',
     preferSide: 'bottom',
+    switchTab: 'schedule',
   },
   {
-    // Done step — no target, centered
     icon: '🎉',
     titleCs: 'Jste připraveni!',
     titleEn: 'You\'re all set!',
@@ -249,9 +280,10 @@ interface Props {
   onClose: () => void;
   canClose?: boolean;
   paid?: boolean;
+  onSwitchTab?: (tab: string) => void;
 }
 
-export default function AppTour({ lang, onClose, canClose, paid }: Props) {
+export default function AppTour({ lang, onClose, canClose, paid, onSwitchTab }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [cardPos, setCardPos] = useState<CardPos>({ top: 0, left: 0, side: 'center' });
@@ -313,17 +345,23 @@ export default function AppTour({ lang, onClose, canClose, paid }: Props) {
     window.location.replace(PRICING_URL);
   }
 
+  function goToStep(i: number) {
+    const target = steps[i];
+    if (target?.switchTab) onSwitchTab?.(target.switchTab);
+    setStepIndex(i);
+  }
+
   function handleNext() {
     if (isLast) {
       if (paid) { onClose(); return; }
       markAndRedirect();
       return;
     }
-    setStepIndex(i => i + 1);
+    goToStep(stepIndex + 1);
   }
 
   function handleBack() {
-    if (stepIndex > 0) setStepIndex(i => i - 1);
+    if (stepIndex > 0) goToStep(stepIndex - 1);
   }
 
   return (
@@ -363,7 +401,7 @@ export default function AppTour({ lang, onClose, canClose, paid }: Props) {
                 {steps.map((_, i) => (
                   <button
                     key={i}
-                    onClick={() => setStepIndex(i)}
+                    onClick={() => goToStep(i)}
                     className={`rounded-full transition-all duration-200 ${
                       i === stepIndex ? 'w-4 h-2 bg-indigo-500' : 'w-2 h-2 bg-slate-200 hover:bg-slate-300'
                     }`}
