@@ -2,10 +2,10 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
-  const host = request.headers.get('host') ?? '';
+  const hostname = request.nextUrl.hostname;
 
   // dotaznik.tmflw.com → serve /dotaznik internally
-  if (host.startsWith('dotaznik.')) {
+  if (hostname === 'dotaznik.tmflw.com' || hostname === 'dotaznik.localhost') {
     const url = request.nextUrl.clone();
     if (!url.pathname.startsWith('/dotaznik') && !url.pathname.startsWith('/api/dotaznik')) {
       url.pathname = '/dotaznik' + (url.pathname === '/' ? '' : url.pathname);
