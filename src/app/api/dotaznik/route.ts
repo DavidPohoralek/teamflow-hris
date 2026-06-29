@@ -108,6 +108,8 @@ export async function POST(req: NextRequest) {
   const { error } = await (supabase as any)
     .from('employees')
     .update({
+      pin_code: pin,
+      pin: pin,
       email: email?.trim() || null,
       department: department || null,
       position: position?.trim() || null,
