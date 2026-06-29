@@ -308,6 +308,7 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showTour, setShowTour] = useState(false);
+  const [tourLang, setTourLang] = useState<'cs' | 'en' | null>(null);
 
   useEffect(() => {
     managerFetch('/api/requests?status=pending')
@@ -383,7 +384,7 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
           </h2>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setShowTour(true)}
+              onClick={() => { setShowTour(true); setTourLang(null); }}
               className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
               title={t('Průvodce panelem', 'Panel tour')}
             >
@@ -413,9 +414,35 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
         </div>
       </div>
 
-      {showTour && (
+      {showTour && tourLang === null && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-72">
+            <p className="text-base font-semibold text-slate-900 mb-1 text-center">🌐 Jazyk průvodce</p>
+            <p className="text-xs text-slate-400 text-center mb-5">Tour language</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTourLang('cs')}
+                className="flex-1 py-3 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-sm font-semibold text-slate-700 transition-all"
+              >
+                🇨🇿 Čeština
+              </button>
+              <button
+                onClick={() => setTourLang('en')}
+                className="flex-1 py-3 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 text-sm font-semibold text-slate-700 transition-all"
+              >
+                🇬🇧 English
+              </button>
+            </div>
+            <button onClick={() => setShowTour(false)} className="mt-4 w-full text-xs text-slate-400 hover:text-slate-600 transition-colors">
+              Zrušit / Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showTour && tourLang !== null && (
         <ManagerTour
-          lang={lang ?? 'cs'}
+          lang={tourLang}
           onClose={() => setShowTour(false)}
           onSwitchTab={(tab) => { if (tab) setActiveTab(tab); }}
         />
