@@ -494,12 +494,15 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
 
       {/* Apply result */}
       {applyResult && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-800">
-          {t('✅ Zapsáno', '✅ Written')} {applyResult.applied} {t('směn.', 'shifts.')}
+        <div className={`border rounded-lg px-4 py-3 text-sm ${applyResult.applied > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          {applyResult.applied > 0
+            ? <div>✅ {t('Zapsáno', 'Written')} {applyResult.applied} {t('směn do kalendáře.', 'shifts to calendar.')}</div>
+            : <div>⚠️ {t('Žádná směna nebyla zapsána.', 'No shifts were written.')}</div>
+          }
           {applyResult.skipped.length > 0 && (
-            <span className="text-amber-700 ml-2">
-              {t('Přeskočeno', 'Skipped')} {applyResult.skipped.length}: {applyResult.skipped.map(s => s.reason).join(', ')}
-            </span>
+            <div className="mt-1 text-xs text-amber-700">
+              {t('Přeskočeno', 'Skipped')} {applyResult.skipped.length}: {applyResult.skipped.map(s => s.reason).join(' · ')}
+            </div>
           )}
         </div>
       )}

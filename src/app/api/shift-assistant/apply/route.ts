@@ -49,18 +49,22 @@ export async function POST(req: NextRequest) {
   const empById: Record<string, string> = {};
   for (const e of employees ?? []) empById[e.id] = e.name;
 
+  console.log('[apply] orgId:', orgId, 'suggestionIds:', suggestionIds, 'times:', suggestionTimes);
+
   for (const id of suggestionIds) {
     const parts = id.split('__');
     const date   = parts[0];
     const empId  = parts[1];
 
     if (!date || !empId) {
+      console.log('[apply] invalid id:', id);
       skipped.push({ id, reason: 'Neplatné ID návrhu' });
       continue;
     }
 
     const empName = empById[empId];
     if (!empName) {
+      console.log('[apply] employee not found:', empId, 'known:', Object.keys(empById));
       skipped.push({ id, reason: `Zaměstnanec ${empId} nenalezen` });
       continue;
     }
@@ -81,7 +85,8 @@ export async function POST(req: NextRequest) {
     }
 
     const times = (suggestionTimes as Record<string, { startTime: string; endTime: string }>)[id] ?? {};
-    const { error } = await sb.from('work_plans').insert({
+    console.log('[apply] inserting', { empId, empName, date, times });
+    const { data: inserted, error } = await sb.from('work_plans').insert({
       organization_id: orgId,
       employee_id:     empId,
       date,
@@ -90,14 +95,17 @@ export async function POST(req: NextRequest) {
       end_time:        times.endTime ?? null,
       note:            'Asistent směn',
       active:          true,
-    });
+    }).select('id');
 
     if (error) {
+      console.log('[apply] insert error:', error);
       skipped.push({ id, reason: error.message });
     } else {
+      console.log('[apply] inserted ok:', inserted);
       applied.push(id);
     }
   }
 
-  return NextResponse.json({ applied: applied.length, skipped });
+  console.log('[apply] done applied:', applied.length, 'skipped:', skipped);
+  return NextResponse.json({ applied: applied.length, skipped, debug: { orgId, total: suggestionIds.length } });
 }
