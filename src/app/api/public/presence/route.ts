@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Neplatný PIN kód' }, { status: 401 });
     }
 
-    // Check if already checked in today without checkout
-    const { data: openLog } = await supabase
+    // Check if already checked in today without checkout (pick most recent open session)
+    const { data: openLogs } = await supabase
       .from('attendance_logs')
       .select('id, check_in, work_type_name')
       .eq('organization_id', orgId)
@@ -45,7 +45,9 @@ export async function GET(req: NextRequest) {
       .eq('date', today)
       .not('check_in', 'is', null)
       .is('check_out', null)
-      .maybeSingle();
+      .order('check_in', { ascending: false })
+      .limit(1)
+    const openLog = openLogs?.[0] ?? null;
 
     return NextResponse.json({
       employeeId: employee.id,

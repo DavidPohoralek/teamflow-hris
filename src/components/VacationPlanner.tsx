@@ -13,6 +13,7 @@ interface VacationRequest {
   date_to: string | null;
   status: 'pending' | 'approved' | 'rejected';
   note?: string | null;
+  type?: string;
 }
 
 interface Employee {
@@ -447,6 +448,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           date_to: r.date_to ?? null,
           status: r.status,
           note: r.note ?? null,
+          type: r.type ?? 'vacation',
         }));
         setRequests(allReqs);
       } else {
@@ -678,58 +680,6 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         </div>
       </div>
 
-      {/* My requests panel — visible when logged in via PIN */}
-      {!isManagerMode && sessionEmployee && (
-        <div className="mb-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-            <span className="text-sm font-semibold text-slate-700">🏖️ {t('Moje žádosti o dovolenou', 'My vacation requests')}</span>
-            {myRequestsLoading && <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />}
-          </div>
-          {myRequests.length === 0 && !myRequestsLoading ? (
-            <p className="text-sm text-slate-400 text-center py-4">{t('Žádné žádosti', 'No requests')}</p>
-          ) : (
-            <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
-              {myRequests.map((req) => {
-                const statusStyles: Record<string, string> = {
-                  approved: 'bg-emerald-100 text-emerald-700',
-                  rejected: 'bg-red-100 text-red-600',
-                  pending: 'bg-amber-100 text-amber-700',
-                };
-                const statusLabels: Record<string, string> = {
-                  approved: t('Schváleno', 'Approved'),
-                  rejected: t('Zamítnuto', 'Rejected'),
-                  pending: t('Čeká', 'Pending'),
-                };
-                const from = new Date(req.date_from + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                const to = req.date_to ? new Date(req.date_to + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
-                return (
-                  <div key={req.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800">{from}{to && to !== from ? ` — ${to}` : ''}</p>
-                      {req.note && <p className="text-xs text-slate-400 truncate mt-0.5">{req.note}</p>}
-                    </div>
-                    <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${statusStyles[req.status] ?? statusStyles.pending}`}>
-                      {statusLabels[req.status] ?? req.status}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteRequest(req.id)}
-                      disabled={deletingId === req.id}
-                      className="shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
-                      title={t('Smazat žádost', 'Delete request')}
-                    >
-                      {deletingId === req.id
-                        ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
-                        : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
-                      }
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Calendar grid */}
       {loading && (
         <div className="flex items-center justify-center py-12 text-gray-400 text-sm">{t('Načítám…', 'Loading…')}</div>
@@ -852,6 +802,71 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-300" />{t('Čeká na schválení', 'Pending approval')}</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
       </div>
+
+      {/* My vacation requests — below calendar, only when PIN logged in */}
+      {!isManagerMode && sessionEmployee && (() => {
+        const vacationOnly = myRequests.filter((r) => !r.type || r.type === 'vacation');
+        const STATUS_STYLE: Record<string, string> = {
+          approved: 'bg-emerald-100 text-emerald-700',
+          rejected: 'bg-red-100 text-red-600',
+          pending: 'bg-amber-100 text-amber-700',
+        };
+        const STATUS_LABEL: Record<string, string> = {
+          approved: t('Schváleno', 'Approved'),
+          rejected: t('Zamítnuto', 'Rejected'),
+          pending: t('Čeká', 'Pending'),
+        };
+        return (
+          <div className="mt-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-slate-100">
+              <span className="text-sm font-semibold text-slate-700">🏖️ {t('Moje žádosti o dovolenou', 'My vacation requests')}</span>
+              {myRequestsLoading && <span className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin inline-block" />}
+            </div>
+            {vacationOnly.length === 0 && !myRequestsLoading ? (
+              <p className="text-sm text-slate-400 text-center py-5">{t('Žádné žádosti o dovolenou', 'No vacation requests')}</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {vacationOnly.map((req) => {
+                  const from = new Date(req.date_from + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: 'long', year: 'numeric' });
+                  const to = req.date_to && req.date_to !== req.date_from
+                    ? new Date(req.date_to + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: 'long', year: 'numeric' })
+                    : null;
+                  const days = req.date_to
+                    ? Math.round((new Date(req.date_to + 'T00:00:00').getTime() - new Date(req.date_from + 'T00:00:00').getTime()) / 86400000) + 1
+                    : 1;
+                  return (
+                    <div key={req.id} className="flex items-center gap-4 px-4 sm:px-5 py-3.5 hover:bg-slate-50 transition-colors">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 text-base">
+                        🏖️
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800">{from}{to ? ` — ${to}` : ''}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{days} {days === 1 ? t('den', 'day') : days < 5 ? t('dny', 'days') : t('dní', 'days')}</p>
+                      </div>
+                      <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLE[req.status] ?? STATUS_STYLE.pending}`}>
+                        {STATUS_LABEL[req.status] ?? req.status}
+                      </span>
+                      {req.status === 'pending' && (
+                        <button
+                          onClick={() => handleDeleteRequest(req.id)}
+                          disabled={deletingId === req.id}
+                          className="shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                          title={t('Stáhnout žádost', 'Withdraw request')}
+                        >
+                          {deletingId === req.id
+                            ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
+                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+                          }
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Employee vacation summary */}
       {isManagerMode && employees.length > 0 && (

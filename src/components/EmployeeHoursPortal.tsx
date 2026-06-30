@@ -236,8 +236,8 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4">
         <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+          {/* Header — fixed, never scrolls */}
+          <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-slate-700 bg-clip-text text-transparent">
@@ -256,6 +256,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
               </button>
             </div>
           </div>
+
+          {/* Scrollable body — everything below header */}
+          <div className="flex-1 overflow-y-auto">
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 gap-3 px-4 sm:px-6 py-4 sm:py-5">
@@ -338,7 +341,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           )}
 
           {/* Attendance table */}
-          <div className="flex-1 overflow-auto px-4 sm:px-6 pb-2">
+          <div className="px-4 sm:px-6 pb-2">
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Poslední záznamy</h3>
             <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
               <table className="w-full min-w-[420px] text-sm">
@@ -408,7 +411,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                 Žádné žádosti
               </p>
             ) : (
-              <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-0.5">
+              <div className="flex flex-col gap-2">
                 {requests.map((req) => {
                   const badge = STATUS_BADGES[req.status] ?? STATUS_BADGES.pending;
                   return (
@@ -442,8 +445,10 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             )}
           </div>
 
-          {/* Footer */}
-          <div className="px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+          </div>{/* end scrollable body */}
+
+          {/* Footer — fixed at bottom */}
+          <div className="shrink-0 px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/50">
             <button
               onClick={handleBack}
               className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition"
