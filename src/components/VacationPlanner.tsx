@@ -846,7 +846,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                       <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLE[req.status] ?? STATUS_STYLE.pending}`}>
                         {STATUS_LABEL[req.status] ?? req.status}
                       </span>
-                      {req.status === 'pending' && (
+                      {(req.status === 'pending' || req.status === 'approved') && (
                         <button
                           onClick={() => handleDeleteRequest(req.id)}
                           disabled={deletingId === req.id}

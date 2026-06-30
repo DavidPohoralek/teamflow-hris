@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE /api/public/requests?orgId=UUID&pin=XXXX&requestId=UUID
-// Deletes a request that belongs to the employee identified by PIN (only pending)
+// Deletes a request that belongs to the employee identified by PIN
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

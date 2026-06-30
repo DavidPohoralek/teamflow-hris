@@ -101,6 +101,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [benefitCounts, setBenefitCounts] = useState<Record<string, number>>({});
   const [benefitSaving, setBenefitSaving] = useState<string | null>(null);
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   // Bottom tab: 'logs' | 'requests'
   const [activeTab, setActiveTab] = useState<'logs' | 'requests'>('logs');
   // Log filter: 'today' | '7d' | '30d' | 'all'
@@ -219,6 +220,20 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       setBenefitCounts((prev) => ({ ...prev, [benefitKey]: count }));
     } catch { /* ignore */ }
     finally { setBenefitSaving(null); }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    setDeletingRequestId(requestId);
+    try {
+      const res = await fetch(
+        `/api/public/requests?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pin)}&requestId=${encodeURIComponent(requestId)}`,
+        { method: 'DELETE' }
+      );
+      if (res.ok) {
+        setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      }
+    } catch { /* ignore */ }
+    finally { setDeletingRequestId(null); }
   };
 
   const handleBack = () => {
@@ -484,7 +499,22 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                               </span>
                             )}
                           </div>
-                          <span className={`ml-3 flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${badge.className}`}>{badge.label}</span>
+                          <div className="flex items-center gap-2 ml-3 shrink-0">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${badge.className}`}>{badge.label}</span>
+                            {req.status === 'pending' && (
+                              <button
+                                onClick={() => handleDeleteRequest(req.id)}
+                                disabled={deletingRequestId === req.id}
+                                className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                                title="Stáhnout žádost"
+                              >
+                                {deletingRequestId === req.id
+                                  ? <span className="inline-block w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+                                }
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
