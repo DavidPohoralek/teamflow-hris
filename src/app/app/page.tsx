@@ -236,7 +236,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="h-dvh flex flex-col bg-gray-50 overflow-hidden">
       {/* Navbar */}
       <nav className={`${theme.navBg} ${theme.navText} shadow-xl border-b ${theme.navBorder} z-10`}>
         {/* Desktop row */}
@@ -370,25 +370,13 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Content */}
-      <main className="flex-1 overflow-auto bg-slate-50">
-        {activeTab === 'schedule' && (
-          <WorkPlanGrid
-            orgId={orgId}
-            month={currentMonth}
-            isManagerMode={isManagerMode}
-            onMonthChange={(month: string) => setCurrentMonth(month)}
-          />
-        )}
-
+      {/* Content — kiosk tabs fill height, others scroll */}
+      <main className="flex-1 overflow-hidden bg-slate-50 flex flex-col">
+        {/* Kiosk tabs: fill remaining height, no outer scroll */}
         {activeTab === 'attendance' && (
           isManagerMode
-            ? <AttendanceManager orgId={orgId} />
+            ? <div className="flex-1 overflow-auto"><AttendanceManager orgId={orgId} /></div>
             : <AttendanceKiosk orgId={orgId} />
-        )}
-
-        {activeTab === 'overview' && (
-          <PresenceDashboard orgId={orgId} isManagerMode={isManagerMode} />
         )}
 
         {activeTab === 'my-hours' && (
@@ -398,24 +386,48 @@ export default function HomePage() {
           />
         )}
 
+        {/* Scrollable tabs */}
+        {activeTab === 'schedule' && (
+          <div className="flex-1 overflow-auto">
+            <WorkPlanGrid
+              orgId={orgId}
+              month={currentMonth}
+              isManagerMode={isManagerMode}
+              onMonthChange={(month: string) => setCurrentMonth(month)}
+            />
+          </div>
+        )}
+
+        {activeTab === 'overview' && (
+          <div className="flex-1 overflow-auto">
+            <PresenceDashboard orgId={orgId} isManagerMode={isManagerMode} />
+          </div>
+        )}
+
         {activeTab === 'vacation' && (
-          <VacationPlanner orgId={orgId} isManagerMode={isManagerMode} />
+          <div className="flex-1 overflow-auto">
+            <VacationPlanner orgId={orgId} isManagerMode={isManagerMode} />
+          </div>
         )}
 
         {activeTab === 'analytics' && isManagerMode && (
-          <AnalyticsDashboard orgId={orgId} />
+          <div className="flex-1 overflow-auto">
+            <AnalyticsDashboard orgId={orgId} />
+          </div>
         )}
 
         {activeTab === 'assistant' && isManagerMode && (
-          <ShiftAssistant
-            orgId={orgId}
-            month={currentMonth}
-            onMonthChange={(m) => setCurrentMonth(m)}
-            onOpenNotifications={() => {
-              setManagerPanelTab('notifications');
-              setShowManagerPanel(true);
-            }}
-          />
+          <div className="flex-1 overflow-auto">
+            <ShiftAssistant
+              orgId={orgId}
+              month={currentMonth}
+              onMonthChange={(m) => setCurrentMonth(m)}
+              onOpenNotifications={() => {
+                setManagerPanelTab('notifications');
+                setShowManagerPanel(true);
+              }}
+            />
+          </div>
         )}
 
         {activeTab === 'management' && isManagerMode && (

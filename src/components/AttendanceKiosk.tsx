@@ -238,7 +238,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#1e293b] text-white flex flex-col items-center justify-center p-4 select-none">
+    <div className="flex-1 bg-[#1e293b] text-white flex flex-col items-center justify-center p-4 select-none overflow-auto">
       {/* Check-in Screen */}
       {screen === 'checkin' && (
         <div className="w-full max-w-2xl flex flex-col items-center gap-8">

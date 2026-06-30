@@ -63,7 +63,7 @@ export default function PinPad({
     : ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
 
   return (
-    <div className="min-h-screen bg-[#1e293b] flex flex-col items-center justify-center p-6 select-none">
+    <div className="flex-1 bg-[#1e293b] flex flex-col items-center justify-center p-6 select-none">
       <div className="w-full max-w-xs flex flex-col items-center gap-7">
         {/* Title */}
         <div className="text-center">
