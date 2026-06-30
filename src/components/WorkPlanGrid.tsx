@@ -693,6 +693,7 @@ interface DayCardProps {
   onRemoveEmployee?: (dateStr: string, employeeId: string) => void;
   onCopyEntry?: (entry: ClipboardEntry) => void;
   onPaste?: (dateStr: string) => void;
+  isMyVacation?: boolean;
 }
 
 function DayCard({
@@ -712,6 +713,7 @@ function DayCard({
   onRemoveEmployee,
   onCopyEntry,
   onPaste,
+  isMyVacation,
 }: DayCardProps) {
   const t = useT();
   const day = new Date(dateStr + 'T00:00:00');
@@ -747,7 +749,9 @@ function DayCard({
     <div
       onClick={handleCardClick}
       className={`group rounded-xl border h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative overflow-hidden ${
-        isPasteMode
+        isMyVacation
+          ? 'bg-pink-50 border-pink-300 shadow-sm cursor-pointer hover:border-pink-400'
+          : isPasteMode
           ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
           : isWeekend
           ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
@@ -1185,6 +1189,28 @@ export default function WorkPlanGrid({
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
   // "Pouze mé směny" — filter grid to show only session employee's entries
   const [myShiftsOnly, setMyShiftsOnly] = useState(false);
+  // "Má dovolená" — highlight vacation days pink
+  const [myVacation, setMyVacation] = useState(false);
+  const [vacationDates, setVacationDates] = useState<Set<string>>(new Set());
+
+  const fetchMyVacation = useCallback(async (employeeId: string) => {
+    try {
+      const res = await fetch(`/api/public/vacation-calendar?orgId=${encodeURIComponent(orgId)}`);
+      const json = await res.json();
+      const dates = new Set<string>();
+      for (const req of json.requests ?? []) {
+        if (req.employee_id !== employeeId) continue;
+        const from = new Date(req.date_from);
+        const to = req.date_to ? new Date(req.date_to) : from;
+        const cur = new Date(from);
+        while (cur <= to) {
+          dates.add(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+      setVacationDates(dates);
+    } catch { /* non-critical */ }
+  }, [orgId]);
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
@@ -1456,6 +1482,17 @@ export default function WorkPlanGrid({
                 >
                   📅 {t('Pouze mé směny', 'My shifts only')}
                 </button>
+                {/* "Má dovolená" toggle */}
+                <button
+                  onClick={() => {
+                    const next = !myVacation;
+                    setMyVacation(next);
+                    if (next && sessionEmployee) fetchMyVacation(sessionEmployee.id);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${myVacation ? 'bg-pink-500 text-white border-pink-500 shadow-md shadow-pink-500/20' : 'bg-white text-slate-700 border-slate-200 hover:border-pink-400 hover:text-pink-600'}`}
+                >
+                  🌴 {t('Má dovolená', 'My vacation')}
+                </button>
                 {/* .ics download */}
                 {myShiftsOnly && (
                   <button
@@ -1585,6 +1622,7 @@ export default function WorkPlanGrid({
                   onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
                   onCopyEntry={handleCopyEntry}
                   onPaste={handlePaste}
+                  isMyVacation={myVacation && vacationDates.has(dateStr)}
                 />
               );
             })}
