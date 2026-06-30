@@ -1229,6 +1229,11 @@ export default function WorkPlanGrid({
   const [myVacation, setMyVacation] = useState(false);
   const [vacationDates, setVacationDates] = useState<Set<string>>(new Set());
 
+  // Department filter
+  const [deptFilter, setDeptFilter] = useState<string | null>(null);
+  const [empDeptMap, setEmpDeptMap] = useState<Record<string, string>>({});
+  const [departments, setDepartments] = useState<string[]>([]);
+
   // Mobile week view — start on Monday of current week
   const [mobileWeekStart, setMobileWeekStart] = useState<Date>(() => getWeekStart(new Date()));
 
@@ -1286,6 +1291,24 @@ export default function WorkPlanGrid({
   useEffect(() => {
     fetchWorkTypes();
   }, [fetchWorkTypes]);
+
+  // Load employee departments for manager filter
+  useEffect(() => {
+    if (!isManagerMode) return;
+    managerFetch('/api/employees')
+      .then((r) => r.json())
+      .then((data: { employees?: Array<{ id: string; department?: string | null }> } | Array<{ id: string; department?: string | null }>) => {
+        const list = Array.isArray(data) ? data : (data as { employees?: Array<{ id: string; department?: string | null }> }).employees ?? [];
+        const map: Record<string, string> = {};
+        const depts = new Set<string>();
+        for (const emp of list) {
+          if (emp.department) { map[emp.id] = emp.department; depts.add(emp.department); }
+        }
+        setEmpDeptMap(map);
+        setDepartments(Array.from(depts).sort());
+      })
+      .catch(() => {});
+  }, [isManagerMode]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -1600,9 +1623,13 @@ export default function WorkPlanGrid({
               const isToday = dateStr === todayStr;
               const isVacation = myVacation && vacationDates.has(dateStr);
               const allEntries = entriesByDate.get(dateStr) ?? [];
-              const visibleEntries = myShiftsOnly && sessionEmployee
-                ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
-                : allEntries;
+              const visibleEntries = (() => {
+                let es = myShiftsOnly && sessionEmployee
+                  ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                  : allEntries;
+                if (deptFilter) es = es.filter((e) => empDeptMap[e.employeeId] === deptFilter);
+                return es;
+              })();
               const dayLong = DAY_NAMES_LONG[wd];
               const dayNum = d.getDate();
               const monName = CZ_MONTHS_LONG_SHORT[d.getMonth()];
@@ -1713,6 +1740,27 @@ export default function WorkPlanGrid({
             </svg>
           </button>
         </div>
+
+        {/* Department filter pills — manager only */}
+        {isManagerMode && departments.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setDeptFilter(null)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilter === null ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+            >
+              {t('Vše', 'All')}
+            </button>
+            {departments.map((dept) => (
+              <button
+                key={dept}
+                onClick={() => setDeptFilter(deptFilter === dept ? null : dept)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilter === dept ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+              >
+                {dept}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Right side: PIN session + add button */}
         <div className="flex items-center gap-2">
@@ -1879,9 +1927,13 @@ export default function WorkPlanGrid({
               const isWeekend = wd === 5 || wd === 6;
               const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
               const allEntries = entriesByDate.get(dateStr) ?? [];
-              const visibleEntries = myShiftsOnly && sessionEmployee
-                ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
-                : allEntries;
+              const visibleEntries = (() => {
+                let es = myShiftsOnly && sessionEmployee
+                  ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                  : allEntries;
+                if (deptFilter) es = es.filter((e) => empDeptMap[e.employeeId] === deptFilter);
+                return es;
+              })();
               return (
                 <DayCard
                   key={dateStr}
