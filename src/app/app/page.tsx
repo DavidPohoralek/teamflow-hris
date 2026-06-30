@@ -239,34 +239,26 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Navbar */}
       <nav className={`${theme.navBg} ${theme.navText} shadow-xl border-b ${theme.navBorder} z-10`}>
-        <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-6">
-          {/* Logo */}
+        {/* Desktop row */}
+        <div className="hidden md:flex max-w-screen-2xl mx-auto px-6 h-16 items-center gap-6">
+          {/* TeamFlow logo */}
           <div className="flex items-center gap-3 shrink-0">
             <svg width="36" height="36" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
-              {/* Outer faces */}
               <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
               <polygon points="25,72 125,130 125,244 25,187" fill="#E09828"/>
-              {/* Rim strips */}
               <polygon points="125,15 225,72 213,72 125,22" fill="#EDB84A"/>
               <polygon points="25,72 125,15 125,22 37,72" fill="#E09828"/>
               <polygon points="225,72 125,130 125,122 213,72" fill="#96560A"/>
               <polygon points="125,130 25,72 37,72 125,122" fill="#AE6A10"/>
-              {/* Interior diagonal split IT→IB */}
               <polygon points="37,72 125,22 125,122" fill="#2A4878"/>
               <polygon points="213,72 125,22 125,122" fill="#05080F"/>
               <line x1="125" y1="22" x2="125" y2="122" stroke="#1A2E58" strokeWidth="1.5"/>
               <polyline points="125,22 213,72 125,122 37,72 125,22" fill="none" stroke="#182840" strokeWidth="1.8"/>
-              {/* T — crossbar */}
               <polygon points="35,98 115,145 115,163 35,117" fill="#7A4808"/>
-              {/* T — stem (gap above) */}
               <polygon points="61,139 89,155 89,210 61,194" fill="#7A4808"/>
-              {/* F — top bar */}
               <polygon points="135,145 215,98 215,117 135,163" fill="#6A3806"/>
-              {/* F — stem (gap above) */}
               <polygon points="135,170 153,159 153,211 135,221" fill="#6A3806"/>
-              {/* F — middle bar (gap from stem) */}
               <polygon points="157,171 200,146 200,163 157,188" fill="#6A3806"/>
-              {/* Outer edges */}
               <polyline points="25,72 125,15 225,72" fill="none" stroke="#C07010" strokeWidth="2.5" strokeLinejoin="round"/>
               <line x1="25" y1="72" x2="25" y2="187" stroke="#C07010" strokeWidth="2"/>
               <line x1="225" y1="72" x2="225" y2="187" stroke="#8A4A08" strokeWidth="2"/>
@@ -274,17 +266,13 @@ export default function HomePage() {
               <line x1="225" y1="187" x2="125" y2="244" stroke="#8A4A08" strokeWidth="2"/>
               <line x1="125" y1="130" x2="125" y2="244" stroke="#9A5C10" strokeWidth="2.5"/>
             </svg>
-            </div>
-
-          {/* Divider + org logo */}
+          </div>
           <div className={`h-6 w-px ${theme.divider}`} />
           {orgLogoUrl
             ? /* eslint-disable-next-line @next/next/no-img-element */
               <img src={orgLogoUrl} alt={orgName} className="h-8 w-auto max-w-[140px] object-contain" />
             : <span className="text-slate-400 text-sm font-medium">{orgName}</span>
           }
-
-          {/* Tabs — center */}
           <div className="flex-1 flex justify-center">
             <div className={`flex items-center rounded-xl p-1 gap-0.5 ${theme.tabsBg}`}>
               {[...BASE_TABS, ...(isManagerMode ? MANAGER_TABS : [])].map((tab) => (
@@ -304,8 +292,6 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-
-          {/* Manager button */}
           <div className="shrink-0">
             {isManagerMode ? (
               <div className="flex items-center gap-3">
@@ -313,34 +299,73 @@ export default function HomePage() {
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                   <span className="text-emerald-400 text-sm font-medium">{t('Manažer', 'Manager')}</span>
                 </div>
-                <button
-                  onClick={handleManagerLogout}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}
-                >
+                <button onClick={handleManagerLogout} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}>
                   {t('Odhlásit', 'Log out')}
                 </button>
               </div>
             ) : (
-              <button
-                data-tour="btn-manager"
-                onClick={() => setShowManagerLogin(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${theme.managerBtnClass}`}
-              >
+              <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${theme.managerBtnClass}`}>
                 <span>🔐</span>
                 <span>{t('Manažer', 'Manager')}</span>
               </button>
             )}
           </div>
-
-          {/* Language toggle */}
           <div className="shrink-0 flex items-center">
-            <button
-              onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${theme.logoutBtnClass}`}
-              title={lang === 'cs' ? 'Switch to English' : 'Přepnout do češtiny'}
-            >
+            <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${theme.logoutBtnClass}`}>
               {lang === 'cs' ? 'EN' : 'CS'}
             </button>
+          </div>
+        </div>
+
+        {/* Mobile layout */}
+        <div className="md:hidden">
+          {/* Top strip: org logo + manager button */}
+          <div className="flex items-center justify-between px-4 h-12">
+            <div className="flex items-center min-w-0">
+              {orgLogoUrl
+                ? /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={orgLogoUrl} alt={orgName} className="h-7 w-auto max-w-[120px] object-contain" />
+                : <span className="text-sm font-semibold truncate">{orgName}</span>
+              }
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {isManagerMode ? (
+                <>
+                  <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2 py-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className="text-emerald-400 text-xs font-medium">{t('Manažer', 'Manager')}</span>
+                  </div>
+                  <button onClick={handleManagerLogout} className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}>
+                    {t('Odhlásit', 'Log out')}
+                  </button>
+                </>
+              ) : (
+                <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${theme.managerBtnClass}`}>
+                  <span>🔐</span>
+                  <span>{t('Manažer', 'Manager')}</span>
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Scrollable tabs row */}
+          <div className={`overflow-x-auto scrollbar-none border-t ${theme.navBorder}`}>
+            <div className={`flex items-center gap-0.5 p-1 min-w-max ${theme.tabsBg} mx-2 mb-2 rounded-xl`}>
+              {[...BASE_TABS, ...(isManagerMode ? MANAGER_TABS : [])].map((tab) => (
+                <button
+                  key={tab.id}
+                  data-tour={`tab-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap
+                    ${activeTab === tab.id
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : theme.tabInactive
+                    }`}
+                >
+                  <span>{tab.icon}</span>
+                  <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </nav>
