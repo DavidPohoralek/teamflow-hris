@@ -645,26 +645,27 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       {loading && (
         <div className="flex items-center justify-center py-12 text-gray-400 text-sm">{t('Načítám…', 'Loading…')}</div>
       )}
-      <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
+      <div className={loading ? 'opacity-40 pointer-events-none' : ''}>
         {/* Day headers */}
-        <div className="grid grid-cols-7 bg-gradient-to-r from-slate-800 to-slate-700 px-1 py-2">
+        <div className="grid grid-cols-7 gap-1 mb-1.5 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
           {DAY_NAMES_SHORT.map((d, i) => (
-            <div key={d} className={`text-center text-xs font-semibold py-0.5 ${i >= 5 ? 'text-blue-300' : 'text-slate-300'}`}>
+            <div key={d} className={`text-center text-xs font-semibold py-0.5 ${i >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
               {d}
             </div>
           ))}
         </div>
 
         {/* Calendar cells */}
-        <div className="grid grid-cols-7 gap-px bg-slate-100">
+        <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: firstOffset }).map((_, i) => (
-            <div key={`e-${i}`} className="bg-white min-h-[52px] sm:min-h-[80px]" />
+            <div key={`e-${i}`} className="rounded-xl" />
           ))}
           {days.map((dateStr) => {
             const wd = mondayWeekday(dateStr);
             const isWeekend = wd >= 5;
             const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
             const dayNum = new Date(dateStr + 'T00:00:00').getDate();
+            const dayName = DAY_NAMES_SHORT[wd];
             const count = dayCountMap.get(dateStr) ?? 0;
             const onVacation = employees.filter((e) => empVacMap.get(e.id)?.has(dateStr));
             const isToday = dateStr === todayISO();
@@ -680,35 +681,53 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     setShowEmployeeVacModal(true);
                   }
                 }}
-                className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 flex flex-col gap-0.5 sm:gap-1 relative overflow-hidden ${isClosed ? 'cursor-default' : isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${isToday && !isClosed ? 'ring-2 ring-inset ring-rose-400 shadow-sm shadow-rose-100' : ''} ${hasMyShift && !isClosed && !isToday ? 'ring-2 ring-inset ring-blue-400' : hasMyShift && !isClosed && isToday ? 'ring-2 ring-inset ring-rose-400' : ''} ${!isClosed && !isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
+                className={`group rounded-xl border min-h-[80px] sm:min-h-[106px] p-2 sm:p-2.5 flex flex-col gap-1 transition-colors relative overflow-hidden ${
+                  isClosed
+                    ? 'bg-slate-50 border-slate-100 cursor-default'
+                    : isToday
+                    ? 'bg-white border-rose-400 shadow-sm shadow-rose-100 ring-1 ring-rose-300 cursor-pointer hover:border-rose-500'
+                    : hasMyShift
+                    ? 'bg-blue-50/20 border-blue-300 cursor-pointer hover:border-blue-400'
+                    : isWeekend
+                    ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
+                    : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
+                } ${!isClosed && !isManagerMode && sessionEmployee ? 'group' : ''}`}
               >
                 {isClosed && (
                   <div
                     className="absolute inset-0 pointer-events-none"
                     style={{
-                      background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.18) 0px, rgba(148,163,184,0.18) 3px, transparent 3px, transparent 10px)',
-                      backgroundColor: 'rgb(241 245 249)',
+                      background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.15) 0px, rgba(148,163,184,0.15) 3px, transparent 3px, transparent 10px)',
                     }}
                   />
                 )}
                 <div className="relative z-10 flex items-center justify-between mb-0.5">
-                  <span className={`text-xs font-bold ${isToday ? 'bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center' : isClosed ? 'text-slate-400' : isWeekend ? 'text-blue-400' : 'text-slate-700'}`}>{dayNum}</span>
-                  {isClosed && <span className="text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
+                  <span className={`text-xs font-semibold ${isWeekend ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {dayName}{isClosed && <span className="ml-1 text-[9px] font-bold text-slate-400 bg-slate-200 px-1 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
+                  </span>
                   <div className="flex items-center gap-1">
                     {hasMyShift && (
                       <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1 py-0.5 rounded">{t('směna', 'shift')}</span>
                     )}
-                    <span className="hidden group-hover:flex items-center text-xs text-emerald-500 font-semibold gap-0.5">
-                      <span className="text-base leading-none">+</span>
-                    </span>
+                    {!isClosed && !isManagerMode && sessionEmployee && (
+                      <span className="hidden group-hover:flex items-center text-xs text-emerald-500 font-semibold gap-0.5">
+                        <span className="text-base leading-none">+</span>
+                      </span>
+                    )}
                     {count > 0 && (
                       <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                         {count}×
                       </span>
                     )}
+                    <span className={`text-sm font-bold ${
+                      isToday ? 'bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs'
+                      : isWeekend ? 'text-slate-400' : 'text-slate-700'
+                    }`}>
+                      {dayNum}
+                    </span>
                   </div>
                 </div>
-                <div className="relative z-10 flex flex-col gap-0.5">
+                <div className="relative z-10 flex flex-col gap-0.5 flex-1 overflow-y-auto min-h-0">
                   {/* On mobile: show coloured dot per person; on sm+: show name chip */}
                   <div className="flex flex-wrap gap-0.5 sm:hidden">
                     {onVacation.map((emp) => {
