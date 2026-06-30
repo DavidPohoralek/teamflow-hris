@@ -13,6 +13,7 @@ interface WorkPlanEntry {
   date: string;
   employeeId: string;
   employeeName: string | null;
+  employeeDepartment: string | null;
   workType: string | null;
   workTypeId: string | null;
   workTypeName: string | null;
@@ -1292,23 +1293,20 @@ export default function WorkPlanGrid({
     fetchWorkTypes();
   }, [fetchWorkTypes]);
 
-  // Load employee departments for manager filter
+  // Build department map from schedule data whenever it loads
   useEffect(() => {
-    if (!isManagerMode) return;
-    managerFetch('/api/employees')
-      .then((r) => r.json())
-      .then((data: { employees?: Array<{ id: string; department?: string | null }> } | Array<{ id: string; department?: string | null }>) => {
-        const list = Array.isArray(data) ? data : (data as { employees?: Array<{ id: string; department?: string | null }> }).employees ?? [];
-        const map: Record<string, string> = {};
-        const depts = new Set<string>();
-        for (const emp of list) {
-          if (emp.department) { map[emp.id] = emp.department; depts.add(emp.department); }
-        }
-        setEmpDeptMap(map);
-        setDepartments(Array.from(depts).sort());
-      })
-      .catch(() => {});
-  }, [isManagerMode]);
+    if (!data) return;
+    const map: Record<string, string> = {};
+    const depts = new Set<string>();
+    for (const entry of data.workPlans) {
+      if (entry.employeeDepartment) {
+        map[entry.employeeId] = entry.employeeDepartment;
+        depts.add(entry.employeeDepartment);
+      }
+    }
+    setEmpDeptMap(map);
+    setDepartments(Array.from(depts).sort());
+  }, [data]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -1741,8 +1739,8 @@ export default function WorkPlanGrid({
           </button>
         </div>
 
-        {/* Department filter pills — manager only */}
-        {isManagerMode && departments.length > 0 && (
+        {/* Department filter pills */}
+        {departments.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => setDeptFilter(null)}

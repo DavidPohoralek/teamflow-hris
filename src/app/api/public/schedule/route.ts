@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       start_time,
       end_time,
       note,
-      employees ( name ),
+      employees ( name, department ),
       work_types ( name, color )
     `
     )
@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
     date: row.date,
     employeeId: row.employee_id,
     employeeName: row.employees?.name ?? null,
+    employeeDepartment: row.employees?.department ?? null,
     workType: row.work_type ?? null,
     workTypeId: row.work_type_id ?? null,
     workTypeName: row.work_types?.name ?? row.work_type ?? null,
