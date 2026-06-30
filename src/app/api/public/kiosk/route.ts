@@ -65,22 +65,52 @@ export async function POST(req: NextRequest) {
 
       const now = new Date().toISOString()
 
-      const insertData: Record<string, unknown> = {
-        organization_id: orgId,
-        employee_id: employee.id,
-        date: today,
-        check_in: now,
-      }
-      if (workTypeId) insertData.work_type_id = workTypeId
-      if (workTypeName) insertData.work_type_name = workTypeName
-
-      const { error: insertError } = await supabase
+      // Check if a completed record exists today (same-day re-checkin)
+      const { data: completed } = await supabase
         .from('attendance_logs')
-        .insert(insertData)
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('employee_id', employee.id)
+        .eq('date', today)
+        .not('check_out', 'is', null)
+        .order('check_out', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-      if (insertError) {
-        console.error('Kiosk checkin insert error:', insertError)
-        return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
+      if (completed) {
+        // Re-checkin same day: reset the existing row
+        const { error: updateError } = await supabase
+          .from('attendance_logs')
+          .update({
+            check_in: now,
+            check_out: null,
+            ...(workTypeId ? { work_type_id: workTypeId } : {}),
+            ...(workTypeName ? { work_type_name: workTypeName } : {}),
+          })
+          .eq('id', completed.id)
+
+        if (updateError) {
+          console.error('Kiosk re-checkin update error:', updateError)
+          return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
+        }
+      } else {
+        const insertData: Record<string, unknown> = {
+          organization_id: orgId,
+          employee_id: employee.id,
+          date: today,
+          check_in: now,
+        }
+        if (workTypeId) insertData.work_type_id = workTypeId
+        if (workTypeName) insertData.work_type_name = workTypeName
+
+        const { error: insertError } = await supabase
+          .from('attendance_logs')
+          .insert(insertData)
+
+        if (insertError) {
+          console.error('Kiosk checkin insert error:', insertError)
+          return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
+        }
       }
 
       return NextResponse.json({
