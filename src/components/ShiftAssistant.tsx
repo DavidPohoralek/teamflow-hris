@@ -335,9 +335,23 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     setApplying(true);
     setError(null);
     try {
+      // Build a map of suggestionId → {startTime, endTime} so apply route can store times
+      const suggestionTimes: Record<string, { startTime: string; endTime: string }> = {};
+      for (const day of result.problemDays) {
+        for (const s of day.suggestions) {
+          if (!selected.has(s.id)) continue;
+          if (s.partialAvailability) {
+            suggestionTimes[s.id] = { startTime: s.partialAvailability.from, endTime: s.partialAvailability.to };
+          } else {
+            // Parse timeLabel "09:00–19:00" (em dash or regular dash)
+            const parts = s.timeLabel.split(/[–-]/).map((p: string) => p.trim());
+            if (parts.length === 2) suggestionTimes[s.id] = { startTime: parts[0], endTime: parts[1] };
+          }
+        }
+      }
       const res = await managerFetch('/api/shift-assistant/apply', {
         method: 'POST',
-        body: JSON.stringify({ month, draft, suggestionIds: Array.from(selected) }),
+        body: JSON.stringify({ month, draft, suggestionIds: Array.from(selected), suggestionTimes }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Chyba při aplikaci');

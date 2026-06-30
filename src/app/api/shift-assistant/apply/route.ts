@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   let body: { month?: string; draft?: string; suggestionIds?: string[] };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const { month, draft = 'A', suggestionIds = [] } = body;
+  const { month, draft = 'A', suggestionIds = [], suggestionTimes = {} } = body as typeof body & { suggestionTimes?: Record<string, { startTime: string; endTime: string }> };
   if (!month) return NextResponse.json({ error: 'Chybí month' }, { status: 422 });
   if (!suggestionIds.length) return NextResponse.json({ applied: 0, skipped: [] });
 
@@ -81,14 +81,17 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    const times = (suggestionTimes as Record<string, { startTime: string; endTime: string }>)[id] ?? {};
     const { error } = await sb.from('work_plans').insert({
       organization_id: orgId,
       employee_id:     empId,
       date,
       work_type:       'Prodejna',
+      start_time:      times.startTime ?? null,
+      end_time:        times.endTime ?? null,
       type:            'draft',
       draft_label:     draft,
-      notes:           'Asistent směn',
+      note:            'Asistent směn',
       active:          true,
     });
 
