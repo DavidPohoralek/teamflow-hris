@@ -48,8 +48,10 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     if (action === 'checkin') {
-      // Reject if an open session already exists (not yet checked out)
-      const { data: existing } = await supabase
+      const now = new Date().toISOString()
+
+      // If an open session exists, auto-close it first so every tap is recorded
+      const { data: openSession } = await supabase
         .from('attendance_logs')
         .select('id')
         .eq('organization_id', orgId)
@@ -59,12 +61,14 @@ export async function POST(req: NextRequest) {
         .is('check_out', null)
         .maybeSingle()
 
-      if (existing) {
-        return NextResponse.json({ ok: false, error: 'Již jste přihlášen/a' }, { status: 409 })
+      if (openSession) {
+        await supabase
+          .from('attendance_logs')
+          .update({ check_out: now })
+          .eq('id', openSession.id)
       }
 
-      // Always insert a new row — every session is recorded separately
-      const now = new Date().toISOString()
+      // Always insert a fresh row — every check-in is its own record
       const insertData: Record<string, unknown> = {
         organization_id: orgId,
         employee_id: employee.id,
@@ -80,7 +84,11 @@ export async function POST(req: NextRequest) {
 
       if (insertError) {
         console.error('Kiosk checkin insert error:', insertError)
-        return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
+        // Surface the real DB error to help diagnose constraint issues
+        return NextResponse.json(
+          { ok: false, error: `Chyba při záznamu příchodu: ${insertError.message}` },
+          { status: 500 }
+        )
       }
 
       return NextResponse.json({
