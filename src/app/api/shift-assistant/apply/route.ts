@@ -36,6 +36,16 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
+  // Look up work_type_id for 'Prodejna' so inserted shifts get the right color
+  const { data: prodejnaType } = await sb
+    .from('work_types')
+    .select('id, name')
+    .eq('organization_id', orgId)
+    .ilike('name', 'prodejna')
+    .maybeSingle();
+  const prodejnaTypeId: string | null = prodejnaType?.id ?? null;
+  const prodejnaTypeName: string = prodejnaType?.name ?? 'Prodejna';
+
   const applied: string[] = [];
   const skipped: { id: string; reason: string }[] = [];
 
@@ -56,7 +66,8 @@ export async function POST(req: NextRequest) {
       organization_id: orgId,
       employee_id:     empId,
       date,
-      work_type:       'Prodejna',
+      work_type:       prodejnaTypeName,
+      work_type_id:    prodejnaTypeId,
       start_time:      times.startTime ?? null,
       end_time:        times.endTime ?? null,
       note:            'Asistent směn',
