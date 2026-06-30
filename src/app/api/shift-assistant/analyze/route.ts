@@ -82,11 +82,21 @@ export async function GET(req: NextRequest) {
     storeRating: Number(e.store_rating ?? 3),
   }));
 
-  // Build draft days — merge schedule_days config with draft assignments + confirmed shifts
-  const confirmedByDate: Record<string, number> = {};
+  // Index confirmed (non-draft) shifts by date — include employee IDs and work types
+  // Bot needs this to know who's already assigned (for CLOSING_ASSIST suggestions)
+  const confirmedByDate: Record<string, { count: number; employeeIds: string[]; shifts: { employeeId: string; workType: string; startTime: string; endTime: string }[] }> = {};
   for (const wp of (wpRes.data ?? [])) {
     const d = String(wp.date ?? '').slice(0, 10);
-    if (d) confirmedByDate[d] = (confirmedByDate[d] ?? 0) + 1;
+    if (!d) continue;
+    if (!confirmedByDate[d]) confirmedByDate[d] = { count: 0, employeeIds: [], shifts: [] };
+    confirmedByDate[d].count++;
+    if (wp.employee_id) confirmedByDate[d].employeeIds.push(String(wp.employee_id));
+    confirmedByDate[d].shifts.push({
+      employeeId: String(wp.employee_id ?? ''),
+      workType: String(wp.work_type ?? ''),
+      startTime: String(wp.start_time ?? ''),
+      endTime: String(wp.end_time ?? ''),
+    });
   }
   const orgSettings = buildSettings(settingsRes.data);
   const draftDays = buildDraftDays(month, draftRes.data ?? [], draft, scheduleDaysRes.data ?? [], confirmedByDate, orgSettings);
@@ -143,7 +153,7 @@ function buildDraftDays(
   draftRows: Record<string, unknown>[],
   _draft: string,
   scheduleDays: Record<string, unknown>[],
-  confirmedByDate: Record<string, number>,
+  confirmedByDate: Record<string, { count: number; employeeIds: string[]; shifts: { employeeId: string; workType: string; startTime: string; endTime: string }[] }>,
   orgSettings: Record<string, unknown> = {},
 ) {
   // Index schedule_days config by date
@@ -158,16 +168,13 @@ function buildDraftDays(
     };
   }
 
-  // Group draft rows by date
-  const byDate: Record<string, { assignedEmployees: string[]; assignedCount: number }> = {};
+  // Group DRAFT rows by date
+  const draftByDate: Record<string, { employeeIds: string[] }> = {};
   for (const row of draftRows) {
     const date = String(row.date ?? '').slice(0, 10);
     if (!date) continue;
-    if (!byDate[date]) byDate[date] = { assignedEmployees: [], assignedCount: 0 };
-    if (row.employee_id) {
-      byDate[date].assignedEmployees.push(String(row.employee_id));
-      byDate[date].assignedCount++;
-    }
+    if (!draftByDate[date]) draftByDate[date] = { employeeIds: [] };
+    if (row.employee_id) draftByDate[date].employeeIds.push(String(row.employee_id));
   }
 
   const [year, mon] = month.split('-').map(Number);
@@ -180,17 +187,30 @@ function buildDraftDays(
     const dateObj = new Date(year, mon - 1, d);
     const dow = dateObj.getDay();
     const isSunday = dow === 0;
-    const slot = byDate[date] ?? { assignedEmployees: [], assignedCount: 0 };
+
+    const draftSlot = draftByDate[date] ?? { employeeIds: [] };
+    const confirmed = confirmedByDate[date];
     const meta = schedMeta[date];
 
-    // requiredTotal: schedule_days override → org settings per-dow → Sunday=0 → fallback 3
+    // requiredTotal priority: schedule_days override → org per-dow settings → Sunday=0 → fallback 3
     const dowKey = DOW_REQUIRED_KEYS[dow];
     const orgDefault = dowKey && orgSettings[dowKey] != null ? Number(orgSettings[dowKey]) : (isSunday ? 0 : 3);
     const requiredTotal = meta ? meta.requiredTotal : orgDefault;
-    // dayType: from schedule_days, or 'Zavřeno' for Sunday
+
     const dayType = meta?.dayType || (isSunday ? 'Zavřeno' : '');
-    // Confirmed (non-draft) shifts already assigned to this day
-    const confirmedCount = confirmedByDate[date] ?? 0;
+
+    // Merge confirmed + draft employee IDs (deduplicated) so bot knows total assigned
+    const confirmedIds = confirmed?.employeeIds ?? [];
+    const seen = new Set<string>();
+    const allAssignedIds: string[] = [];
+    for (const id of [...confirmedIds, ...draftSlot.employeeIds]) {
+      if (!seen.has(id)) { seen.add(id); allAssignedIds.push(id); }
+    }
+
+    // Count only Prodejna-type confirmed shifts for "store" coverage
+    const prodejnaConfirmedCount = (confirmed?.shifts ?? []).filter(s =>
+      s.workType && (s.workType.toLowerCase().includes('prodejna') || s.workType.toLowerCase().includes('store'))
+    ).length;
 
     days.push({
       date,
@@ -199,9 +219,12 @@ function buildDraftDays(
       requiredTotal,
       startTime: meta?.startTime ?? null,
       endTime: meta?.endTime ?? null,
-      assignedEmployees: slot.assignedEmployees,
-      assignedCount: slot.assignedCount,
-      confirmedCount,          // bot can subtract confirmed from missing
+      // assignedEmployees = everyone working that day (draft + confirmed) for CLOSING_ASSIST check
+      assignedEmployees: allAssignedIds,
+      // assignedCount = Prodejna confirmed + draft → bot calculates missing = requiredTotal - assignedCount
+      assignedCount: prodejnaConfirmedCount + draftSlot.employeeIds.length,
+      // Full confirmed shift detail so bot can suggest CLOSING_ASSIST (e.g. Jirka 9-17 Backoffice → extend)
+      confirmedShifts: confirmed?.shifts ?? [],
     });
   }
   return days;
