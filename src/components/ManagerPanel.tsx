@@ -1128,6 +1128,7 @@ function VacationOverviewPanel() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deptFilter, setDeptFilter] = useState<string>('all');
 
   useEffect(() => {
     setLoading(true);
@@ -1151,6 +1152,9 @@ function VacationOverviewPanel() {
     return day >= from && (to ? day <= to : day === from);
   }
 
+  const departments = ['all', ...Array.from(new Set(employees.map(e => e.department ?? '').filter(Boolean))).sort()];
+  const filteredEmployees = deptFilter === 'all' ? employees : employees.filter(e => (e.department ?? '') === deptFilter);
+
   const empDays = new Map<string, Map<string, string>>();
   for (const req of requests) {
     for (const day of days) {
@@ -1166,13 +1170,28 @@ function VacationOverviewPanel() {
 
   return (
     <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
-        <h3 className="text-sm font-semibold text-slate-700">{t('Přehled dovolených — kdo kdy chybí', 'Vacation overview — who is absent when')}</h3>
-        <div className="flex items-center gap-1">
-          <button onClick={() => { const [y,m] = month.split('-').map(Number); const d = new Date(y, m-2, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }} className="p-1.5 rounded hover:bg-slate-200 text-slate-500 text-sm">‹</button>
-          <span className="text-sm font-medium text-slate-700 px-2">{CZ_MONTHS[mo-1]} {year}</span>
-          <button onClick={() => { const [y,m] = month.split('-').map(Number); const d = new Date(y, m, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }} className="p-1.5 rounded hover:bg-slate-200 text-slate-500 text-sm">›</button>
+      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-700">{t('Přehled dovolených — kdo kdy chybí', 'Vacation overview — who is absent when')}</h3>
+          <div className="flex items-center gap-1">
+            <button onClick={() => { const [y,m] = month.split('-').map(Number); const d = new Date(y, m-2, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }} className="p-1.5 rounded hover:bg-slate-200 text-slate-500 text-sm">‹</button>
+            <span className="text-sm font-medium text-slate-700 px-2">{CZ_MONTHS[mo-1]} {year}</span>
+            <button onClick={() => { const [y,m] = month.split('-').map(Number); const d = new Date(y, m, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }} className="p-1.5 rounded hover:bg-slate-200 text-slate-500 text-sm">›</button>
+          </div>
         </div>
+        {departments.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {departments.map(dept => (
+              <button
+                key={dept}
+                onClick={() => setDeptFilter(dept)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${deptFilter === dept ? 'bg-slate-700 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-400'}`}
+              >
+                {dept === 'all' ? t('Všechna oddělení', 'All departments') : dept}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {loading ? (
         <div className="py-8 text-center text-sm text-slate-400">{t('Načítám…', 'Loading…')}</div>
@@ -1196,7 +1215,7 @@ function VacationOverviewPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {employees.map((emp) => {
+              {filteredEmployees.map((emp) => {
                 const dayMap = empDays.get(emp.id);
                 return (
                   <tr key={emp.id} className="hover:bg-slate-50">
