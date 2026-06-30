@@ -1117,7 +1117,7 @@ function toIcsDate(date: string): string {
 }
 
 /** Generate and trigger .ics download for an employee's shifts */
-async function downloadShiftsIcs(orgId: string, employeeId: string, employeeName: string, currentMonth: string) {
+async function downloadShiftsIcs(orgId: string, employeeId: string, employeeName: string, currentMonth: string, customLabel?: string) {
   // Fetch shifts for current month + next 5 months
   const [y, m] = currentMonth.split('-').map(Number);
   const months: string[] = [];
@@ -1152,7 +1152,7 @@ async function downloadShiftsIcs(orgId: string, employeeId: string, employeeName
   for (const plan of allPlans) {
     const start = plan.start_time ? toIcsDateTime(plan.date, plan.start_time) : `${toIcsDate(plan.date)}T080000`;
     const end   = plan.end_time   ? toIcsDateTime(plan.date, plan.end_time)   : `${toIcsDate(plan.date)}T160000`;
-    const summary = icsEscape(plan.work_type ?? 'Směna');
+    const summary = icsEscape(customLabel || plan.work_type || 'Směna');
     lines.push(
       'BEGIN:VEVENT',
       `UID:teamflow-shift-${plan.date}-${employeeId}`,
@@ -1222,6 +1222,8 @@ export default function WorkPlanGrid({
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
   // "Pouze mé směny" — filter grid to show only session employee's entries
   const [myShiftsOnly, setMyShiftsOnly] = useState(false);
+  const [showIcsModal, setShowIcsModal] = useState(false);
+  const [icsLabel, setIcsLabel] = useState('');
   // "Má dovolená" — highlight vacation days pink
   const [myVacation, setMyVacation] = useState(false);
   const [vacationDates, setVacationDates] = useState<Set<string>>(new Set());
@@ -1737,13 +1739,43 @@ export default function WorkPlanGrid({
                 </button>
                 {/* .ics download */}
                 {myShiftsOnly && (
-                  <button
-                    onClick={() => downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-600 transition-all"
-                    title={t('Stáhnout jako kalendář (.ics)', 'Download as calendar (.ics)')}
-                  >
-                    ⬇ .ics
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => { setIcsLabel(sessionEmployee.name); setShowIcsModal(true); }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-600 transition-all"
+                      title={t('Stáhnout jako kalendář (.ics)', 'Download as calendar (.ics)')}
+                    >
+                      ⬇ .ics
+                    </button>
+                    {showIcsModal && (
+                      <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 w-72">
+                        <p className="text-sm font-semibold text-slate-800 mb-1">{t('Název události v kalendáři', 'Event name in calendar')}</p>
+                        <p className="text-xs text-slate-400 mb-3">{t('Takto se zobrazí každá směna ve vašem kalendáři.', 'This is how each shift will appear in your calendar.')}</p>
+                        <input
+                          type="text"
+                          value={icsLabel}
+                          onChange={e => setIcsLabel(e.target.value)}
+                          placeholder={t('Např. Práce, Směna…', 'E.g. Work, Shift…')}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 mb-3"
+                          autoFocus
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { setShowIcsModal(false); downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month, icsLabel.trim() || sessionEmployee.name); }
+                            if (e.key === 'Escape') setShowIcsModal(false);
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowIcsModal(false)}
+                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition"
+                          >{t('Zrušit', 'Cancel')}</button>
+                          <button
+                            onClick={() => { setShowIcsModal(false); downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month, icsLabel.trim() || sessionEmployee.name); }}
+                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition"
+                          >{t('Stáhnout', 'Download')}</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {/* Session badge */}
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
