@@ -398,6 +398,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
+  const [vacCountWeekends, setVacCountWeekends] = useState(false);
   const portalRootRef = useRef<HTMLElement | null>(null);
   useEffect(() => { portalRootRef.current = document.body; }, []);
 
@@ -416,6 +417,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           if (key in s && !s[key]) closed.add(wd);
         }
         setClosedWeekdays(closed);
+        setVacCountWeekends((s.vacation_counting_mode as string) === 'all');
       })
       .catch(() => {});
   }, [orgId]);
@@ -496,7 +498,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const empStatusMap = new Map<string, Map<string, string>>();
   for (const req of visibleRequests) {
     for (const day of days) {
-      if (dateInRange(day, req.date_from, req.date_to)) {
+      const dayDow = new Date(day + 'T00:00:00').getDay();
+      const isWeekendDay = dayDow === 0 || dayDow === 6;
+      if (dateInRange(day, req.date_from, req.date_to) && (vacCountWeekends || !isWeekendDay)) {
         if (!empVacMap.has(req.employee_id)) empVacMap.set(req.employee_id, new Set());
         empVacMap.get(req.employee_id)!.add(day);
         if (!empStatusMap.has(req.employee_id)) empStatusMap.set(req.employee_id, new Map());
