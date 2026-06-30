@@ -184,16 +184,19 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           workTypeName: selectedWorkType.name,
         }),
       });
-      if (!res.ok) throw new Error();
-      const now = new Date().toLocaleTimeString('cs-CZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMessage(json.error ?? t('Chyba při záznamu příchodu. Zkuste to prosím znovu.', 'Error recording clock-in. Please try again.'));
+        setScreen('error');
+        resetKiosk();
+        return;
+      }
+      const now = new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
       setSuccessMessage(`${t('Příchod zaznamenán v', 'Clocked in at')} ${now}`);
       setScreen('success-checkin');
       resetKiosk();
     } catch {
-      setErrorMessage(t('Chyba při záznamu příchodu. Zkuste to prosím znovu.', 'Error recording clock-in. Please try again.'));
+      setErrorMessage(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
       setScreen('error');
       resetKiosk();
     } finally {
