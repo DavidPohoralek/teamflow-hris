@@ -131,9 +131,7 @@ export async function GET(req: NextRequest) {
     const recentLogs = recentSource.map((l) => {
       const durationHours =
         l.check_in && l.check_out
-          ? Math.round(
-              ((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 3_600_000) * 10
-            ) / 10
+          ? (new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 3_600_000
           : null
 
       return {

@@ -75,6 +75,8 @@ function formatDate(iso: string): string {
 
 function formatHours(h: number | null): string {
   if (h === null) return '—';
+  if (h < 1 / 60) return '< 1 min';
+  if (h < 1) return `${Math.round(h * 60)} min`;
   return `${h.toFixed(2)} h`;
 }
 
