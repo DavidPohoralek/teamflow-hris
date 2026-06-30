@@ -187,10 +187,10 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   // Step 2 — Employee hours dashboard
   if (data) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4">
+        <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-slate-700 bg-clip-text text-transparent">
@@ -211,26 +211,26 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           </div>
 
           {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-4 px-6 py-5">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 rounded-2xl p-5 border border-blue-100">
-              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-3">Tento měsíc</p>
-              <p className="text-4xl font-bold text-blue-700 leading-none">{data.thisMonth.hours.toFixed(1)}<span className="text-xl ml-1 font-medium">h</span></p>
-              <p className="text-sm text-blue-600 mt-1.5 font-medium">{data.thisMonth.days} pracovních dní</p>
-              <p className="text-xs text-blue-400 mt-0.5 capitalize">{thisMonthName}</p>
+          <div className="grid grid-cols-2 gap-3 px-4 sm:px-6 py-4 sm:py-5">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-blue-100">
+              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1 sm:mb-3">Tento měsíc</p>
+              <p className="text-2xl sm:text-4xl font-bold text-blue-700 leading-none">{data.thisMonth.hours.toFixed(1)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
+              <p className="text-xs sm:text-sm text-blue-600 mt-1 sm:mt-1.5 font-medium">{data.thisMonth.days} dní</p>
+              <p className="text-xs text-blue-400 mt-0.5 capitalize hidden sm:block">{thisMonthName}</p>
             </div>
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-2xl p-5 border border-slate-200">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Minulý měsíc</p>
-              <p className="text-4xl font-bold text-slate-700 leading-none">{data.lastMonth.hours.toFixed(1)}<span className="text-xl ml-1 font-medium">h</span></p>
-              <p className="text-sm text-slate-600 mt-1.5 font-medium">{data.lastMonth.days} pracovních dní</p>
-              <p className="text-xs text-slate-400 mt-0.5 capitalize">{lastMonthName}</p>
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-slate-200">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 sm:mb-3">Minulý měsíc</p>
+              <p className="text-2xl sm:text-4xl font-bold text-slate-700 leading-none">{data.lastMonth.hours.toFixed(1)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1 sm:mt-1.5 font-medium">{data.lastMonth.days} dní</p>
+              <p className="text-xs text-slate-400 mt-0.5 capitalize hidden sm:block">{lastMonthName}</p>
             </div>
           </div>
 
           {/* Attendance table */}
-          <div className="flex-1 overflow-auto px-6 pb-2">
+          <div className="flex-1 overflow-auto px-4 sm:px-6 pb-2">
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Poslední záznamy</h3>
-            <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              <table className="w-full text-sm">
+            <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
+              <table className="w-full min-w-[420px] text-sm">
                 <thead>
                   <tr className="bg-slate-800 text-xs font-semibold text-slate-300 uppercase tracking-wide">
                     <th className="px-4 py-3 text-left">Datum</th>
@@ -274,7 +274,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           </div>
 
           {/* My requests section */}
-          <div className="px-6 pb-4">
+          <div className="px-4 sm:px-6 pb-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-slate-700">Moje žádosti</h3>
               <button
@@ -332,7 +332,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/50">
             <button
               onClick={handleBack}
               className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition"

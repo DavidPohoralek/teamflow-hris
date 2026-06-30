@@ -544,9 +544,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   }, [month, showMyShifts, sessionEmployee, loadMyShifts]);
 
   return (
-    <div className="w-full px-6 py-5">
+    <div className="w-full px-3 sm:px-6 py-4 sm:py-5">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
         <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
           <button onClick={() => setMonth(prevMonth(month))}
             className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors">
@@ -565,7 +565,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* PIN session — same UX as WorkPlanGrid */}
           {!isManagerMode && (
             sessionEmployee ? (
@@ -628,7 +628,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
 
           {isManagerMode && (
             <button onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
               <span className="text-lg leading-none font-light">+</span>
               {t('Přidat dovolenou', 'Add vacation')}
             </button>
@@ -653,7 +653,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         {/* Calendar cells */}
         <div className="grid grid-cols-7 gap-px bg-slate-100">
           {Array.from({ length: firstOffset }).map((_, i) => (
-            <div key={`e-${i}`} className="bg-white min-h-[80px]" />
+            <div key={`e-${i}`} className="bg-white min-h-[52px] sm:min-h-[80px]" />
           ))}
           {days.map((dateStr) => {
             const wd = mondayWeekday(dateStr);
@@ -674,7 +674,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     setShowEmployeeVacModal(true);
                   }
                 }}
-                className={`min-h-[80px] p-2 flex flex-col gap-1 relative overflow-hidden ${isClosed ? 'cursor-default' : isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${hasMyShift && !isClosed ? 'ring-2 ring-inset ring-blue-400' : ''} ${!isClosed && !isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
+                className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 flex flex-col gap-0.5 sm:gap-1 relative overflow-hidden ${isClosed ? 'cursor-default' : isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${hasMyShift && !isClosed ? 'ring-2 ring-inset ring-blue-400' : ''} ${!isClosed && !isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
               >
                 {isClosed && (
                   <div
@@ -703,16 +703,28 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   </div>
                 </div>
                 <div className="relative z-10 flex flex-col gap-0.5">
-                  {onVacation.map((emp) => {
-                    const st = empStatusMap.get(emp.id)?.get(dateStr) ?? 'pending';
-                    return (
-                      <div key={emp.id}
-                        className={`text-xs px-1.5 py-0.5 rounded font-medium text-white truncate ${statusColor(st)}`}
-                        title={`${emp.name} (${st === 'approved' ? t('schváleno', 'approved') : st === 'rejected' ? t('zamítnuto', 'rejected') : t('čeká', 'pending')})`}>
-                        {emp.name}
-                      </div>
-                    );
-                  })}
+                  {/* On mobile: show coloured dot per person; on sm+: show name chip */}
+                  <div className="flex flex-wrap gap-0.5 sm:hidden">
+                    {onVacation.map((emp) => {
+                      const st = empStatusMap.get(emp.id)?.get(dateStr) ?? 'pending';
+                      return (
+                        <span key={emp.id} className={`w-2 h-2 rounded-full inline-block ${statusColor(st)}`}
+                          title={emp.name} />
+                      );
+                    })}
+                  </div>
+                  <div className="hidden sm:flex flex-col gap-0.5">
+                    {onVacation.map((emp) => {
+                      const st = empStatusMap.get(emp.id)?.get(dateStr) ?? 'pending';
+                      return (
+                        <div key={emp.id}
+                          className={`text-xs px-1.5 py-0.5 rounded font-medium text-white truncate ${statusColor(st)}`}
+                          title={`${emp.name} (${st === 'approved' ? t('schváleno', 'approved') : st === 'rejected' ? t('zamítnuto', 'rejected') : t('čeká', 'pending')})`}>
+                          {emp.name}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             );
@@ -721,7 +733,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-4 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-4 text-xs text-slate-500">
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400" />{t('Schválena', 'Approved')}</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-300" />{t('Čeká na schválení', 'Pending approval')}</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
@@ -748,8 +760,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
               const pct = Math.min(100, (used / total) * 100);
 
               return (
-                <div key={emp.id} className="flex items-center gap-4 px-5 py-3">
-                  <span className="text-sm font-medium text-slate-800 w-32 shrink-0 truncate">{emp.name}</span>
+                <div key={emp.id} className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-3">
+                  <span className="text-sm font-medium text-slate-800 w-24 sm:w-32 shrink-0 truncate">{emp.name}</span>
                   <div className="flex-1">
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct}%` }} />
