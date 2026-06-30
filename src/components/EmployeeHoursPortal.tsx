@@ -75,7 +75,7 @@ function formatDate(iso: string): string {
 
 function formatHours(h: number | null): string {
   if (h === null) return '—';
-  return `${h.toFixed(1)} h`;
+  return `${h.toFixed(2)} h`;
 }
 
 export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPortalProps) {
@@ -214,13 +214,13 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           <div className="grid grid-cols-2 gap-3 px-4 sm:px-6 py-4 sm:py-5">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-blue-100">
               <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1 sm:mb-3">Tento měsíc</p>
-              <p className="text-2xl sm:text-4xl font-bold text-blue-700 leading-none">{data.thisMonth.hours.toFixed(1)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
+              <p className="text-2xl sm:text-4xl font-bold text-blue-700 leading-none">{data.thisMonth.hours.toFixed(2)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
               <p className="text-xs sm:text-sm text-blue-600 mt-1 sm:mt-1.5 font-medium">{data.thisMonth.days} dní</p>
               <p className="text-xs text-blue-400 mt-0.5 capitalize hidden sm:block">{thisMonthName}</p>
             </div>
             <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-slate-200">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 sm:mb-3">Minulý měsíc</p>
-              <p className="text-2xl sm:text-4xl font-bold text-slate-700 leading-none">{data.lastMonth.hours.toFixed(1)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
+              <p className="text-2xl sm:text-4xl font-bold text-slate-700 leading-none">{data.lastMonth.hours.toFixed(2)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
               <p className="text-xs sm:text-sm text-slate-600 mt-1 sm:mt-1.5 font-medium">{data.lastMonth.days} dní</p>
               <p className="text-xs text-slate-400 mt-0.5 capitalize hidden sm:block">{lastMonthName}</p>
             </div>
