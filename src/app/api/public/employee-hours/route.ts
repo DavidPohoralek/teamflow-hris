@@ -100,8 +100,9 @@ export async function GET(req: NextRequest) {
     const thisRange = monthRange(thisYear, thisMonthNum)
     const lastRange = monthRange(lastYear, lastMonthNum)
 
-    // Fetch this month + last month + recent logs in one query (last 10 by date desc)
-    const earliestDate = lastRange.firstDay
+    // Fetch 3 months of logs for stats + recent display
+    const threeMonthsAgo = new Date(thisYear, thisMonthNum - 4, 1)
+    const earliestDate = threeMonthsAgo.toISOString().slice(0, 10)
 
     const { data: allLogs, error: logsError } = await supabase
       .from('attendance_logs')
@@ -110,7 +111,8 @@ export async function GET(req: NextRequest) {
       .eq('employee_id', employee.id)
       .gte('date', earliestDate)
       .order('date', { ascending: false })
-      .order('check_in', { ascending: true })
+      .order('check_in', { ascending: false })
+      .limit(200)
 
     if (logsError) {
       console.error('employee-hours GET logs error:', logsError)
@@ -126,9 +128,8 @@ export async function GET(req: NextRequest) {
     const thisStats = calcStats(thisMonthLogs)
     const lastStats = calcStats(lastMonthLogs)
 
-    // Recent 10 logs (already sorted by date desc from query)
-    const recentSource = logs.slice(0, 10)
-    const recentLogs = recentSource.map((l) => {
+    // All logs for display (sorted by date desc, check_in desc)
+    const recentLogs = logs.map((l) => {
       const durationHours =
         l.check_in && l.check_out
           ? (new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 3_600_000

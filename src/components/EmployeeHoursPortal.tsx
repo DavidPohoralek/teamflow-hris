@@ -99,9 +99,12 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
-  // Benefit counts: { [benefit_key]: count }
   const [benefitCounts, setBenefitCounts] = useState<Record<string, number>>({});
   const [benefitSaving, setBenefitSaving] = useState<string | null>(null);
+  // Bottom tab: 'logs' | 'requests'
+  const [activeTab, setActiveTab] = useState<'logs' | 'requests'>('logs');
+  // Log filter: 'today' | '7d' | '30d' | 'all'
+  const [logFilter, setLogFilter] = useState<'today' | '7d' | '30d' | 'all'>('30d');
 
   const handleNumpad = (key: string) => {
     if (key === '⌫') {
@@ -351,108 +354,143 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             </div>
           )}
 
-          {/* Attendance table */}
-          <div className="px-4 sm:px-6 pb-2">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Poslední záznamy</h3>
-            <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead>
-                  <tr className="bg-slate-800 text-xs font-semibold text-slate-300 uppercase tracking-wide">
-                    <th className="px-4 py-3 text-left">Datum</th>
-                    <th className="px-4 py-3 text-left">Příchod</th>
-                    <th className="px-4 py-3 text-left">Odchod</th>
-                    <th className="px-4 py-3 text-left">Odpracováno</th>
-                    <th className="px-4 py-3 text-left">Kategorie</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.records.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-sm">
-                        Žádné záznamy
-                      </td>
-                    </tr>
-                  ) : (
-                    data.records.map((rec, i) => {
-                      const isComplete = rec.departure !== null;
-                      return (
-                        <tr key={i} className={`border-b border-slate-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-blue-50/40`}>
-                          <td className="px-4 py-3 text-slate-900 font-semibold">{formatDate(rec.date)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatTime(rec.arrival)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatTime(rec.departure)}</td>
-                          <td className="px-4 py-3 text-slate-700 font-medium">{formatHours(rec.worked)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isComplete ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                {rec.category}
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* My requests section */}
-          <div className="px-4 sm:px-6 pb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-700">Moje žádosti</h3>
+          {/* Tabs: Záznamy / Žádosti */}
+          <div className="px-4 sm:px-6 pt-1 pb-4">
+            {/* Tab bar */}
+            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 mb-4">
               <button
-                onClick={() => setShowRequestModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition shadow-sm"
+                onClick={() => setActiveTab('logs')}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'logs' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                </svg>
-                Podat žádost
+                Záznamy docházky
+              </button>
+              <button
+                onClick={() => setActiveTab('requests')}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'requests' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Moje žádosti
+                {requests.filter(r => r.status === 'pending').length > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-amber-400 text-white rounded-full">{requests.filter(r => r.status === 'pending').length}</span>
+                )}
               </button>
             </div>
 
-            {requestsLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : requests.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-5 bg-slate-50 rounded-xl border border-slate-100">
-                Žádné žádosti
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {requests.map((req) => {
-                  const badge = STATUS_BADGES[req.status] ?? STATUS_BADGES.pending;
-                  return (
-                    <div key={req.id} className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-sm font-semibold text-slate-800 truncate">
-                          {REQUEST_TYPE_LABELS[req.type] ?? req.type}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {formatDate(req.dateFrom)}{req.dateTo ? ` — ${formatDate(req.dateTo)}` : ''}
-                        </span>
-                        {req.note && (
-                          <span className="text-xs text-slate-400 truncate">
-                            {(() => {
-                              try {
-                                const p = JSON.parse(req.note!);
-                                if (p.timeIn && p.timeOut) return `Příchod: ${p.timeIn} – Odchod: ${p.timeOut}${p.userNote ? ' · ' + p.userNote : ''}`;
-                              } catch { /* not JSON */ }
-                              return req.note;
-                            })()}
-                          </span>
+            {/* LOGS TAB */}
+            {activeTab === 'logs' && (() => {
+              const now = new Date();
+              const cutoff: Record<string, Date> = {
+                today: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+                '7d': new Date(now.getTime() - 7 * 86400000),
+                '30d': new Date(now.getTime() - 30 * 86400000),
+                all: new Date(0),
+              };
+              const filtered = data.records.filter(rec => new Date(rec.date + 'T00:00:00') >= cutoff[logFilter]);
+              return (
+                <>
+                  {/* Filter pills */}
+                  <div className="flex gap-1.5 mb-3 flex-wrap">
+                    {(['today', '7d', '30d', 'all'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setLogFilter(f)}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${logFilter === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        {f === 'today' ? 'Dnes' : f === '7d' ? '7 dní' : f === '30d' ? '30 dní' : 'Vše'}
+                      </button>
+                    ))}
+                    <span className="ml-auto text-xs text-slate-400 self-center">{filtered.length} záznamů</span>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
+                    <table className="w-full min-w-[420px] text-sm">
+                      <thead>
+                        <tr className="bg-slate-800 text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                          <th className="px-4 py-3 text-left">Datum</th>
+                          <th className="px-4 py-3 text-left">Příchod</th>
+                          <th className="px-4 py-3 text-left">Odchod</th>
+                          <th className="px-4 py-3 text-left">Odpracováno</th>
+                          <th className="px-4 py-3 text-left">Kategorie</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.length === 0 ? (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-sm">Žádné záznamy</td></tr>
+                        ) : (
+                          filtered.map((rec, i) => {
+                            const isComplete = rec.departure !== null;
+                            return (
+                              <tr key={i} className={`border-b border-slate-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-blue-50/40`}>
+                                <td className="px-4 py-3 text-slate-900 font-semibold">{formatDate(rec.date)}</td>
+                                <td className="px-4 py-3 text-slate-600">{formatTime(rec.arrival)}</td>
+                                <td className="px-4 py-3 text-slate-600">{formatTime(rec.departure)}</td>
+                                <td className="px-4 py-3 text-slate-700 font-medium">{formatHours(rec.worked)}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isComplete ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{rec.category}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
-                      </div>
-                      <span className={`ml-3 flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${badge.className}`}>
-                        {badge.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* REQUESTS TAB */}
+            {activeTab === 'requests' && (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-slate-500">{requests.length} žádostí celkem</span>
+                  <button
+                    onClick={() => setShowRequestModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition shadow-sm"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                    </svg>
+                    Podat žádost
+                  </button>
+                </div>
+                {requestsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : requests.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-xl border border-slate-100">Žádné žádosti</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {requests.map((req) => {
+                      const badge = STATUS_BADGES[req.status] ?? STATUS_BADGES.pending;
+                      return (
+                        <div key={req.id} className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-semibold text-slate-800 truncate">{REQUEST_TYPE_LABELS[req.type] ?? req.type}</span>
+                            <span className="text-xs text-slate-500">
+                              {formatDate(req.dateFrom)}{req.dateTo ? ` — ${formatDate(req.dateTo)}` : ''}
+                            </span>
+                            {req.note && (
+                              <span className="text-xs text-slate-400 truncate">
+                                {(() => {
+                                  try {
+                                    const p = JSON.parse(req.note!);
+                                    if (p.timeIn && p.timeOut) return `Příchod: ${p.timeIn} – Odchod: ${p.timeOut}${p.userNote ? ' · ' + p.userNote : ''}`;
+                                  } catch { /* not JSON */ }
+                                  return req.note;
+                                })()}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`ml-3 flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${badge.className}`}>{badge.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
