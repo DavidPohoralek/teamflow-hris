@@ -199,7 +199,8 @@ function buildDraftDays(
     const meta = schedMeta[date];
 
     // requiredTotal priority: closed date → schedule_days override → org per-dow settings → Sunday=0 → fallback 3
-    const isClosed = closedDates.has(date);
+    const isClosed = closedDates.has(date)
+      || (meta?.dayType != null && meta.dayType.toLowerCase().includes('zavř'));
     const dowKey = DOW_REQUIRED_KEYS[dow];
     const orgDefault = dowKey && orgSettings[dowKey] != null ? Number(orgSettings[dowKey]) : (isSunday ? 0 : 3);
     const requiredTotal = isClosed ? 0 : (meta ? meta.requiredTotal : orgDefault);
