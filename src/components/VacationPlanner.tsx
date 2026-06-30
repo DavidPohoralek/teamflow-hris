@@ -391,7 +391,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   // "Pouze má dovolená" filter
   const [myVacationOnly, setMyVacationOnly] = useState(false);
   // Vacation balance
-  const [vacBalance, setVacBalance] = useState<{ hasPaidVacation: boolean; totalDays: number; usedDays: number; pendingDays: number; remainingDays: number; remainingAfterPendingDays: number } | null>(null);
+  const [vacBalance, setVacBalance] = useState<{ hasPaidVacation: boolean; totalDays: number; totalHours: number; usedDays: number; usedHours: number; pendingDays: number; pendingHours: number; remainingDays: number; remainingHours: number; remainingAfterPendingDays: number; remainingAfterPendingHours: number } | null>(null);
   // My requests panel
   const [myRequests, setMyRequests] = useState<VacationRequest[]>([]);
   const [myRequestsLoading, setMyRequestsLoading] = useState(false);
@@ -822,18 +822,22 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           <div className="grid grid-cols-4 gap-3 text-center">
             <div className="bg-slate-50 rounded-xl p-3">
               <div className="text-xl font-bold text-slate-800">{vacBalance.totalDays}</div>
+              <div className="text-xs text-slate-400 mt-0.5">{vacBalance.totalHours} h</div>
               <div className="text-xs text-slate-500 mt-0.5">{t('Celkem dní', 'Total days')}</div>
             </div>
             <div className="bg-emerald-50 rounded-xl p-3">
               <div className="text-xl font-bold text-emerald-700">{vacBalance.remainingDays}</div>
+              <div className="text-xs text-emerald-400 mt-0.5">{vacBalance.remainingHours} h</div>
               <div className="text-xs text-emerald-600 mt-0.5">{t('Zbývá', 'Remaining')}</div>
             </div>
             <div className="bg-red-50 rounded-xl p-3">
               <div className="text-xl font-bold text-red-600">{vacBalance.usedDays}</div>
+              <div className="text-xs text-red-300 mt-0.5">{vacBalance.usedHours} h</div>
               <div className="text-xs text-red-500 mt-0.5">{t('Vyčerpáno', 'Used')}</div>
             </div>
             <div className="bg-amber-50 rounded-xl p-3">
               <div className="text-xl font-bold text-amber-600">{vacBalance.pendingDays}</div>
+              <div className="text-xs text-amber-300 mt-0.5">{vacBalance.pendingHours} h</div>
               <div className="text-xs text-amber-500 mt-0.5">{t('Čeká na schválení', 'Pending')}</div>
             </div>
           </div>
