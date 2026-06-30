@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const sb = supabase as any;
 
   // Load all data needed by the bot
-  const [empRes, draftRes, absenceRes, wpRes, settingsRes] = await Promise.all([
+  const [empRes, draftRes, absenceRes, wpRes, settingsRes, scheduleDaysRes] = await Promise.all([
     sb.from('employees').select('*').eq('organization_id', orgId).eq('active', true).order('name'),
     sb.from('work_plans')
       .select('employee_id, date, work_type, start_time, end_time, notes')
@@ -60,6 +60,12 @@ export async function GET(req: NextRequest) {
       .gte('date', `${month}-01`)
       .lte('date', `${month}-31`),
     sb.from('company_settings').select('extra_settings, saturday_logic_enabled').eq('organization_id', orgId).maybeSingle(),
+    // schedule_days holds requiredTotal and dayType per date
+    sb.from('schedule_days')
+      .select('date, required_total, day_type, start_time, end_time')
+      .eq('organization_id', orgId)
+      .gte('date', `${month}-01`)
+      .lte('date', `${month}-31`),
   ]);
 
   const employees = (empRes.data ?? []).map((e: Record<string, unknown>) => ({
@@ -76,8 +82,13 @@ export async function GET(req: NextRequest) {
     storeRating: Number(e.store_rating ?? 3),
   }));
 
-  // Build draft days from schedules — use calendar-style approach
-  const draftDays = buildDraftDays(month, draftRes.data ?? [], draft);
+  // Build draft days — merge schedule_days config with draft assignments + confirmed shifts
+  const confirmedByDate: Record<string, number> = {};
+  for (const wp of (wpRes.data ?? [])) {
+    const d = String(wp.date ?? '').slice(0, 10);
+    if (d) confirmedByDate[d] = (confirmedByDate[d] ?? 0) + 1;
+  }
+  const draftDays = buildDraftDays(month, draftRes.data ?? [], draft, scheduleDaysRes.data ?? [], confirmedByDate);
 
   const settings = buildSettings(settingsRes.data);
 
@@ -124,10 +135,27 @@ export async function GET(req: NextRequest) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildDraftDays(month: string, draftRows: Record<string, unknown>[], _draft: string) {
-  // Group by date
-  const byDate: Record<string, { assignedEmployees: string[]; assignedCount: number }> = {};
+function buildDraftDays(
+  month: string,
+  draftRows: Record<string, unknown>[],
+  _draft: string,
+  scheduleDays: Record<string, unknown>[],
+  confirmedByDate: Record<string, number>,
+) {
+  // Index schedule_days config by date
+  const schedMeta: Record<string, { requiredTotal: number; dayType: string; startTime: string | null; endTime: string | null }> = {};
+  for (const row of scheduleDays) {
+    const date = String(row.date ?? '').slice(0, 10);
+    if (date) schedMeta[date] = {
+      requiredTotal: Number(row.required_total ?? 0),
+      dayType: String(row.day_type ?? ''),
+      startTime: row.start_time ? String(row.start_time) : null,
+      endTime: row.end_time ? String(row.end_time) : null,
+    };
+  }
 
+  // Group draft rows by date
+  const byDate: Record<string, { assignedEmployees: string[]; assignedCount: number }> = {};
   for (const row of draftRows) {
     const date = String(row.date ?? '').slice(0, 10);
     if (!date) continue;
@@ -138,12 +166,10 @@ function buildDraftDays(month: string, draftRows: Record<string, unknown>[], _dr
     }
   }
 
-  // Generate every calendar day of the month
   const [year, mon] = month.split('-').map(Number);
-  const days = [];
   const daysInMonth = new Date(year, mon, 0).getDate();
-
   const DAY_NAMES = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
+  const days = [];
 
   for (let d = 1; d <= daysInMonth; d++) {
     const date = `${month}-${String(d).padStart(2, '0')}`;
@@ -151,14 +177,25 @@ function buildDraftDays(month: string, draftRows: Record<string, unknown>[], _dr
     const dow = dateObj.getDay();
     const isSunday = dow === 0;
     const slot = byDate[date] ?? { assignedEmployees: [], assignedCount: 0 };
+    const meta = schedMeta[date];
+
+    // requiredTotal: from schedule_days if configured, else 0 for Sunday, else 3 fallback
+    const requiredTotal = meta ? meta.requiredTotal : (isSunday ? 0 : 3);
+    // dayType: from schedule_days, or 'Zavřeno' for Sunday
+    const dayType = meta?.dayType || (isSunday ? 'Zavřeno' : '');
+    // Confirmed (non-draft) shifts already assigned to this day
+    const confirmedCount = confirmedByDate[date] ?? 0;
 
     days.push({
       date,
       dayName: DAY_NAMES[dow],
-      dayType: isSunday ? 'Zavřeno' : '',
-      requiredTotal: isSunday ? 0 : 3,      // default — should come from org settings
+      dayType,
+      requiredTotal,
+      startTime: meta?.startTime ?? null,
+      endTime: meta?.endTime ?? null,
       assignedEmployees: slot.assignedEmployees,
       assignedCount: slot.assignedCount,
+      confirmedCount,          // bot can subtract confirmed from missing
     });
   }
   return days;
