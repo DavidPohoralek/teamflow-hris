@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('attendance_logs')
-    .upsert(record, { onConflict: 'employee_id,date' })
+    .insert(record)
     .select('*, employees(name)')
     .single();
 
