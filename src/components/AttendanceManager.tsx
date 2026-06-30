@@ -115,8 +115,9 @@ interface AddRecordModalProps {
   onSuccess: () => void;
 }
 
-function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddRecordModalProps) {
+function AddRecordModal({ date: defaultDate, employees, workTypes, onClose, onSuccess }: AddRecordModalProps) {
   const t = useT();
+  const [selectedDate, setSelectedDate] = useState(defaultDate);
   const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? '');
   const [checkInTime, setCheckInTime] = useState(nowTimeStr());
   const [checkOutTime, setCheckOutTime] = useState('');
@@ -141,10 +142,10 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
       const selectedWt = workTypes.find((wt) => wt.id === workTypeId);
       const body: Record<string, string> = {
         employee_id: employeeId,
-        date,
-        check_in: buildISO(date, checkInTime),
+        date: selectedDate,
+        check_in: buildISO(selectedDate, checkInTime),
       };
-      if (checkOutTime) body.check_out = buildISO(date, checkOutTime);
+      if (checkOutTime) body.check_out = buildISO(selectedDate, checkOutTime);
       if (note.trim()) body.note = note.trim();
       if (workTypeId) body.work_type_id = workTypeId;
       if (selectedWt) body.work_type_name = selectedWt.name;
@@ -210,9 +211,9 @@ function AddRecordModal({ date, employees, workTypes, onClose, onSuccess }: AddR
             </label>
             <input
               type="date"
-              value={date}
-              disabled
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-500 bg-slate-50 cursor-not-allowed"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
