@@ -42,7 +42,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data });
+  // Supabase returns joined table as `employees` (plural) — remap to `employee` (singular) expected by client
+  const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
+    ...row,
+    employee: row.employees ?? { id: row.employee_id, name: '—' },
+  }));
+
+  return NextResponse.json({ data: mapped });
 }
 
 // POST /api/attendance
