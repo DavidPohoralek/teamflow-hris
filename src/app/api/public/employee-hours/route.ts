@@ -56,7 +56,7 @@ function calcStats(logs: AttendanceRow[]): { hours: number; days: number } {
   }
 
   return {
-    hours: Math.round((totalMs / 3_600_000) * 10) / 10,
+    hours: totalMs / 3_600_000,
     days: daySet.size,
   }
 }
