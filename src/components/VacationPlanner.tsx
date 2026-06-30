@@ -390,6 +390,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [myShiftsLoading, setMyShiftsLoading] = useState(false);
   // "Pouze má dovolená" filter
   const [myVacationOnly, setMyVacationOnly] = useState(false);
+  // Vacation balance
+  const [vacBalance, setVacBalance] = useState<{ hasPaidVacation: boolean; totalDays: number; usedDays: number; pendingDays: number; remainingDays: number; remainingAfterPendingDays: number } | null>(null);
   // My requests panel
   const [myRequests, setMyRequests] = useState<VacationRequest[]>([]);
   const [myRequestsLoading, setMyRequestsLoading] = useState(false);
@@ -520,6 +522,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       const json = await res.json();
       setSessionPin(pinInputValue);
       setSessionEmployee({ id: json.employeeId, name: json.employeeName });
+      // Load vacation balance
+      fetch(`/api/public/vacation-balance?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pinInputValue)}`)
+        .then(r => r.json()).then(b => setVacBalance(b)).catch(() => {});
       setPinInputValue('');
     } catch { setPinInputError(true); setPinInputValue(''); }
     finally { setPinInputLoading(false); }
@@ -642,7 +647,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
                   <button
-                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); setMyVacationOnly(false); }}
+                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); setMyVacationOnly(false); setVacBalance(null); }}
                     className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1"
                     title="Odhlásit"
                   >✕</button>
@@ -802,6 +807,39 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-300" />{t('Čeká na schválení', 'Pending approval')}</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
       </div>
+
+      {/* Vacation balance widget — only when PIN logged in and has paid vacation */}
+      {!isManagerMode && sessionEmployee && vacBalance?.hasPaidVacation && (
+        <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-slate-700">🏖️ {t('Fond dovolené', 'Vacation balance')}</span>
+            <span className="text-xs text-slate-400">{new Date().getFullYear()}</span>
+          </div>
+          <div className="grid grid-cols-4 gap-3 text-center">
+            <div className="bg-slate-50 rounded-xl p-3">
+              <div className="text-xl font-bold text-slate-800">{vacBalance.totalDays}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{t('Celkem dní', 'Total days')}</div>
+            </div>
+            <div className="bg-emerald-50 rounded-xl p-3">
+              <div className="text-xl font-bold text-emerald-700">{vacBalance.remainingDays}</div>
+              <div className="text-xs text-emerald-600 mt-0.5">{t('Zbývá', 'Remaining')}</div>
+            </div>
+            <div className="bg-red-50 rounded-xl p-3">
+              <div className="text-xl font-bold text-red-600">{vacBalance.usedDays}</div>
+              <div className="text-xs text-red-500 mt-0.5">{t('Vyčerpáno', 'Used')}</div>
+            </div>
+            <div className="bg-amber-50 rounded-xl p-3">
+              <div className="text-xl font-bold text-amber-600">{vacBalance.pendingDays}</div>
+              <div className="text-xs text-amber-500 mt-0.5">{t('Čeká na schválení', 'Pending')}</div>
+            </div>
+          </div>
+          {vacBalance.pendingDays > 0 && (
+            <div className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">
+              {t('Po schválení čekajících žádostí zbyde:', 'After pending approval remaining:')} <strong>{vacBalance.remainingAfterPendingDays} {t('dní', 'days')}</strong>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* My vacation requests — below calendar, only when PIN logged in */}
       {!isManagerMode && sessionEmployee && (() => {

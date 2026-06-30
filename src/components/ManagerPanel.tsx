@@ -231,17 +231,19 @@ function employmentLabel(value?: string | null) {
 
 function useEmploymentTypes() {
   const [types, setTypes] = useState<string[]>(DEFAULT_EMPLOYMENT_TYPES);
+  const [configs, setConfigs] = useState<Record<string, { paidVacation: boolean }>>({});
   const refresh = useCallback(async () => {
     try {
       const res = await managerFetch('/api/manager/employment-types');
       if (res.ok) {
         const d = await res.json();
         if (Array.isArray(d.types) && d.types.length > 0) setTypes(d.types);
+        if (d.configs) setConfigs(d.configs);
       }
     } catch { /* keep defaults */ }
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
-  return { types, refresh };
+  return { types, configs, refresh };
 }
 
 interface Employee {
@@ -461,6 +463,7 @@ function EmployeesTab() {
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [vacBalances, setVacBalances] = useState<Record<string, { remainingDays: number; usedDays: number; pendingDays: number; totalDays: number; hasPaidVacation: boolean }>>({});
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
@@ -475,6 +478,14 @@ function EmployeesTab() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    managerFetch('/api/manager/vacation-balances').then(r => r.json()).then(d => {
+      const map: typeof vacBalances = {};
+      for (const b of (d.balances ?? [])) map[b.employeeId] = b;
+      setVacBalances(map);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -512,7 +523,7 @@ function EmployeesTab() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), t('Štítky', 'Tags'), t('Cíl. hodiny', 'Target hours'), 'Tier', t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
+                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), t('Štítky', 'Tags'), t('Cíl. hodiny', 'Target hours'), t('Dovolená', 'Vacation'), 'Tier', t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -553,6 +564,19 @@ function EmployeesTab() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{emp.target_hours ?? 160}</td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {(() => {
+                        const b = vacBalances[emp.id];
+                        if (!b) return <span className="text-gray-300">—</span>;
+                        if (!b.hasPaidVacation) return <span className="text-xs text-gray-400">{t('Bez nároku', 'No entitlement')}</span>;
+                        return (
+                          <span className={`font-semibold ${b.remainingDays <= 3 ? 'text-red-600' : b.remainingDays <= 7 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {b.remainingDays}/{b.totalDays} {t('dní', 'd')}
+                            {b.pendingDays > 0 && <span className="text-amber-500 font-normal ml-1">(+{b.pendingDays} čeká)</span>}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${emp.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                         {emp.active ? t('Ano', 'Yes') : t('Ne', 'No')}
@@ -1401,7 +1425,7 @@ function SettingsTab() {
   const [savingPwd, setSavingPwd] = useState(false);
   const [pwdMsg, setPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [kioskEnabled, setKioskEnabled] = useState(false);
-  const { types: empTypes, refresh: refreshEmpTypes } = useEmploymentTypes();
+  const { types: empTypes, configs: empConfigs, refresh: refreshEmpTypes } = useEmploymentTypes();
   const [newEmpType, setNewEmpType] = useState('');
   const [savingEmpTypes, setSavingEmpTypes] = useState(false);
 
@@ -1417,6 +1441,16 @@ function SettingsTab() {
     } finally {
       setSavingEmpTypes(false);
     }
+  };
+
+  const togglePaidVacation = async (typeName: string, value: boolean) => {
+    const updated = { ...empConfigs, [typeName]: { paidVacation: value } };
+    await managerFetch('/api/manager/employment-types', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ configs: updated }),
+    });
+    await refreshEmpTypes();
   };
 
   const handlePasswordSave = async (e: React.FormEvent) => {
@@ -1505,21 +1539,37 @@ function SettingsTab() {
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-1">{t('Pracovní poměry', 'Employment types')}</h3>
         <p className="text-xs text-gray-400 mb-4">{t('Typy pracovního poměru, které budou dostupné při přidávání zaměstnance.', 'Employment types available when adding an employee.')}</p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {empTypes.map((et) => (
-            <span key={et} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm font-medium">
-              {et}
-              {empTypes.length > 1 && (
-                <button
-                  type="button"
-                  className="ml-1 text-blue-400 hover:text-red-500 transition-colors leading-none"
-                  onClick={() => saveEmpTypes(empTypes.filter((x) => x !== et))}
-                  disabled={savingEmpTypes}
-                  aria-label={`${t('Odebrat', 'Remove')} ${et}`}
-                >✕</button>
-              )}
-            </span>
-          ))}
+        <div className="space-y-2 mb-4">
+          {empTypes.map((et) => {
+            const paid = empConfigs[et]?.paidVacation ?? true;
+            return (
+              <div key={et} className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl">
+                <span className="font-medium text-blue-900 text-sm">{et}</span>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={paid}
+                      onClick={() => togglePaidVacation(et, !paid)}
+                      className={`relative w-9 h-5 rounded-full transition-colors ${paid ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${paid ? 'translate-x-4' : ''}`} />
+                    </button>
+                    {paid ? t('Placená dovolená', 'Paid vacation') : t('Bez placené dovolené', 'No paid vacation')}
+                  </label>
+                  {empTypes.length > 1 && (
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-red-500 transition-colors text-xs"
+                      onClick={() => saveEmpTypes(empTypes.filter((x) => x !== et))}
+                      disabled={savingEmpTypes}
+                    >✕</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div className="flex gap-2">
           <input
