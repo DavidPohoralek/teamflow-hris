@@ -37,6 +37,11 @@ const EN_MONTHS = [
 
 const DAY_NAMES_SHORT = ['Po','Út','St','Čt','Pá','So','Ne'];
 
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function mondayWeekday(dateStr: string): number {
   return (new Date(dateStr + 'T00:00:00').getDay() + 6) % 7;
 }
@@ -662,6 +667,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
             const dayNum = new Date(dateStr + 'T00:00:00').getDate();
             const count = dayCountMap.get(dateStr) ?? 0;
             const onVacation = employees.filter((e) => empVacMap.get(e.id)?.has(dateStr));
+            const isToday = dateStr === todayISO();
 
             const hasMyShift = showMyShifts && myShiftDays.has(dateStr);
 
@@ -674,7 +680,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     setShowEmployeeVacModal(true);
                   }
                 }}
-                className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 flex flex-col gap-0.5 sm:gap-1 relative overflow-hidden ${isClosed ? 'cursor-default' : isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${hasMyShift && !isClosed ? 'ring-2 ring-inset ring-blue-400' : ''} ${!isClosed && !isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
+                className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 flex flex-col gap-0.5 sm:gap-1 relative overflow-hidden ${isClosed ? 'cursor-default' : isWeekend ? 'bg-blue-50/40' : 'bg-white'} ${isToday && !isClosed ? 'ring-2 ring-inset ring-rose-400 shadow-sm shadow-rose-100' : ''} ${hasMyShift && !isClosed && !isToday ? 'ring-2 ring-inset ring-blue-400' : hasMyShift && !isClosed && isToday ? 'ring-2 ring-inset ring-rose-400' : ''} ${!isClosed && !isManagerMode && sessionEmployee ? 'cursor-pointer hover:bg-emerald-50/60 transition-colors group' : ''}`}
               >
                 {isClosed && (
                   <div
@@ -686,7 +692,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   />
                 )}
                 <div className="relative z-10 flex items-center justify-between mb-0.5">
-                  <span className={`text-xs font-bold ${isClosed ? 'text-slate-400' : isWeekend ? 'text-blue-400' : 'text-slate-700'}`}>{dayNum}</span>
+                  <span className={`text-xs font-bold ${isToday ? 'bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center' : isClosed ? 'text-slate-400' : isWeekend ? 'text-blue-400' : 'text-slate-700'}`}>{dayNum}</span>
                   {isClosed && <span className="text-[9px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
                   <div className="flex items-center gap-1">
                     {hasMyShift && (

@@ -720,6 +720,7 @@ interface DayCardProps {
   onCopyEntry?: (entry: ClipboardEntry) => void;
   onPaste?: (dateStr: string) => void;
   isMyVacation?: boolean;
+  isToday?: boolean;
 }
 
 function DayCard({
@@ -740,6 +741,7 @@ function DayCard({
   onCopyEntry,
   onPaste,
   isMyVacation,
+  isToday,
 }: DayCardProps) {
   const t = useT();
   const day = new Date(dateStr + 'T00:00:00');
@@ -779,6 +781,8 @@ function DayCard({
           ? 'bg-pink-50 border-pink-300 shadow-sm cursor-pointer hover:border-pink-400'
           : isPasteMode
           ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
+          : isToday
+          ? 'bg-white border-rose-400 shadow-sm shadow-rose-100 cursor-pointer hover:border-rose-500 ring-1 ring-rose-300'
           : isWeekend
           ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
           : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
@@ -824,7 +828,10 @@ function DayCard({
               {scheduleMeta.assignedCount}/{scheduleMeta.requiredTotal}
             </span>
           )}
-          <span className={`text-sm font-bold ${isWeekend ? 'text-slate-400' : 'text-slate-700'} ${isManagerMode ? 'mr-5' : ''}`}>
+          <span className={`text-sm font-bold ${isManagerMode ? 'mr-5' : ''} ${
+            isToday ? 'bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs'
+            : isWeekend ? 'text-slate-400' : 'text-slate-700'
+          }`}>
             {dayNum}
           </span>
         </div>
@@ -1858,6 +1865,7 @@ export default function WorkPlanGrid({
                   onCopyEntry={handleCopyEntry}
                   onPaste={handlePaste}
                   isMyVacation={myVacation && vacationDates.has(dateStr)}
+                  isToday={dateStr === todayStr}
                 />
               );
             })}
