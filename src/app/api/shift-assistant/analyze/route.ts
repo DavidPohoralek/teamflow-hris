@@ -156,6 +156,12 @@ function buildDraftDays(
   confirmedByDate: Record<string, { count: number; employeeIds: string[]; shifts: { employeeId: string; workType: string; startTime: string; endTime: string }[] }>,
   orgSettings: Record<string, unknown> = {},
 ) {
+  // Build a Set of closed dates from settings (holidays / manually closed days)
+  const closedDates = new Set<string>(
+    Array.isArray(orgSettings.closed_dates)
+      ? (orgSettings.closed_dates as unknown[]).map(String)
+      : []
+  );
   // Index schedule_days config by date
   const schedMeta: Record<string, { requiredTotal: number; dayType: string; startTime: string | null; endTime: string | null }> = {};
   for (const row of scheduleDays) {
@@ -192,12 +198,13 @@ function buildDraftDays(
     const confirmed = confirmedByDate[date];
     const meta = schedMeta[date];
 
-    // requiredTotal priority: schedule_days override → org per-dow settings → Sunday=0 → fallback 3
+    // requiredTotal priority: closed date → schedule_days override → org per-dow settings → Sunday=0 → fallback 3
+    const isClosed = closedDates.has(date);
     const dowKey = DOW_REQUIRED_KEYS[dow];
     const orgDefault = dowKey && orgSettings[dowKey] != null ? Number(orgSettings[dowKey]) : (isSunday ? 0 : 3);
-    const requiredTotal = meta ? meta.requiredTotal : orgDefault;
+    const requiredTotal = isClosed ? 0 : (meta ? meta.requiredTotal : orgDefault);
 
-    const dayType = meta?.dayType || (isSunday ? 'Zavřeno' : '');
+    const dayType = isClosed ? 'Zavřeno' : (meta?.dayType || (isSunday ? 'Zavřeno' : ''));
 
     // Merge confirmed + draft employee IDs (deduplicated) so bot knows total assigned
     const confirmedIds = confirmed?.employeeIds ?? [];
