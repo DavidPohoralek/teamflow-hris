@@ -27,6 +27,13 @@ const EXTRA_KEYS = [
   'evening_shift_min_staff',
   'evening_shift_label',
   'favicon_url',
+  'required_mon',
+  'required_tue',
+  'required_wed',
+  'required_thu',
+  'required_fri',
+  'required_sat',
+  'required_sun',
 ];
 
 // GET /api/manager/settings

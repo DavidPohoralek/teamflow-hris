@@ -1597,6 +1597,13 @@ function SettingsTab() {
         <EveningShiftSetting />
       </section>
 
+      {/* Počet lidí na prodejně */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">{t('Počet lidí na prodejně', 'Required staff per day')}</h3>
+        <p className="text-xs text-gray-400 mb-4">{t('Kolik zaměstnanců musí být na prodejně v daný den v týdnu. Asistent směn toto použije jako výchozí hodnotu.', 'How many employees must be at the store on each weekday. The shift assistant uses this as the default.')}</p>
+        <StaffingPerDaySetting />
+      </section>
+
       {/* Absence a benefity */}
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-1">{t('Absence a benefity', 'Absences and benefits')}</h3>
@@ -1959,6 +1966,82 @@ function ClosedDatesSetting() {
           {t('+ Přidat datum', '+ Add date')}
         </button>
         {saved && <span className="text-emerald-600 text-sm">✓ {t('Uloženo', 'Saved')}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ─── StaffingPerDaySetting ───────────────────────────────────────────────────
+
+const DOW_KEYS = ['required_mon', 'required_tue', 'required_wed', 'required_thu', 'required_fri', 'required_sat', 'required_sun'] as const;
+const DOW_CZ   = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle'];
+const DOW_EN   = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DOW_DEFAULT = [3, 3, 3, 3, 3, 2, 0];
+
+function StaffingPerDaySetting() {
+  const t = useT();
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    managerFetch('/api/manager/settings')
+      .then((r) => r.json())
+      .then((d: Record<string, unknown>) => {
+        const v: Record<string, string> = {};
+        DOW_KEYS.forEach((key, i) => {
+          v[key] = typeof d[key] === 'number' ? String(d[key]) : String(DOW_DEFAULT[i]);
+        });
+        setValues(v);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const payload: Record<string, number> = {};
+    DOW_KEYS.forEach((key) => { payload[key] = Math.max(0, parseInt(values[key] ?? '0') || 0); });
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-2 mb-3">
+        {DOW_KEYS.map((key, i) => (
+          <div key={key} className="flex flex-col items-center gap-1.5">
+            <span className="text-xs font-semibold text-gray-500">{t(DOW_CZ[i].slice(0, 2), DOW_EN[i].slice(0, 2))}</span>
+            <input
+              type="number"
+              min={0}
+              max={99}
+              value={values[key] ?? String(DOW_DEFAULT[i])}
+              onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+              className={`w-full text-center border rounded-lg px-1 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                parseInt(values[key] ?? '0') === 0 ? 'border-gray-100 bg-gray-50 text-gray-300' : 'border-gray-200 text-gray-800'
+              }`}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? t('Ukládám…', 'Saving…') : t('Uložit', 'Save')}
+        </button>
+        {saved && <span className="text-emerald-600 text-sm font-medium">✓ {t('Uloženo', 'Saved')}</span>}
+        <span className="text-xs text-gray-400 ml-auto">{t('0 = zavřeno / nepracovní den', '0 = closed / non-working day')}</span>
       </div>
     </div>
   );

@@ -88,9 +88,10 @@ export async function GET(req: NextRequest) {
     const d = String(wp.date ?? '').slice(0, 10);
     if (d) confirmedByDate[d] = (confirmedByDate[d] ?? 0) + 1;
   }
-  const draftDays = buildDraftDays(month, draftRes.data ?? [], draft, scheduleDaysRes.data ?? [], confirmedByDate);
+  const orgSettings = buildSettings(settingsRes.data);
+  const draftDays = buildDraftDays(month, draftRes.data ?? [], draft, scheduleDaysRes.data ?? [], confirmedByDate, orgSettings);
 
-  const settings = buildSettings(settingsRes.data);
+  const settings = orgSettings;
 
   const absences = buildAbsences(absenceRes.data ?? []);
 
@@ -135,12 +136,15 @@ export async function GET(req: NextRequest) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const DOW_REQUIRED_KEYS = ['required_sun','required_mon','required_tue','required_wed','required_thu','required_fri','required_sat'];
+
 function buildDraftDays(
   month: string,
   draftRows: Record<string, unknown>[],
   _draft: string,
   scheduleDays: Record<string, unknown>[],
   confirmedByDate: Record<string, number>,
+  orgSettings: Record<string, unknown> = {},
 ) {
   // Index schedule_days config by date
   const schedMeta: Record<string, { requiredTotal: number; dayType: string; startTime: string | null; endTime: string | null }> = {};
@@ -179,8 +183,10 @@ function buildDraftDays(
     const slot = byDate[date] ?? { assignedEmployees: [], assignedCount: 0 };
     const meta = schedMeta[date];
 
-    // requiredTotal: from schedule_days if configured, else 0 for Sunday, else 3 fallback
-    const requiredTotal = meta ? meta.requiredTotal : (isSunday ? 0 : 3);
+    // requiredTotal: schedule_days override → org settings per-dow → Sunday=0 → fallback 3
+    const dowKey = DOW_REQUIRED_KEYS[dow];
+    const orgDefault = dowKey && orgSettings[dowKey] != null ? Number(orgSettings[dowKey]) : (isSunday ? 0 : 3);
+    const requiredTotal = meta ? meta.requiredTotal : orgDefault;
     // dayType: from schedule_days, or 'Zavřeno' for Sunday
     const dayType = meta?.dayType || (isSunday ? 'Zavřeno' : '');
     // Confirmed (non-draft) shifts already assigned to this day
