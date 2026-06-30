@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     sb.from('work_plans')
       .select('employee_id, date, work_type, start_time, end_time')
       .eq('organization_id', orgId)
-      .neq('type', 'draft')
+      .eq('active', true)
       .gte('date', `${month}-01`)
       .lte('date', `${month}-31`),
     sb.from('company_settings').select('extra_settings, saturday_logic_enabled').eq('organization_id', orgId).maybeSingle(),
