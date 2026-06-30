@@ -34,6 +34,7 @@ const EXTRA_KEYS = [
   'required_fri',
   'required_sat',
   'required_sun',
+  'vacation_counting_mode',
 ];
 
 // GET /api/manager/settings

@@ -569,11 +569,20 @@ function EmployeesTab() {
                         const b = vacBalances[emp.id];
                         if (!b) return <span className="text-gray-300">—</span>;
                         if (!b.hasPaidVacation) return <span className="text-xs text-gray-400">{t('Bez nároku', 'No entitlement')}</span>;
+                        const pct = b.totalDays > 0 ? Math.min(100, (b.usedDays / b.totalDays) * 100) : 0;
+                        const pendingPct = b.totalDays > 0 ? Math.min(100 - pct, (b.pendingDays / b.totalDays) * 100) : 0;
+                        const remaining = b.totalDays - b.usedDays;
+                        const barColor = remaining / b.totalDays > 0.5 ? 'bg-emerald-500' : remaining / b.totalDays > 0.1 ? 'bg-amber-500' : 'bg-red-500';
                         return (
-                          <span className={`font-semibold ${b.remainingDays <= 3 ? 'text-red-600' : b.remainingDays <= 7 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {b.remainingDays}/{b.totalDays} {t('dní', 'd')}
-                            {b.pendingDays > 0 && <span className="text-amber-500 font-normal ml-1">(+{b.pendingDays} čeká)</span>}
-                          </span>
+                          <div className="min-w-[90px]">
+                            <span className={`text-xs font-semibold ${remaining <= 0 ? 'text-red-600' : remaining <= 3 ? 'text-amber-600' : 'text-gray-700'}`}>
+                              {b.usedDays}/{b.totalDays} {t('dní', 'd')}
+                            </span>
+                            <div className="mt-1 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                              <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                              {pendingPct > 0 && <div className="h-full bg-amber-300 transition-all" style={{ width: `${pendingPct}%` }} />}
+                            </div>
+                          </div>
                         );
                       })()}
                     </td>
@@ -1666,6 +1675,13 @@ function SettingsTab() {
         <EveningShiftSetting />
       </section>
 
+      {/* Počítání dovolené */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">{t('Počítání dovolené', 'Vacation counting')}</h3>
+        <p className="text-xs text-gray-400 mb-4">{t('Jak se počítají dny dovolené — pouze pracovní dny, nebo všechny dny týdne.', 'How vacation days are counted — workdays only or all days of the week.')}</p>
+        <VacationCountingModeSetting />
+      </section>
+
       {/* Počet lidí na prodejně */}
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-1">{t('Počet lidí na prodejně', 'Required staff per day')}</h3>
@@ -2302,6 +2318,60 @@ function EveningShiftSetting() {
         </div>
       )}
 
+      <button onClick={handleSave} disabled={saving}
+        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}>
+        {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
+      </button>
+    </div>
+  );
+}
+
+// ─── VacationCountingModeSetting ──────────────────────────────────────────────
+
+function VacationCountingModeSetting() {
+  const t = useT();
+  const [mode, setMode] = useState<'workdays' | 'all'>('workdays');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    managerFetch('/api/manager/settings')
+      .then((r) => r.json())
+      .then((d: Record<string, unknown>) => {
+        if (d.vacation_counting_mode === 'all') setMode('all');
+        else setMode('workdays');
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacation_counting_mode: mode }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input type="radio" name="vacation_counting_mode" value="workdays" checked={mode === 'workdays'}
+            onChange={() => setMode('workdays')} className="accent-blue-600" />
+          <span className="text-sm text-gray-700">{t('Pracovní dny (Po–Pá)', 'Workdays (Mon–Fri)')}</span>
+        </label>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input type="radio" name="vacation_counting_mode" value="all" checked={mode === 'all'}
+            onChange={() => setMode('all')} className="accent-blue-600" />
+          <span className="text-sm text-gray-700">{t('Celý týden (Po–Ne)', 'All days (Mon–Sun)')}</span>
+        </label>
+      </div>
       <button onClick={handleSave} disabled={saving}
         className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}>
         {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}

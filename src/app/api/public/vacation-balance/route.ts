@@ -9,14 +9,14 @@ function getServiceClient() {
   return createClient(url, key);
 }
 
-function countVacationDays(dateFrom: string, dateTo: string | null): number {
+function countVacationDays(dateFrom: string, dateTo: string | null, countWeekends: boolean = false): number {
   const from = new Date(dateFrom + 'T00:00:00');
   const to = dateTo ? new Date(dateTo + 'T00:00:00') : from;
   let days = 0;
   const cur = new Date(from);
   while (cur <= to) {
     const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) days++; // skip weekends
+    if (countWeekends || (dow !== 0 && dow !== 6)) days++;
     cur.setDate(cur.getDate() + 1);
   }
   return days;
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
 
   const extraSettings = (settings as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
   const configs = (extraSettings.employment_type_configs as Record<string, { paidVacation: boolean }> | undefined) ?? {};
+  const countWeekends = (extraSettings.vacation_counting_mode as string | undefined) === 'all';
   const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
   const empType = employee.employment_type ?? '';
   const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
@@ -91,7 +92,7 @@ export async function GET(req: NextRequest) {
   let pendingDays = 0;
 
   for (const req of requests ?? []) {
-    const days = countVacationDays(req.date_from, req.date_to ?? null);
+    const days = countVacationDays(req.date_from, req.date_to ?? null, countWeekends);
     if (req.status === 'approved') usedDays += days;
     else if (req.status === 'pending') pendingDays += days;
   }

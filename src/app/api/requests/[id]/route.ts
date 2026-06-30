@@ -177,6 +177,67 @@ export async function PUT(
     }
   }
 
+  // When vacation approved + employee has paid vacation → create attendance_log for each vacation day
+  if (status === 'approved' && existing.type === 'vacation') {
+    void (async () => {
+      try {
+        const svc = getServiceClient();
+
+        // Fetch employee employment_type
+        const { data: emp } = await svc
+          .from('employees')
+          .select('employment_type')
+          .eq('id', existing.employee_id)
+          .eq('organization_id', orgId)
+          .maybeSingle();
+
+        // Fetch company settings
+        const { data: settingsRow } = await svc
+          .from('company_settings')
+          .select('extra_settings')
+          .eq('organization_id', orgId)
+          .maybeSingle();
+
+        const extraSettings = (settingsRow as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
+        const configs = (extraSettings.employment_type_configs as Record<string, { paidVacation: boolean }> | undefined) ?? {};
+        const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
+        const empType = (emp as { employment_type?: string } | null)?.employment_type ?? '';
+        const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
+        const countWeekends = (extraSettings.vacation_counting_mode as string | undefined) === 'all';
+
+        if (!hasPaidVacation) return;
+
+        const dateFrom = existing.date_from as string;
+        const dateTo = (existing.date_to as string | null) ?? dateFrom;
+        const from = new Date(dateFrom + 'T00:00:00');
+        const to = new Date(dateTo + 'T00:00:00');
+        const cur = new Date(from);
+
+        while (cur <= to) {
+          const dow = cur.getDay();
+          if (countWeekends || (dow !== 0 && dow !== 6)) {
+            const dateStr = cur.toISOString().slice(0, 10);
+            const { error: logError } = await svc.from('attendance_logs').insert({
+              organization_id: orgId,
+              employee_id: existing.employee_id,
+              date: dateStr,
+              check_in: `${dateStr}T09:00:00`,
+              check_out: `${dateStr}T17:00:00`,
+              note: 'Placená dovolená',
+              type: 'vacation',
+            });
+            if (logError) {
+              console.error('Vacation attendance_log insert error:', logError.message, logError);
+            }
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+      } catch (err) {
+        console.error('Vacation attendance_log block error:', err);
+      }
+    })();
+  }
+
   // Send email notification to employee (fire-and-forget, non-blocking)
   void (async () => {
     try {
