@@ -241,53 +241,79 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     <div className="flex-1 bg-[#1e293b] text-white flex flex-col items-center justify-center p-4 select-none overflow-auto">
       {/* Check-in Screen */}
       {screen === 'checkin' && (
-        <div className="w-full max-w-2xl flex flex-col items-center gap-8">
-          <h1 className="text-4xl font-bold text-slate-100 text-center">
+        <div className="w-full max-w-2xl flex flex-col items-center gap-4 sm:gap-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-slate-100 text-center">
             {t('Dobrý den', 'Hello')}, {employeeName}!
           </h1>
-          <p className="text-slate-400 text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
+          <p className="text-slate-400 text-sm sm:text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
-            {workTypes.map((wt, idx) => {
-              const colorClass =
-                WORK_TYPE_COLORS[wt.name] ??
-                DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-              const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
-              const isSelected = selectedWorkType?.id === wt.id;
-
-              return (
-                <button
-                  key={wt.id}
-                  onClick={() => setSelectedWorkType(wt)}
-                  className={`
-                    ${colorClass}
-                    flex flex-col items-center justify-center gap-3 p-6 rounded-2xl
-                    min-h-[120px] text-white font-semibold text-xl
-                    transition-all duration-150 active:scale-95
-                    ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}
-                  `}
-                >
-                  <span className="text-4xl">{wt.icon ?? icon}</span>
-                  <span>{wt.name}</span>
-                </button>
-              );
-            })}
+          {/* Mobile: compact list; Desktop: grid cards */}
+          <div className="w-full">
+            {/* Mobile list */}
+            <div className="flex flex-col gap-2 sm:hidden">
+              {workTypes.map((wt, idx) => {
+                const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+                const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                const isSelected = selectedWorkType?.id === wt.id;
+                return (
+                  <button
+                    key={wt.id}
+                    onClick={() => setSelectedWorkType(wt)}
+                    className={`
+                      ${colorClass}
+                      flex items-center gap-3 px-4 py-3 rounded-xl w-full
+                      text-white font-semibold text-base
+                      transition-all duration-150 active:scale-[0.98]
+                      ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1e293b] brightness-110' : 'opacity-80'}
+                    `}
+                  >
+                    <span className="text-2xl shrink-0">{wt.icon ?? icon}</span>
+                    <span className="flex-1 text-left">{wt.name}</span>
+                    {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Desktop grid */}
+            <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {workTypes.map((wt, idx) => {
+                const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+                const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                const isSelected = selectedWorkType?.id === wt.id;
+                return (
+                  <button
+                    key={wt.id}
+                    onClick={() => setSelectedWorkType(wt)}
+                    className={`
+                      ${colorClass}
+                      flex flex-col items-center justify-center gap-3 p-6 rounded-2xl
+                      min-h-[120px] text-white font-semibold text-xl
+                      transition-all duration-150 active:scale-95
+                      ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}
+                    `}
+                  >
+                    <span className="text-4xl">{wt.icon ?? icon}</span>
+                    <span>{wt.name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex gap-4 w-full mt-2">
+          <div className="flex gap-3 w-full mt-1">
             <button
               onClick={() => { setScreen('pin'); setPin(''); }}
-              className="flex-1 min-h-[64px] bg-slate-700 hover:bg-slate-600 text-white text-xl font-semibold rounded-xl transition-all active:scale-95"
+              className="flex-1 min-h-[48px] sm:min-h-[64px] bg-slate-700 hover:bg-slate-600 text-white text-base sm:text-xl font-semibold rounded-xl transition-all active:scale-95"
             >
               {t('Zpět', 'Back')}
             </button>
             <button
               onClick={handleCheckin}
               disabled={!selectedWorkType || loading}
-              className="flex-[2] min-h-[64px] bg-emerald-600 hover:bg-emerald-500 text-white text-xl font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-[2] min-h-[48px] sm:min-h-[64px] bg-emerald-600 hover:bg-emerald-500 text-white text-base sm:text-xl font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
-                <span className="inline-block w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : null}
               {t('Zaznamenat příchod', 'Clock in')}
             </button>
