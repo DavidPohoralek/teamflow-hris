@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import PinPad from './PinPad';
 import { useT } from '@/lib/i18n';
 
@@ -94,6 +94,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load work types
   useEffect(() => {
@@ -107,7 +108,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   }, [orgId]);
 
   const resetKiosk = useCallback(() => {
-    setTimeout(() => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
       setScreen('pin');
       setPin('');
       setEmployeeName('');
@@ -132,6 +134,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   };
 
   const handlePinConfirm = async (enteredPin: string) => {
+    // Cancel any pending reset from a previous session
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     setLoading(true);
     setPinError(false);
     setPin(enteredPin);
