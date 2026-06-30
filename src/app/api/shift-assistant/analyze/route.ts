@@ -186,13 +186,30 @@ function buildDraftDays(
     };
   }
 
-  // Group DRAFT rows by date
-  const draftByDate: Record<string, { employeeIds: string[] }> = {};
+  // Evening shift config from org settings
+  const eveningEnabled = Boolean(orgSettings.evening_shift_enabled);
+  const eveningStart = String(orgSettings.evening_shift_start ?? '17:00');
+  const eveningEnd = String(orgSettings.evening_shift_end ?? '19:00');
+  const eveningMinStaff = Number(orgSettings.evening_shift_min_staff ?? 2);
+  const eveningLabel = String(orgSettings.evening_shift_label ?? 'Prodejna').toLowerCase();
+
+  function isProdejnaType(workType: string) {
+    const wt = workType.toLowerCase();
+    return wt.includes('prodejna') || wt.includes('store');
+  }
+
+  // Group DRAFT rows by date — only count Prodejna-type drafts toward store coverage
+  const draftByDate: Record<string, { employeeIds: string[]; prodejnaIds: string[] }> = {};
   for (const row of draftRows) {
     const date = String(row.date ?? '').slice(0, 10);
     if (!date) continue;
-    if (!draftByDate[date]) draftByDate[date] = { employeeIds: [] };
-    if (row.employee_id) draftByDate[date].employeeIds.push(String(row.employee_id));
+    if (!draftByDate[date]) draftByDate[date] = { employeeIds: [], prodejnaIds: [] };
+    if (row.employee_id) {
+      draftByDate[date].employeeIds.push(String(row.employee_id));
+      if (!row.work_type || isProdejnaType(String(row.work_type))) {
+        draftByDate[date].prodejnaIds.push(String(row.employee_id));
+      }
+    }
   }
 
   const [year, mon] = month.split('-').map(Number);
@@ -206,7 +223,7 @@ function buildDraftDays(
     const dow = dateObj.getDay();
     const isSunday = dow === 0;
 
-    const draftSlot = draftByDate[date] ?? { employeeIds: [] };
+    const draftSlot = draftByDate[date] ?? { employeeIds: [], prodejnaIds: [] };
     const confirmed = confirmedByDate[date];
     const meta = schedMeta[date];
 
@@ -220,7 +237,7 @@ function buildDraftDays(
 
     const dayType = isClosed ? 'Zavřeno' : (meta?.dayType || (isSunday ? 'Zavřeno' : ''));
 
-    // Merge confirmed + draft employee IDs (deduplicated) so bot knows total assigned
+    // Merge ALL confirmed + draft employee IDs (deduplicated) — for CLOSING_ASSIST check
     const confirmedIds = confirmed?.employeeIds ?? [];
     const seen = new Set<string>();
     const allAssignedIds: string[] = [];
@@ -228,10 +245,45 @@ function buildDraftDays(
       if (!seen.has(id)) { seen.add(id); allAssignedIds.push(id); }
     }
 
-    // Count only Prodejna-type confirmed shifts for "store" coverage
+    // assignedCount = ONLY Prodejna confirmed shifts + Prodejna draft shifts
     const prodejnaConfirmedCount = (confirmed?.shifts ?? []).filter(s =>
-      s.workType && (s.workType.toLowerCase().includes('prodejna') || s.workType.toLowerCase().includes('store'))
+      s.workType && isProdejnaType(s.workType)
     ).length;
+    const assignedCount = prodejnaConfirmedCount + draftSlot.prodejnaIds.length;
+
+    // ── Evening coverage pre-calculation ──────────────────────────────────────
+    // Who from confirmed shifts covers the evening window (startTime ≤ eveningStart, endTime ≥ eveningEnd)?
+    const allShifts = confirmed?.shifts ?? [];
+    let eveningCoverage: {
+      enabled: boolean; from: string; to: string; requiredStaff: number;
+      assignedStaff: number; missingStaff: number;
+      candidates: { employeeId: string; workType: string; shiftEnd: string }[];
+    } | null = null;
+
+    if (eveningEnabled && !isClosed) {
+      // Count people already covering the full evening window on Prodejna
+      const eveningCovered = allShifts.filter(s =>
+        isProdejnaType(s.workType) &&
+        s.startTime <= eveningStart &&
+        s.endTime >= eveningEnd
+      ).length;
+
+      // Candidates: non-Prodejna workers with the eveningLabel in their workType or who could extend
+      // (their shift ends before eveningEnd but at or after eveningStart — they overlap the window)
+      const candidates = allShifts
+        .filter(s => !isProdejnaType(s.workType) && s.endTime >= eveningStart && s.endTime < eveningEnd)
+        .map(s => ({ employeeId: s.employeeId, workType: s.workType, shiftEnd: s.endTime }));
+
+      eveningCoverage = {
+        enabled: true,
+        from: eveningStart,
+        to: eveningEnd,
+        requiredStaff: eveningMinStaff,
+        assignedStaff: eveningCovered,
+        missingStaff: Math.max(0, eveningMinStaff - eveningCovered),
+        candidates,
+      };
+    }
 
     days.push({
       date,
@@ -240,12 +292,10 @@ function buildDraftDays(
       requiredTotal,
       startTime: meta?.startTime ?? null,
       endTime: meta?.endTime ?? null,
-      // assignedEmployees = everyone working that day (draft + confirmed) for CLOSING_ASSIST check
       assignedEmployees: allAssignedIds,
-      // assignedCount = Prodejna confirmed + draft → bot calculates missing = requiredTotal - assignedCount
-      assignedCount: prodejnaConfirmedCount + draftSlot.employeeIds.length,
-      // Full confirmed shift detail so bot can suggest CLOSING_ASSIST (e.g. Jirka 9-17 Backoffice → extend)
-      confirmedShifts: confirmed?.shifts ?? [],
+      assignedCount,
+      confirmedShifts: allShifts,
+      eveningCoverage,
     });
   }
   return days;
