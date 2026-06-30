@@ -157,10 +157,22 @@ function buildDraftDays(
   orgSettings: Record<string, unknown> = {},
 ) {
   // Build a Set of closed dates from settings (holidays / manually closed days)
+  // closed_dates is stored as a comma-separated string e.g. "2026-07-06,2026-12-25"
+  const rawClosedDates = orgSettings.closed_dates;
   const closedDates = new Set<string>(
-    Array.isArray(orgSettings.closed_dates)
-      ? (orgSettings.closed_dates as unknown[]).map(String)
-      : []
+    typeof rawClosedDates === 'string'
+      ? rawClosedDates.split(',').map(s => s.trim()).filter(Boolean)
+      : Array.isArray(rawClosedDates)
+        ? (rawClosedDates as unknown[]).map(String)
+        : []
+  );
+
+  // Also respect per-weekday closed flags (hours_mon…hours_sun falsy = closed that weekday)
+  const DOW_HOURS_KEYS = ['hours_sun','hours_mon','hours_tue','hours_wed','hours_thu','hours_fri','hours_sat'];
+  const closedWeekdays = new Set<number>(
+    DOW_HOURS_KEYS.map((k, i) => ({ k, i }))
+      .filter(({ k }) => orgSettings[k] != null && !orgSettings[k])
+      .map(({ i }) => i)
   );
   // Index schedule_days config by date
   const schedMeta: Record<string, { requiredTotal: number; dayType: string; startTime: string | null; endTime: string | null }> = {};
@@ -200,6 +212,7 @@ function buildDraftDays(
 
     // requiredTotal priority: closed date → schedule_days override → org per-dow settings → Sunday=0 → fallback 3
     const isClosed = closedDates.has(date)
+      || closedWeekdays.has(dow)
       || (meta?.dayType != null && meta.dayType.toLowerCase().includes('zavř'));
     const dowKey = DOW_REQUIRED_KEYS[dow];
     const orgDefault = dowKey && orgSettings[dowKey] != null ? Number(orgSettings[dowKey]) : (isSunday ? 0 : 3);
