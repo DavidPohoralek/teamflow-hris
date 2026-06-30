@@ -83,12 +83,26 @@ export async function POST(req: NextRequest) {
         .insert(insertData)
 
       if (insertError) {
-        console.error('Kiosk checkin insert error:', insertError)
-        // Surface the real DB error to help diagnose constraint issues
-        return NextResponse.json(
-          { ok: false, error: `Chyba při záznamu příchodu: ${insertError.message}` },
-          { status: 500 }
-        )
+        // Unique constraint still in place — fall back to updating the existing row
+        // so check-in at least works. Drop the index in Supabase to record every session.
+        if (insertError.code === '23505') {
+          const { error: updateError } = await supabase
+            .from('attendance_logs')
+            .update({ check_in: now, check_out: null,
+              ...(workTypeId ? { work_type_id: workTypeId } : {}),
+              ...(workTypeName ? { work_type_name: workTypeName } : {}),
+            })
+            .eq('organization_id', orgId)
+            .eq('employee_id', employee.id)
+            .eq('date', today)
+          if (updateError) {
+            console.error('Kiosk checkin fallback update error:', updateError)
+            return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
+          }
+        } else {
+          console.error('Kiosk checkin insert error:', insertError)
+          return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
+        }
       }
 
       return NextResponse.json({
