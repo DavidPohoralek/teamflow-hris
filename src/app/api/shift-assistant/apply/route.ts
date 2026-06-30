@@ -65,15 +65,14 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    // Check if already assigned (idempotent)
+    // Check if already has any active shift on this date (idempotent)
     const { data: existing } = await sb
       .from('work_plans')
       .select('id')
       .eq('organization_id', orgId)
       .eq('employee_id', empId)
       .eq('date', date)
-      .eq('type', 'draft')
-      .eq('draft_label', draft)
+      .eq('active', true)
       .maybeSingle();
 
     if (existing) {
@@ -89,8 +88,6 @@ export async function POST(req: NextRequest) {
       work_type:       'Prodejna',
       start_time:      times.startTime ?? null,
       end_time:        times.endTime ?? null,
-      type:            'draft',
-      draft_label:     draft,
       note:            'Asistent směn',
       active:          true,
     });
