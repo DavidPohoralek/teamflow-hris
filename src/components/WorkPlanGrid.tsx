@@ -72,6 +72,32 @@ function nextMonth(month: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Monday of the week containing date */
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d;
+}
+
+/** 7 ISO date strings Mon→Sun for a given Monday date */
+function getWeekDays(monday: Date): string[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+}
+
+function dateToISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function monthOf(dateStr: string): string {
+  return dateStr.slice(0, 7);
+}
+
 /** Returns Monday-based weekday index 0–6 for a date string YYYY-MM-DD */
 function mondayWeekday(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00');
@@ -1193,6 +1219,9 @@ export default function WorkPlanGrid({
   const [myVacation, setMyVacation] = useState(false);
   const [vacationDates, setVacationDates] = useState<Set<string>>(new Set());
 
+  // Mobile week view — start on Monday of current week
+  const [mobileWeekStart, setMobileWeekStart] = useState<Date>(() => getWeekStart(new Date()));
+
   const fetchMyVacation = useCallback(async (employeeId: string) => {
     try {
       const res = await fetch(`/api/public/vacation-calendar?orgId=${encodeURIComponent(orgId)}`);
@@ -1383,6 +1412,36 @@ export default function WorkPlanGrid({
     if (res.ok) await fetchSchedule();
   }, [data, orgId, sessionPin, sessionEmployee, fetchSchedule]);
 
+  // Mobile week navigation — sync month when week crosses boundary
+  const handlePrevWeek = () => {
+    const prev = new Date(mobileWeekStart);
+    prev.setDate(prev.getDate() - 7);
+    setMobileWeekStart(prev);
+    const newMonth = monthOf(dateToISO(prev));
+    if (newMonth !== month) onMonthChange(newMonth);
+  };
+
+  const handleNextWeek = () => {
+    const next = new Date(mobileWeekStart);
+    next.setDate(next.getDate() + 7);
+    setMobileWeekStart(next);
+    const newMonth = monthOf(dateToISO(next));
+    if (newMonth !== month) onMonthChange(newMonth);
+  };
+
+  const mobileWeekDays = getWeekDays(mobileWeekStart);
+  const mobileWeekEnd = mobileWeekDays[6];
+
+  // Format week label: "2. – 8. června 2026" or cross-month "30. května – 5. června 2026"
+  const CZ_MONTHS_LONG_SHORT = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
+  const wsDate = new Date(mobileWeekDays[0] + 'T00:00:00');
+  const weDate = new Date(mobileWeekEnd + 'T00:00:00');
+  const mobileWeekLabel = wsDate.getMonth() === weDate.getMonth()
+    ? `${wsDate.getDate()}. – ${weDate.getDate()}. ${CZ_MONTHS_LONG_SHORT[wsDate.getMonth()]} ${wsDate.getFullYear()}`
+    : `${wsDate.getDate()}. ${CZ_MONTHS_LONG_SHORT[wsDate.getMonth()]} – ${weDate.getDate()}. ${CZ_MONTHS_LONG_SHORT[weDate.getMonth()]} ${weDate.getFullYear()}`;
+
+  const todayStr = todayISO();
+
   const calendarDays = buildCalendarDays(month);
   const firstDayOffset = calendarDays.length > 0 ? mondayWeekday(calendarDays[0]) : 0;
 
@@ -1411,8 +1470,13 @@ export default function WorkPlanGrid({
 
   const editingMeta = editingDate ? metaByDate.get(editingDate) : undefined;
 
+  const DAY_NAMES_LONG = [
+    t('Neděle', 'Sunday'), t('Pondělí', 'Monday'), t('Úterý', 'Tuesday'),
+    t('Středa', 'Wednesday'), t('Čtvrtek', 'Thursday'), t('Pátek', 'Friday'), t('Sobota', 'Saturday'),
+  ];
+
   return (
-    <div className="w-full px-6 py-5">
+    <div className="w-full">
       {/* Toast */}
       {showToast && (
         <Toast message={toastMessage} onDone={() => setShowToast(false)} />
@@ -1441,6 +1505,177 @@ export default function WorkPlanGrid({
           </button>
         </div>
       )}
+
+      {/* ── MOBILE WEEK VIEW ─────────────────────────────────────────────── */}
+      <div className="md:hidden flex flex-col h-full">
+        {/* Mobile toolbar: PIN session */}
+        {!isManagerMode && (
+          <div className="px-4 pt-3 pb-2 border-b border-slate-200 bg-white">
+            {sessionEmployee ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setMyShiftsOnly((v) => !v)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${myShiftsOnly ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200'}`}
+                >
+                  📅 {t('Mé směny', 'My shifts')}
+                </button>
+                <button
+                  onClick={() => {
+                    const next = !myVacation;
+                    setMyVacation(next);
+                    if (next && sessionEmployee) fetchMyVacation(sessionEmployee.id);
+                  }}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${myVacation ? 'bg-pink-500 text-white border-pink-500' : 'bg-white text-slate-700 border-slate-200'}`}
+                >
+                  🌴 {t('Dovolená', 'Vacation')}
+                </button>
+                <div className="ml-auto flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
+                  <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); }} className="text-emerald-400 hover:text-emerald-700 text-xs">✕</button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={pinInputValue}
+                  onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
+                  placeholder={t('Váš PIN kód', 'Your PIN')}
+                  className={`flex-1 text-sm px-3 py-2 rounded-lg border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-slate-200'} focus:outline-none focus:ring-2 focus:ring-blue-400 tracking-widest`}
+                />
+                <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
+                  className="px-4 py-2 bg-slate-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
+                  {pinInputLoading ? '…' : 'OK'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* Week navigation */}
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shrink-0">
+          <button onClick={handlePrevWeek} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors" aria-label={t('Předchozí týden', 'Previous week')}>
+            <svg className="w-4 h-4 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <div className="text-center">
+            <div className="text-sm font-bold text-slate-800">{mobileWeekLabel}</div>
+            {mobileWeekDays.includes(todayStr) && (
+              <div className="text-xs text-blue-500 font-medium mt-0.5">{t('Aktuální týden', 'Current week')}</div>
+            )}
+          </div>
+          <button onClick={handleNextWeek} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors" aria-label={t('Další týden', 'Next week')}>
+            <svg className="w-4 h-4 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Week days list */}
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+            {t('Načítám…', 'Loading…')}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto divide-y divide-slate-100">
+            {mobileWeekDays.map((dateStr) => {
+              const d = new Date(dateStr + 'T00:00:00');
+              const wd = d.getDay(); // 0=Sun
+              const isWeekend = wd === 0 || wd === 6;
+              const isClosed = closedDates.has(dateStr) || closedWeekdays.has(wd);
+              const isToday = dateStr === todayStr;
+              const isVacation = myVacation && vacationDates.has(dateStr);
+              const allEntries = entriesByDate.get(dateStr) ?? [];
+              const visibleEntries = myShiftsOnly && sessionEmployee
+                ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                : allEntries;
+              const dayLong = DAY_NAMES_LONG[wd];
+              const dayNum = d.getDate();
+              const monName = CZ_MONTHS_LONG_SHORT[d.getMonth()];
+
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => handleClickDay(dateStr)}
+                  className={`w-full text-left px-4 py-3 flex items-start gap-3 active:bg-slate-50 transition-colors ${
+                    isVacation ? 'bg-pink-50' :
+                    isToday ? 'bg-blue-50' :
+                    isWeekend ? 'bg-slate-50/60' : 'bg-white'
+                  }`}
+                >
+                  {/* Date column */}
+                  <div className={`shrink-0 w-12 flex flex-col items-center justify-center rounded-xl py-1.5 ${
+                    isToday ? 'bg-blue-600 text-white' :
+                    isWeekend ? 'bg-slate-200 text-slate-500' :
+                    isClosed ? 'bg-slate-100 text-slate-400' :
+                    'bg-slate-100 text-slate-700'
+                  }`}>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide leading-none">{DAY_NAMES_SHORT[mondayWeekday(dateStr)]}</span>
+                    <span className="text-xl font-bold leading-tight">{dayNum}</span>
+                    <span className="text-[10px] leading-none opacity-70">{monName}</span>
+                  </div>
+
+                  {/* Content column */}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    {isClosed && !visibleEntries.length ? (
+                      <span className="inline-block text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {t('Zavřeno', 'Closed')}
+                      </span>
+                    ) : visibleEntries.length === 0 ? (
+                      <span className="text-sm text-slate-400 italic">{t('Žádné směny', 'No shifts')}</span>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {visibleEntries.slice(0, 4).map((entry, idx) => {
+                          const color = entry.workTypeColor ?? '#94a3b8';
+                          const parts = (entry.employeeName ?? '—').trim().split(/\s+/);
+                          const shortName = parts.length < 2 ? (entry.employeeName ?? '—') : `${parts[0]} ${parts[parts.length - 1][0]}.`;
+                          const timeLabel = entry.startTime && entry.endTime
+                            ? `${entry.startTime.slice(0,5)}–${entry.endTime.slice(0,5)}`
+                            : '';
+                          return (
+                            <div key={idx} className="flex items-center gap-2 min-w-0">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                              <span className="text-sm font-medium text-slate-800 truncate">{shortName}</span>
+                              {timeLabel && <span className="text-xs text-slate-400 shrink-0">{timeLabel}</span>}
+                              <span className="text-xs text-slate-400 shrink-0 truncate max-w-[80px]">{entry.workTypeName ?? entry.workType ?? ''}</span>
+                            </div>
+                          );
+                        })}
+                        {visibleEntries.length > 4 && (
+                          <span className="text-xs text-slate-400">+{visibleEntries.length - 4} {t('dalších', 'more')}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chevron */}
+                  <svg className="w-4 h-4 text-slate-300 shrink-0 mt-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Mobile add button */}
+        <div className="shrink-0 p-4 bg-white border-t border-slate-200">
+          <button
+            onClick={() => { setAddShiftDate(todayISO()); setShowModal(true); }}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95"
+          >
+            <span className="text-lg font-light">+</span>
+            {t('Přidat směnu', 'Add shift')}
+          </button>
+        </div>
+      </div>
+
+      {/* ── DESKTOP MONTH VIEW ───────────────────────────────────────────── */}
+      <div className="hidden md:block px-6 py-5">
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
@@ -1632,8 +1867,9 @@ export default function WorkPlanGrid({
           <Legend workTypes={workTypes} isManagerMode={isManagerMode} onChanged={fetchWorkTypes} />
         </>
       )}
+      </div>{/* end desktop */}
 
-      {/* Add shift modal */}
+      {/* Shared modals — fixed position, visible on both mobile and desktop */}
       {showModal && (
         <AddShiftModal
           orgId={orgId}
@@ -1646,7 +1882,6 @@ export default function WorkPlanGrid({
         />
       )}
 
-      {/* Edit day modal */}
       {editingDate && (
         <EditDayModal
           orgId={orgId}
@@ -1657,7 +1892,6 @@ export default function WorkPlanGrid({
         />
       )}
 
-      {/* Day detail modal — read-only, shown when no PIN */}
       {dayDetailDate && (
         <DayDetailModal
           dateStr={dayDetailDate}
