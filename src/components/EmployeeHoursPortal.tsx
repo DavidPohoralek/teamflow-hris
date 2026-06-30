@@ -261,11 +261,20 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           <div className="flex-1 overflow-y-auto">
 
           {/* Stat cards */}
+          {(() => {
+            const benefitImpact = (data.benefits ?? []).reduce((sum, b) => sum + (benefitCounts[b.key] ?? 0) * b.hoursPerUnit, 0);
+            const adjustedHours = data.thisMonth.hours + benefitImpact;
+            return (
           <div className="grid grid-cols-2 gap-3 px-4 sm:px-6 py-4 sm:py-5">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-blue-100">
               <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1 sm:mb-3">Tento měsíc</p>
-              <p className="text-2xl sm:text-4xl font-bold text-blue-700 leading-none">{data.thisMonth.hours.toFixed(2)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
-              <p className="text-xs sm:text-sm text-blue-600 mt-1 sm:mt-1.5 font-medium">{data.thisMonth.days} dní</p>
+              <p className="text-2xl sm:text-4xl font-bold text-blue-700 leading-none">{adjustedHours.toFixed(2)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
+              {benefitImpact !== 0 && (
+                <p className={`text-xs font-semibold mt-0.5 ${benefitImpact < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  {data.thisMonth.hours.toFixed(2)} h {benefitImpact > 0 ? '+' : ''}{benefitImpact.toFixed(2)} h aktivity
+                </p>
+              )}
+              <p className="text-xs sm:text-sm text-blue-600 mt-1 font-medium">{data.thisMonth.days} dní</p>
               <p className="text-xs text-blue-400 mt-0.5 capitalize hidden sm:block">{thisMonthName}</p>
             </div>
             <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-slate-200">
@@ -275,6 +284,8 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
               <p className="text-xs text-slate-400 mt-0.5 capitalize hidden sm:block">{lastMonthName}</p>
             </div>
           </div>
+            );
+          })()}
 
           {/* Benefits section */}
           {data.benefits && data.benefits.length > 0 && (
