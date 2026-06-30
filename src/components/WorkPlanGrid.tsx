@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { managerFetch } from '@/lib/managerFetch';
 import PinPad from './PinPad';
 import { useT } from '@/lib/i18n';
@@ -1739,7 +1740,7 @@ export default function WorkPlanGrid({
                 </button>
                 {/* .ics download */}
                 {myShiftsOnly && (
-                  <div className="relative">
+                  <>
                     <button
                       onClick={() => { setIcsLabel(sessionEmployee.name); setShowIcsModal(true); }}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-600 transition-all"
@@ -1747,35 +1748,39 @@ export default function WorkPlanGrid({
                     >
                       ⬇ .ics
                     </button>
-                    {showIcsModal && (
-                      <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 w-72">
-                        <p className="text-sm font-semibold text-slate-800 mb-1">{t('Název události v kalendáři', 'Event name in calendar')}</p>
-                        <p className="text-xs text-slate-400 mb-3">{t('Takto se zobrazí každá směna ve vašem kalendáři.', 'This is how each shift will appear in your calendar.')}</p>
-                        <input
-                          type="text"
-                          value={icsLabel}
-                          onChange={e => setIcsLabel(e.target.value)}
-                          placeholder={t('Např. Práce, Směna…', 'E.g. Work, Shift…')}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 mb-3"
-                          autoFocus
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { setShowIcsModal(false); downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month, icsLabel.trim() || sessionEmployee.name); }
-                            if (e.key === 'Escape') setShowIcsModal(false);
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setShowIcsModal(false)}
-                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition"
-                          >{t('Zrušit', 'Cancel')}</button>
-                          <button
-                            onClick={() => { setShowIcsModal(false); downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month, icsLabel.trim() || sessionEmployee.name); }}
-                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition"
-                          >{t('Stáhnout', 'Download')}</button>
+                    {showIcsModal && typeof window !== 'undefined' && createPortal(
+                      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowIcsModal(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 w-80 mx-4" onClick={e => e.stopPropagation()}>
+                          <h3 className="text-base font-bold text-slate-800 mb-1">{t('Název směny v kalendáři', 'Shift name in calendar')}</h3>
+                          <p className="text-xs text-slate-400 mb-4">{t('Takto se zobrazí každá směna ve vašem Apple/Google kalendáři.', 'This is how each shift will appear in your Apple/Google calendar.')}</p>
+                          <input
+                            type="text"
+                            value={icsLabel}
+                            onChange={e => setIcsLabel(e.target.value)}
+                            placeholder={t('Např. Práce, Směna…', 'E.g. Work, Shift…')}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 mb-4"
+                            autoFocus
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { setShowIcsModal(false); downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month, icsLabel.trim() || sessionEmployee.name); }
+                              if (e.key === 'Escape') setShowIcsModal(false);
+                            }}
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => setShowIcsModal(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition">
+                              {t('Zrušit', 'Cancel')}
+                            </button>
+                            <button
+                              onClick={() => { setShowIcsModal(false); downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, month, icsLabel.trim() || sessionEmployee.name); }}
+                              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition"
+                            >
+                              ⬇ {t('Stáhnout', 'Download')}
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      </div>,
+                      document.body
                     )}
-                  </div>
+                  </>
                 )}
                 {/* Session badge */}
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
