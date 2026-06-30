@@ -299,7 +299,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                 Žádné žádosti
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-0.5">
                 {requests.map((req) => {
                   const badge = STATUS_BADGES[req.status] ?? STATUS_BADGES.pending;
                   return (
