@@ -389,6 +389,10 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [myShiftsLoading, setMyShiftsLoading] = useState(false);
   // "Pouze má dovolená" filter
   const [myVacationOnly, setMyVacationOnly] = useState(false);
+  // My requests panel
+  const [myRequests, setMyRequests] = useState<VacationRequest[]>([]);
+  const [myRequestsLoading, setMyRequestsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
   const portalRootRef = useRef<HTMLElement | null>(null);
@@ -548,6 +552,39 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
     }
   }, [month, showMyShifts, sessionEmployee, loadMyShifts]);
 
+  const loadMyRequests = useCallback(async (pin: string) => {
+    setMyRequestsLoading(true);
+    try {
+      const res = await fetch(`/api/public/requests?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pin)}`);
+      if (res.ok) {
+        const json = await res.json() as { requests: VacationRequest[] };
+        setMyRequests(json.requests ?? []);
+      }
+    } catch { /* ignore */ }
+    finally { setMyRequestsLoading(false); }
+  }, [orgId]);
+
+  useEffect(() => {
+    if (sessionPin) loadMyRequests(sessionPin);
+    else setMyRequests([]);
+  }, [sessionPin, loadMyRequests]);
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!sessionPin) return;
+    setDeletingId(requestId);
+    try {
+      const res = await fetch(
+        `/api/public/requests?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}&requestId=${encodeURIComponent(requestId)}`,
+        { method: 'DELETE' }
+      );
+      if (res.ok) {
+        setMyRequests((prev) => prev.filter((r) => r.id !== requestId));
+        fetchData();
+      }
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
+  };
+
   return (
     <div className="w-full px-3 sm:px-6 py-4 sm:py-5">
       {/* Toolbar */}
@@ -640,6 +677,58 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           )}
         </div>
       </div>
+
+      {/* My requests panel — visible when logged in via PIN */}
+      {!isManagerMode && sessionEmployee && (
+        <div className="mb-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+            <span className="text-sm font-semibold text-slate-700">🏖️ {t('Moje žádosti o dovolenou', 'My vacation requests')}</span>
+            {myRequestsLoading && <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />}
+          </div>
+          {myRequests.length === 0 && !myRequestsLoading ? (
+            <p className="text-sm text-slate-400 text-center py-4">{t('Žádné žádosti', 'No requests')}</p>
+          ) : (
+            <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
+              {myRequests.map((req) => {
+                const statusStyles: Record<string, string> = {
+                  approved: 'bg-emerald-100 text-emerald-700',
+                  rejected: 'bg-red-100 text-red-600',
+                  pending: 'bg-amber-100 text-amber-700',
+                };
+                const statusLabels: Record<string, string> = {
+                  approved: t('Schváleno', 'Approved'),
+                  rejected: t('Zamítnuto', 'Rejected'),
+                  pending: t('Čeká', 'Pending'),
+                };
+                const from = new Date(req.date_from + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const to = req.date_to ? new Date(req.date_to + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
+                return (
+                  <div key={req.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800">{from}{to && to !== from ? ` — ${to}` : ''}</p>
+                      {req.note && <p className="text-xs text-slate-400 truncate mt-0.5">{req.note}</p>}
+                    </div>
+                    <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${statusStyles[req.status] ?? statusStyles.pending}`}>
+                      {statusLabels[req.status] ?? req.status}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteRequest(req.id)}
+                      disabled={deletingId === req.id}
+                      className="shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                      title={t('Smazat žádost', 'Delete request')}
+                    >
+                      {deletingId === req.id
+                        ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
+                        : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+                      }
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Calendar grid */}
       {loading && (

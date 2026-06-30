@@ -95,6 +95,61 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// DELETE /api/public/requests?orgId=UUID&pin=XXXX&requestId=UUID
+// Deletes a request that belongs to the employee identified by PIN (only pending)
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const orgId = searchParams.get('orgId');
+    const pin = searchParams.get('pin');
+    const requestId = searchParams.get('requestId');
+
+    if (!orgId || !pin || !requestId) {
+      return NextResponse.json({ error: 'Povinné parametry chybí: orgId, pin, requestId.' }, { status: 400 });
+    }
+
+    const supabase = getServiceClient();
+
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('organization_id', orgId)
+      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .maybeSingle();
+
+    if (empError || !employee) {
+      return NextResponse.json({ error: 'Zaměstnanec s tímto PINem nebyl nalezen.' }, { status: 404 });
+    }
+
+    // Verify the request belongs to this employee
+    const { data: existing } = await supabase
+      .from('requests')
+      .select('id, status')
+      .eq('id', requestId)
+      .eq('employee_id', employee.id)
+      .eq('organization_id', orgId)
+      .maybeSingle();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Žádost nebyla nalezena.' }, { status: 404 });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('requests')
+      .delete()
+      .eq('id', requestId);
+
+    if (deleteError) {
+      return NextResponse.json({ error: 'Nepodařilo se smazat žádost.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/public/requests error:', err);
+    return NextResponse.json({ error: 'Interní chyba serveru.' }, { status: 500 });
+  }
+}
+
 // GET /api/public/requests?orgId=UUID&pin=XXXX
 // Returns requests for the employee identified by PIN
 export async function GET(req: NextRequest) {
