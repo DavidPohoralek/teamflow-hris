@@ -17,15 +17,25 @@ interface AttendanceRecord {
   category: string;
 }
 
+interface BenefitDef {
+  key: string;
+  czLabel: string;
+  enLabel: string;
+  hoursPerUnit: number;
+  maxPerMonth: number | null;
+}
+
 interface EmployeeHoursData {
   name: string;
   thisMonth: {
     hours: number;
     days: number;
+    monthKey?: string;
   };
   lastMonth: {
     hours: number;
     days: number;
+    monthKey?: string;
   };
   records: AttendanceRecord[];
   vacation?: {
@@ -33,6 +43,7 @@ interface EmployeeHoursData {
     used: number;
     remaining: number;
   };
+  benefits?: BenefitDef[];
 }
 
 type RequestStatus = 'pending' | 'approved' | 'rejected';
@@ -88,6 +99,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
+  // Benefit counts: { [benefit_key]: count }
+  const [benefitCounts, setBenefitCounts] = useState<Record<string, number>>({});
+  const [benefitSaving, setBenefitSaving] = useState<string | null>(null);
 
   const handleNumpad = (key: string) => {
     if (key === '⌫') {
@@ -119,12 +133,15 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           thisMonth: {
             hours: json.thisMonth?.hours ?? 0,
             days: json.thisMonth?.days ?? 0,
+            monthKey: json.thisMonth?.monthKey,
           },
           lastMonth: {
             hours: json.lastMonth?.hours ?? 0,
             days: json.lastMonth?.days ?? 0,
+            monthKey: json.lastMonth?.monthKey,
           },
           vacation: json.vacation ?? undefined,
+          benefits: json.benefits ?? [],
           records: (json.recentLogs ?? json.records ?? []).map((l: {
             date: string; check_in?: string | null; arrival?: string | null;
             check_out?: string | null; departure?: string | null;
@@ -140,6 +157,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
         };
         setData(normalized);
         fetchRequests(enteredPin);
+        if (normalized.thisMonth.monthKey) {
+          fetchBenefitCounts(enteredPin, normalized.thisMonth.monthKey);
+        }
       } else if (res.status === 401 || res.status === 404) {
         setError('Nesprávný PIN. Zkuste to znovu.');
         setPin('');
@@ -174,11 +194,36 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     }
   };
 
+  const fetchBenefitCounts = async (currentPin: string, month: string) => {
+    try {
+      const res = await fetch(`/api/public/employee-benefits?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(currentPin)}&month=${encodeURIComponent(month)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setBenefitCounts(json.counts ?? {});
+      }
+    } catch { /* ignore */ }
+  };
+
+  const saveBenefitCount = async (benefitKey: string, count: number) => {
+    if (!data?.thisMonth.monthKey) return;
+    setBenefitSaving(benefitKey);
+    try {
+      await fetch('/api/public/employee-benefits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, pin, month: data.thisMonth.monthKey, benefit_key: benefitKey, count }),
+      });
+      setBenefitCounts((prev) => ({ ...prev, [benefitKey]: count }));
+    } catch { /* ignore */ }
+    finally { setBenefitSaving(null); }
+  };
+
   const handleBack = () => {
     setData(null);
     setPin('');
     setError('');
     setRequests([]);
+    setBenefitCounts({});
   };
 
   // Get current month name
@@ -227,6 +272,70 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
               <p className="text-xs text-slate-400 mt-0.5 capitalize hidden sm:block">{lastMonthName}</p>
             </div>
           </div>
+
+          {/* Benefits section */}
+          {data.benefits && data.benefits.length > 0 && (
+            <div className="px-4 sm:px-6 pb-3">
+              {(() => {
+                const totalImpact = data.benefits!.reduce((sum, b) => {
+                  const count = benefitCounts[b.key] ?? 0;
+                  return sum + count * b.hoursPerUnit;
+                }, 0);
+                const BENEFIT_ICONS: Record<string, string> = { blood: '🩸', english: '🇬🇧', gym: '🏋️' };
+                return (
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-white">
+                      <span className="text-sm font-semibold text-slate-700">Aktivity tento měsíc</span>
+                      {totalImpact !== 0 && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${totalImpact < 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                          Dopad: {totalImpact > 0 ? '+' : ''}{totalImpact.toFixed(2)} h
+                        </span>
+                      )}
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {data.benefits!.map((b) => {
+                        const count = benefitCounts[b.key] ?? 0;
+                        const impact = count * b.hoursPerUnit;
+                        const isSaving = benefitSaving === b.key;
+                        const max = b.maxPerMonth ?? 99;
+                        return (
+                          <div key={b.key} className="flex items-center gap-3 px-4 py-3">
+                            <span className="text-xl shrink-0">{BENEFIT_ICONS[b.key] ?? '📌'}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800">{b.czLabel}</p>
+                              {count > 0 && (
+                                <p className={`text-xs font-semibold mt-0.5 ${impact < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                  {count}× = {impact > 0 ? '+' : ''}{impact.toFixed(2)} h
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => count > 0 && saveBenefitCount(b.key, count - 1)}
+                                disabled={count === 0 || isSaving}
+                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-lg flex items-center justify-center hover:bg-red-50 hover:border-red-300 hover:text-red-600 disabled:opacity-30 transition-colors"
+                              >−</button>
+                              <span className="w-8 text-center text-sm font-bold text-slate-800">
+                                {isSaving ? <span className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : count}
+                              </span>
+                              <button
+                                onClick={() => count < max && saveBenefitCount(b.key, count + 1)}
+                                disabled={count >= max || isSaving}
+                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-lg flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-30 transition-colors"
+                              >+</button>
+                              {b.maxPerMonth && (
+                                <span className="text-xs text-slate-400 ml-1">/ {b.maxPerMonth}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Attendance table */}
           <div className="flex-1 overflow-auto px-4 sm:px-6 pb-2">

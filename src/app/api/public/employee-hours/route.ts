@@ -171,6 +171,30 @@ export async function GET(req: NextRequest) {
     const vacationTotal = (employee as { vacation_days_per_year?: number }).vacation_days_per_year ?? 20
     const vacationRemaining = Math.max(0, vacationTotal - vacationUsed)
 
+    // Fetch benefit config from company_settings
+    const { data: settingsRow } = await supabase
+      .from('company_settings')
+      .select('extra_settings')
+      .eq('organization_id', orgId)
+      .maybeSingle()
+    const extra = (settingsRow as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {}
+
+    const BENEFIT_DEFS = [
+      { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',   hoursKey: 'benefit_blood_hours',   maxKey: 'benefit_blood_max' },
+      { key: 'english', czLabel: 'Angličtina',      enLabel: 'English lessons',  hoursKey: 'benefit_english_hours', maxKey: 'benefit_english_max' },
+      { key: 'gym',     czLabel: 'Cvičení',         enLabel: 'Gym',              hoursKey: 'benefit_gym_hours',     maxKey: 'benefit_gym_max' },
+    ]
+
+    const benefits = BENEFIT_DEFS
+      .map((b) => ({
+        key: b.key,
+        czLabel: b.czLabel,
+        enLabel: b.enLabel,
+        hoursPerUnit: extra[b.hoursKey] != null ? Number(extra[b.hoursKey]) : null,
+        maxPerMonth: extra[b.maxKey] != null ? Number(extra[b.maxKey]) : null,
+      }))
+      .filter((b) => b.hoursPerUnit != null)
+
     return NextResponse.json({
       employee: {
         name: employee.name,
@@ -184,13 +208,16 @@ export async function GET(req: NextRequest) {
         hours: thisStats.hours,
         days: thisStats.days,
         monthName: czechMonthName(thisYear, thisMonthNum),
+        monthKey: `${thisYear}-${String(thisMonthNum).padStart(2, '0')}`,
       },
       lastMonth: {
         hours: lastStats.hours,
         days: lastStats.days,
         monthName: czechMonthName(lastYear, lastMonthNum),
+        monthKey: `${lastYear}-${String(lastMonthNum).padStart(2, '0')}`,
       },
       recentLogs,
+      benefits,
     })
   } catch (err) {
     console.error('employee-hours unexpected error:', err)
