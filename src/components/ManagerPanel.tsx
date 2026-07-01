@@ -302,6 +302,22 @@ const CATEGORY_COLORS: Record<string, string> = {
   absence: 'bg-red-100 text-red-800',
 };
 
+function formatRequestNote(raw: string | null | undefined): { short: string; full: string } {
+  if (!raw) return { short: '—', full: '' };
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    const parts: string[] = [];
+    if (obj.timeIn && obj.timeIn !== '--:--') parts.push(`Příchod: ${obj.timeIn}`);
+    if (obj.timeOut && obj.timeOut !== '--:--') parts.push(`Odchod: ${obj.timeOut}`);
+    const userNote = typeof obj.userNote === 'string' ? obj.userNote.trim() : '';
+    if (userNote) parts.push(userNote);
+    const full = parts.join(' · ') || raw;
+    return { short: full.length > 60 ? full.slice(0, 60) + '…' : full, full };
+  } catch {
+    return { short: raw.length > 60 ? raw.slice(0, 60) + '…' : raw, full: raw };
+  }
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanelProps & { initialTab?: 'notifications' }) {
@@ -1393,7 +1409,9 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.date_from}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.date_to ?? '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.hours ? `${req.hours}h` : '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{req.note ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs">
+                      {(() => { const { short, full } = formatRequestNote(req.note); return <span title={full || undefined}>{short}</span>; })()}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                       {new Date(req.created_at).toLocaleDateString('cs-CZ')}
                     </td>
