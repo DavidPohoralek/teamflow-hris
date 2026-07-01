@@ -29,20 +29,17 @@ export async function POST(req: NextRequest) {
 
     const supabase = getServiceClient()
 
-    // Find employee by pin + org
+    // Find employee by pin + org (active only — avoids .single() failing on duplicate PINs across active/inactive rows)
     const { data: employee, error: empError } = await supabase
       .from('employees')
       .select('id, name, active')
       .eq('organization_id', orgId)
+      .eq('active', true)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
-      .single()
+      .maybeSingle()
 
     if (empError || !employee) {
       return NextResponse.json({ ok: false, error: 'Neplatný PIN kód' }, { status: 401 })
-    }
-
-    if (!employee.active) {
-      return NextResponse.json({ ok: false, error: 'Váš účet není aktivní' }, { status: 403 })
     }
 
     const today = new Date().toISOString().split('T')[0]
