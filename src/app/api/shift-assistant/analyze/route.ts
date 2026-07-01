@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
     });
   }
   const orgSettings = buildSettings(settingsRes.data);
-  const draftDays = buildDraftDays(month, draftRes.data ?? [], draft, scheduleDaysRes.data ?? [], confirmedByDate, orgSettings);
+  const draftDays = buildDraftDays(month, draftRes.data ?? [], draft, scheduleDaysRes.data ?? [], confirmedByDate, orgSettings, employees);
 
   const settings = orgSettings;
 
@@ -155,7 +155,10 @@ function buildDraftDays(
   scheduleDays: Record<string, unknown>[],
   confirmedByDate: Record<string, { count: number; employeeIds: string[]; shifts: { employeeId: string; workType: string; startTime: string; endTime: string }[] }>,
   orgSettings: Record<string, unknown> = {},
+  employees: { id: string; labels: string[] }[] = [],
 ) {
+  // Build employee label index for fast lookup
+  const empLabels = new Map<string, string[]>(employees.map(e => [e.id, e.labels]));
   // Build a Set of closed dates from settings (holidays / manually closed days)
   // closed_dates is stored as a comma-separated string e.g. "2026-07-06,2026-12-25"
   const rawClosedDates = orgSettings.closed_dates;
@@ -251,6 +254,9 @@ function buildDraftDays(
     ).length;
     const assignedCount = prodejnaConfirmedCount + draftSlot.prodejnaIds.length;
 
+    // totalAssignedCount = everyone scheduled (all work types, confirmed + draft), deduplicated
+    const totalAssignedCount = allAssignedIds.length;
+
     // ── Evening coverage pre-calculation ──────────────────────────────────────
     // Who from confirmed shifts covers the evening window (startTime ≤ eveningStart, endTime ≥ eveningEnd)?
     const allShifts = confirmed?.shifts ?? [];
@@ -268,11 +274,31 @@ function buildDraftDays(
         s.endTime >= eveningEnd
       ).length;
 
-      // Candidates: non-Prodejna workers with the eveningLabel in their workType or who could extend
-      // (their shift ends before eveningEnd but at or after eveningStart — they overlap the window)
+      // Candidates for the evening slot — two groups:
+      // 1. Non-Prodejna workers with the Prodejna employee label whose day shift ends
+      //    at or before eveningStart (they're free by the time the evening starts)
+      // 2. Any non-Prodejna worker whose shift ends inside the evening window
+      //    (they're partially available — can stay on)
+      const hasEveningLabel = (empId: string) => {
+        const labels = empLabels.get(empId) ?? [];
+        return labels.some(l => l.toLowerCase().replace(/\s+/g, '') === eveningLabel.toLowerCase().replace(/\s+/g, ''));
+      };
+
       const candidates = allShifts
-        .filter(s => !isProdejnaType(s.workType) && s.endTime >= eveningStart && s.endTime < eveningEnd)
-        .map(s => ({ employeeId: s.employeeId, workType: s.workType, shiftEnd: s.endTime }));
+        .filter(s => !isProdejnaType(s.workType))
+        .filter(s =>
+          // Group 1: has Prodejna label + ends at or before evening start (free for evening)
+          (hasEveningLabel(s.employeeId) && s.endTime <= eveningStart) ||
+          // Group 2: shift overlaps but doesn't cover full evening window
+          (s.endTime > eveningStart && s.endTime < eveningEnd)
+        )
+        .map(s => ({
+          employeeId: s.employeeId,
+          workType: s.workType,
+          shiftEnd: s.endTime,
+          hasProdejnaLabel: hasEveningLabel(s.employeeId),
+          freeForEvening: s.endTime <= eveningStart,
+        }));
 
       eveningCoverage = {
         enabled: true,
@@ -293,7 +319,8 @@ function buildDraftDays(
       startTime: meta?.startTime ?? null,
       endTime: meta?.endTime ?? null,
       assignedEmployees: allAssignedIds,
-      assignedCount,
+      assignedCount,          // Prodejna-only count (for min-Prodejna-staff check)
+      totalAssignedCount,     // all work types combined (so bot knows total coverage)
       confirmedShifts: allShifts,
       eveningCoverage,
     });
