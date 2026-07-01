@@ -889,9 +889,6 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                         <p className="text-sm font-semibold text-slate-800">{from}{to ? ` — ${to}` : ''}</p>
                         <p className="text-xs text-slate-400 mt-0.5">{days} {days === 1 ? t('den', 'day') : days < 5 ? t('dny', 'days') : t('dní', 'days')}</p>
                       </div>
-                      <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLE[req.status] ?? STATUS_STYLE.pending}`}>
-                        {STATUS_LABEL[req.status] ?? req.status}
-                      </span>
                       {(req.status === 'pending' || req.status === 'approved') && (
                         <button
                           onClick={() => handleDeleteRequest(req.id)}
@@ -905,6 +902,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                           }
                         </button>
                       )}
+                      <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLE[req.status] ?? STATUS_STYLE.pending}`}>
+                        {STATUS_LABEL[req.status] ?? req.status}
+                      </span>
                     </div>
                   );
                 })}
