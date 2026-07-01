@@ -116,6 +116,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Zaměstnanec nenalezen.' }, { status: 404 });
   }
 
+  // Duplicate check: same employee + date + overlapping time
+  const { data: existing } = await supabase
+    .from('work_plans')
+    .select('id, start_time, end_time')
+    .eq('organization_id', profile.organization_id)
+    .eq('employee_id', employee_id)
+    .eq('date', date)
+    .eq('active', true);
+
+  if (existing?.length) {
+    const newStart = start_time ?? null;
+    const newEnd = end_time ?? null;
+    const duplicate = existing.some((e: { start_time: string | null; end_time: string | null }) =>
+      e.start_time === newStart && e.end_time === newEnd
+    );
+    if (duplicate) {
+      return NextResponse.json({ error: 'Tato směna již existuje (stejný čas).' }, { status: 409 });
+    }
+  }
+
   const { data, error } = await supabase
     .from('work_plans')
     .insert({

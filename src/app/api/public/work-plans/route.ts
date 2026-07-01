@@ -89,6 +89,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Typ práce nebyl nalezen.' }, { status: 404 })
   }
 
+  // Duplicate check: same employee + date + same start/end time
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existing } = await (supabase as any)
+    .from('work_plans')
+    .select('id, start_time, end_time')
+    .eq('organization_id', orgId)
+    .eq('employee_id', employeeId)
+    .eq('date', date)
+    .eq('active', true)
+
+  if (existing?.length) {
+    const dup = existing.some((e: { start_time: string | null; end_time: string | null }) =>
+      e.start_time === (startTime ?? null) && e.end_time === (endTime ?? null)
+    )
+    if (dup) {
+      return NextResponse.json({ error: 'Tato směna již existuje (stejný čas).' }, { status: 409 })
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('work_plans')

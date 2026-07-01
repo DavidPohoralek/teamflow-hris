@@ -718,7 +718,7 @@ interface DayCardProps {
   orgId?: string;
   onClickDay?: (dateStr: string) => void;
   onEditDay?: (dateStr: string) => void;
-  onRemoveEmployee?: (dateStr: string, employeeId: string) => void;
+  onRemoveEmployee?: (dateStr: string, entryId: string) => void;
   onCopyEntry?: (entry: ClipboardEntry) => void;
   onPaste?: (dateStr: string) => void;
   isMyVacation?: boolean;
@@ -913,7 +913,7 @@ function EntryChip({
   isManagerMode: boolean;
   sessionEmployeeId?: string;
   dateStr: string;
-  onRemoveEmployee?: (dateStr: string, employeeId: string) => void;
+  onRemoveEmployee?: (dateStr: string, entryId: string) => void;
   onCopyEntry?: (entry: ClipboardEntry) => void;
   t: (cz: string, en: string) => string;
   isEvening?: boolean;
@@ -959,7 +959,7 @@ function EntryChip({
           )}
           {onRemoveEmployee && (isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
             <button
-              onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.employeeId); }}
+              onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.id); }}
               className="text-slate-400 hover:text-red-500"
               aria-label={`Odebrat ${entry.employeeName ?? entry.employeeId}`}
               title={t('Odebrat ze dne', 'Remove from day')}
@@ -1416,22 +1416,21 @@ export default function WorkPlanGrid({
     }
   }, [clipboard, orgId, isManagerMode, sessionPin, fetchSchedule]);
 
-  const handleRemoveEmployee = useCallback(async (dateStr: string, employeeId: string) => {
-    const entry = data?.workPlans.find((wp) => wp.date === dateStr && wp.employeeId === employeeId);
-    if (!entry?.id) return;
-    const res = await managerFetch(`/api/public/work-plans?workPlanId=${entry.id}&orgId=${orgId}`, {
+  const handleRemoveEmployee = useCallback(async (_dateStr: string, entryId: string) => {
+    if (!entryId) return;
+    const res = await managerFetch(`/api/public/work-plans?workPlanId=${entryId}&orgId=${orgId}`, {
       method: 'DELETE',
     });
     if (res.ok) await fetchSchedule();
-  }, [data, orgId, fetchSchedule]);
+  }, [orgId, fetchSchedule]);
 
   // PIN-authenticated delete: employee removes only their own shift
-  const handleRemoveEmployeeSelf = useCallback(async (dateStr: string, employeeId: string) => {
-    if (!sessionPin || !sessionEmployee || sessionEmployee.id !== employeeId) return;
-    const entry = data?.workPlans.find((wp) => wp.date === dateStr && wp.employeeId === employeeId);
-    if (!entry?.id) return;
+  const handleRemoveEmployeeSelf = useCallback(async (_dateStr: string, entryId: string) => {
+    if (!sessionPin || !sessionEmployee || !entryId) return;
+    const entry = data?.workPlans.find((wp) => wp.id === entryId);
+    if (!entry || entry.employeeId !== sessionEmployee.id) return;
     const res = await fetch(
-      `/api/public/work-plans?workPlanId=${entry.id}&orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}`,
+      `/api/public/work-plans?workPlanId=${entryId}&orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}`,
       { method: 'DELETE' }
     );
     if (res.ok) await fetchSchedule();
