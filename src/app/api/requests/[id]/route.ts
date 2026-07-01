@@ -146,23 +146,50 @@ export async function PUT(
     return NextResponse.json({ error: 'Nepodařilo se aktualizovat žádost.' }, { status: 500 });
   }
 
-  // When a correction request is approved, create an attendance_log entry
+  // When a correction request is approved, update the linked attendance_log or insert a new one
   if (status === 'approved' && existing.type === 'correction') {
     let timeIn: string | null = null;
     let timeOut: string | null = null;
+    let correctionField: 'check_in' | 'check_out' | 'both' = 'both';
+    let linkedLogId: string | null = null;
 
     try {
       const parsed = JSON.parse(existing.note ?? '');
       timeIn = parsed.timeIn ?? null;
       timeOut = parsed.timeOut ?? null;
+      correctionField = parsed.field ?? 'both';
+      linkedLogId = parsed.linkedLogId ?? null;
     } catch {
+      // Legacy format fallback — extract two times from plain text
       const m = (existing.note ?? '').match(/(\d{2}:\d{2}).*?(\d{2}:\d{2})/);
       if (m) { timeIn = m[1]; timeOut = m[2]; }
     }
 
-    if (timeIn && timeOut) {
-      const date: string = existing.date_from;
-      const svc = getServiceClient();
+    const date: string = existing.date_from;
+    const svc = getServiceClient();
+
+    if (linkedLogId) {
+      // UPDATE the specific linked log — only patch the corrected field(s)
+      const patch: Record<string, string> = {};
+      if ((correctionField === 'check_in' || correctionField === 'both') && timeIn) {
+        patch.check_in = `${date}T${timeIn}:00`;
+      }
+      if ((correctionField === 'check_out' || correctionField === 'both') && timeOut) {
+        patch.check_out = `${date}T${timeOut}:00`;
+      }
+      if (Object.keys(patch).length > 0) {
+        const { error: logError } = await svc
+          .from('attendance_logs')
+          .update(patch)
+          .eq('id', linkedLogId)
+          .eq('organization_id', orgId)
+          .eq('employee_id', existing.employee_id);
+        if (logError) {
+          console.error('Correction attendance_log update error:', logError.message, logError);
+        }
+      }
+    } else if (timeIn && timeOut) {
+      // No linked log (old behaviour or both-field correction) → insert new record
       const { error: logError } = await svc.from('attendance_logs').insert({
         organization_id: orgId,
         employee_id: existing.employee_id,
