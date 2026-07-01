@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useT } from '@/lib/i18n';
+import { managerFetch } from '@/lib/managerFetch';
 
 interface PresenceRecord {
   id: string;
@@ -94,6 +95,39 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const openEdit = (record: PresenceRecord) => {
+    setEditingId(record.id);
+    setEditCheckIn(new Date(record.checkInTime).toTimeString().slice(0, 5));
+    setEditCheckOut('');
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async (record: PresenceRecord) => {
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const date = new Date(record.checkInTime).toISOString().slice(0, 10);
+      const body: Record<string, string> = {
+        check_in: `${date}T${editCheckIn}:00`,
+      };
+      if (editCheckOut) body.check_out = `${date}T${editCheckOut}:00`;
+      const res = await managerFetch(`/api/attendance/${record.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) { setEditError(json.error ?? t('Chyba při ukládání.', 'Save error.')); return; }
+      setEditingId(null);
+      await fetchPresence();
+    } catch { setEditError(t('Síťová chyba.', 'Network error.')); }
+    finally { setEditSaving(false); }
+  };
 
   useEffect(() => {
     fetch(`/api/work-types?orgId=${encodeURIComponent(orgId)}`)
@@ -364,7 +398,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                   <div className="mt-3 border-t border-gray-100 pt-3">
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-gray-500"><span className="font-medium text-gray-600">ID:</span> {record.employeeId}</div>
-                      <button onClick={() => setEditingId(isEditing ? null : record.id)} className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                      <button onClick={() => isEditing ? setEditingId(null) : openEdit(record)} className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                         {isEditing ? t('Zavřít', 'Close') : t('Upravit', 'Edit')}
                       </button>
                     </div>
@@ -374,14 +408,17 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <label className="block mb-1 text-gray-500">{t('Příchod', 'Clock in')}</label>
-                            <input type="time" defaultValue={new Date(record.checkInTime).toTimeString().slice(0, 5)} className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" />
+                            <input type="time" value={editCheckIn} onChange={(e) => setEditCheckIn(e.target.value)} className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" />
                           </div>
                           <div className="flex-1">
                             <label className="block mb-1 text-gray-500">{t('Odchod', 'Clock out')}</label>
-                            <input type="time" className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" placeholder="—" />
+                            <input type="time" value={editCheckOut} onChange={(e) => setEditCheckOut(e.target.value)} className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" />
                           </div>
                         </div>
-                        <button className="mt-1 w-full rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors">{t('Uložit změny', 'Save changes')}</button>
+                        {editError && <p className="text-red-500">{editError}</p>}
+                        <button onClick={() => handleSaveEdit(record)} disabled={editSaving} className="mt-1 w-full rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                          {editSaving ? '…' : t('Uložit změny', 'Save changes')}
+                        </button>
                       </div>
                     )}
                   </div>
