@@ -110,63 +110,6 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Also surface employees with a planned HO work_plan for today (within planned hours)
-  // even if they haven't submitted a kiosk record yet
-  {
-    const presentIds = new Set(present.map((p) => p.employeeId));
-
-    const { data: orgEmps } = await supabase
-      .from('employees')
-      .select('id, name')
-      .eq('organization_id', orgId)
-      .eq('active', true);
-
-    if (orgEmps && orgEmps.length > 0) {
-      const empIdToName = new Map(orgEmps.map((e: { id: string; name: string }) => [e.id, e.name]));
-      const empIds = orgEmps.map((e: { id: string }) => e.id);
-
-      const { data: hoPlans } = await supabase
-        .from('work_plans')
-        .select('employee_id, work_type, start_time, end_time')
-        .in('employee_id', empIds)
-        .eq('date', today)
-        .eq('active', true);
-
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${hh}:${mm}:00`;
-
-      for (const plan of (hoPlans ?? []) as { employee_id: string; work_type?: string; start_time?: string | null; end_time?: string | null }[]) {
-        const wt = plan.work_type ?? '';
-        const n = wt.toLowerCase().replace(/\s+/g, '');
-        if (n !== 'ho' && n !== 'homeoffice') continue;
-        if (presentIds.has(plan.employee_id)) continue;
-
-        const start = plan.start_time ?? null;
-        const end = plan.end_time ?? null;
-        const withinWindow = start && end
-          ? currentTimeStr >= start && currentTimeStr <= end
-          : true;
-        if (!withinWindow) continue;
-
-        const checkIn = `${today}T${start ?? '00:00:00'}`;
-        const duration = start
-          ? Math.max(0, Math.floor((now.getTime() - new Date(checkIn).getTime()) / 60000))
-          : 0;
-
-        present.push({
-          employeeId: plan.employee_id,
-          employeeName: empIdToName.get(plan.employee_id) ?? 'Neznámý zaměstnanec',
-          workTypeName: wt || 'HomeOffice',
-          workTypeColor: null,
-          checkIn,
-          duration,
-          planned: true,
-        });
-        presentIds.add(plan.employee_id);
-      }
-    }
-  }
 
   // Souhrn podle typu práce
   const byWorkTypeMap = new Map<
