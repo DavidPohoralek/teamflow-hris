@@ -200,7 +200,7 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
     const cur = new Date(from + 'T00:00:00');
     const last = new Date(end + 'T00:00:00');
     while (cur <= last) {
-      const d = cur.toISOString().slice(0, 10);
+      const d = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
       if (shiftDays.has(d)) result.push(d);
       cur.setDate(cur.getDate() + 1);
     }
