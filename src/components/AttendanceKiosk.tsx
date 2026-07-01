@@ -123,8 +123,10 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
   // HomeOffice retrospective form
   const [hoFormDate, setHoFormDate] = useState('');
+  const [hoFormMode, setHoFormMode] = useState<'range' | 'hours'>('range');
   const [hoFormStart, setHoFormStart] = useState('');
   const [hoFormEnd, setHoFormEnd] = useState('');
+  const [hoFormHours, setHoFormHours] = useState('');
   const [hoFormSummary, setHoFormSummary] = useState('');
   const [hoFormError, setHoFormError] = useState('');
   const [hoFormWorkTypeId, setHoFormWorkTypeId] = useState('');
@@ -313,19 +315,42 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
   const handleHoRecord = async () => {
     setHoFormError('');
-    if (!hoFormStart || !hoFormEnd) {
-      setHoFormError(t('Zadejte čas příchodu i odchodu.', 'Enter both start and end time.'));
-      return;
+
+    let startIso: string;
+    let endIso: string;
+
+    if (hoFormMode === 'hours') {
+      const hours = parseFloat(hoFormHours.replace(',', '.'));
+      if (!hoFormHours || isNaN(hours) || hours <= 0) {
+        setHoFormError(t('Zadejte platný počet hodin (např. 8 nebo 7,5).', 'Enter valid hours (e.g. 8 or 7.5).'));
+        return;
+      }
+      if (hours > 24) {
+        setHoFormError(t('Počet hodin nesmí přesáhnout 24.', 'Hours cannot exceed 24.'));
+        return;
+      }
+      const startTotalMins = 9 * 60;
+      const endTotalMins = startTotalMins + Math.round(hours * 60);
+      const sh = Math.floor(startTotalMins / 60), sm = startTotalMins % 60;
+      const eh = Math.floor(endTotalMins / 60) % 24, em = endTotalMins % 60;
+      startIso = new Date(`${hoFormDate}T${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`).toISOString();
+      endIso = new Date(`${hoFormDate}T${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`).toISOString();
+    } else {
+      if (!hoFormStart || !hoFormEnd) {
+        setHoFormError(t('Zadejte čas příchodu i odchodu.', 'Enter both start and end time.'));
+        return;
+      }
+      if (hoFormEnd <= hoFormStart) {
+        setHoFormError(t('Čas odchodu musí být po čase příchodu.', 'End time must be after start time.'));
+        return;
+      }
+      // Convert local HH:MM times to UTC ISO so the server stores correct timestamps
+      startIso = new Date(`${hoFormDate}T${hoFormStart}`).toISOString();
+      endIso = new Date(`${hoFormDate}T${hoFormEnd}`).toISOString();
     }
-    if (hoFormEnd <= hoFormStart) {
-      setHoFormError(t('Čas odchodu musí být po čase příchodu.', 'End time must be after start time.'));
-      return;
-    }
+
     setHoLoading(true);
     try {
-      // Convert local HH:MM times to UTC ISO so the server stores correct timestamps
-      const startIso = new Date(`${hoFormDate}T${hoFormStart}`).toISOString();
-      const endIso = new Date(`${hoFormDate}T${hoFormEnd}`).toISOString();
 
       const res = await fetch('/api/public/kiosk', {
         method: 'POST',
@@ -572,41 +597,87 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             </div>
           </div>
 
-          {/* Time range */}
+          {/* Time range / Hours toggle */}
           <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-            <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
-            <div className="flex gap-3 items-center">
-              <div className="flex-1 flex flex-col gap-1">
-                <span className="text-slate-400 text-xs">{t('Od', 'From')}</span>
-                <input
-                  type="time"
-                  value={hoFormStart}
-                  onChange={(e) => setHoFormStart(e.target.value)}
-                  className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
-                />
-              </div>
-              <span className="text-slate-500 text-2xl mt-4">–</span>
-              <div className="flex-1 flex flex-col gap-1">
-                <span className="text-slate-400 text-xs">{t('Do', 'To')}</span>
-                <input
-                  type="time"
-                  value={hoFormEnd}
-                  onChange={(e) => setHoFormEnd(e.target.value)}
-                  className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
-                />
+            <div className="flex items-center justify-between">
+              <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
+              <div className="flex rounded-lg overflow-hidden border border-slate-600 text-sm">
+                <button
+                  onClick={() => setHoFormMode('range')}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'range' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                >
+                  {t('Od / Do', 'From / To')}
+                </button>
+                <button
+                  onClick={() => setHoFormMode('hours')}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'hours' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                >
+                  {t('Počet hodin', 'Total hours')}
+                </button>
               </div>
             </div>
-            {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (
-              <p className="text-emerald-400 text-sm text-center">
-                {(() => {
-                  const [sh, sm] = hoFormStart.split(':').map(Number);
-                  const [eh, em] = hoFormEnd.split(':').map(Number);
-                  const totalMins = (eh * 60 + em) - (sh * 60 + sm);
-                  const h = Math.floor(totalMins / 60);
-                  const m = totalMins % 60;
-                  return `${t('Celkem', 'Total')}: ${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m` : ''}`;
-                })()}
-              </p>
+
+            {hoFormMode === 'range' ? (
+              <>
+                <div className="flex gap-3 items-center">
+                  <div className="flex-1 flex flex-col gap-1">
+                    <span className="text-slate-400 text-xs">{t('Od', 'From')}</span>
+                    <input
+                      type="time"
+                      value={hoFormStart}
+                      onChange={(e) => setHoFormStart(e.target.value)}
+                      className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                    />
+                  </div>
+                  <span className="text-slate-500 text-2xl mt-4">–</span>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <span className="text-slate-400 text-xs">{t('Do', 'To')}</span>
+                    <input
+                      type="time"
+                      value={hoFormEnd}
+                      onChange={(e) => setHoFormEnd(e.target.value)}
+                      className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                    />
+                  </div>
+                </div>
+                {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (
+                  <p className="text-emerald-400 text-sm text-center">
+                    {(() => {
+                      const [sh, sm] = hoFormStart.split(':').map(Number);
+                      const [eh, em] = hoFormEnd.split(':').map(Number);
+                      const totalMins = (eh * 60 + em) - (sh * 60 + sm);
+                      const h = Math.floor(totalMins / 60);
+                      const m = totalMins % 60;
+                      return `${t('Celkem', 'Total')}: ${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m` : ''}`;
+                    })()}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1">
+                  <span className="text-slate-400 text-xs">{t('Odpracováno hodin', 'Hours worked')}</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0.5"
+                      max="24"
+                      step="0.5"
+                      value={hoFormHours}
+                      onChange={(e) => setHoFormHours(e.target.value)}
+                      placeholder="8"
+                      className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+                    />
+                    <span className="text-slate-400 text-base font-medium whitespace-nowrap">hod.</span>
+                  </div>
+                </div>
+                {hoFormHours && !isNaN(parseFloat(hoFormHours.replace(',', '.'))) && parseFloat(hoFormHours.replace(',', '.')) > 0 && (
+                  <p className="text-emerald-400 text-sm text-center">
+                    {t('Celkem', 'Total')}: {parseFloat(hoFormHours.replace(',', '.')).toLocaleString('cs-CZ')}h
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -637,7 +708,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             </button>
             <button
               onClick={handleHoRecord}
-              disabled={!hoFormDate || !hoFormStart || !hoFormEnd || hoLoading}
+              disabled={!hoFormDate || (hoFormMode === 'range' ? (!hoFormStart || !hoFormEnd) : (!hoFormHours || parseFloat(hoFormHours.replace(',', '.')) <= 0)) || hoLoading}
               className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {hoLoading
