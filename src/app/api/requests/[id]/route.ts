@@ -168,14 +168,20 @@ export async function PUT(
     const date: string = existing.date_from;
     const svc = getServiceClient();
 
+    // timeIn/timeOut may be a full UTC ISO string (new format) or legacy "HH:MM"
+    const toTimestamp = (t: string | null): string | null => {
+      if (!t) return null;
+      return t.includes('T') ? t : `${date}T${t}:00`;
+    };
+
     if (linkedLogId) {
       // UPDATE the specific linked log — only patch the corrected field(s)
       const patch: Record<string, string> = {};
       if ((correctionField === 'check_in' || correctionField === 'both') && timeIn) {
-        patch.check_in = `${date}T${timeIn}:00`;
+        patch.check_in = toTimestamp(timeIn)!;
       }
       if ((correctionField === 'check_out' || correctionField === 'both') && timeOut) {
-        patch.check_out = `${date}T${timeOut}:00`;
+        patch.check_out = toTimestamp(timeOut)!;
       }
       if (Object.keys(patch).length > 0) {
         const { error: logError } = await svc
@@ -194,8 +200,8 @@ export async function PUT(
         organization_id: orgId,
         employee_id: existing.employee_id,
         date,
-        check_in: `${date}T${timeIn}:00`,
-        check_out: `${date}T${timeOut}:00`,
+        check_in: toTimestamp(timeIn),
+        check_out: toTimestamp(timeOut),
         note: 'Oprava docházky (schváleno)',
       });
       if (logError) {

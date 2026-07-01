@@ -323,6 +323,10 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     }
     setHoLoading(true);
     try {
+      // Convert local HH:MM times to UTC ISO so the server stores correct timestamps
+      const startIso = new Date(`${hoFormDate}T${hoFormStart}`).toISOString();
+      const endIso = new Date(`${hoFormDate}T${hoFormEnd}`).toISOString();
+
       const res = await fetch('/api/public/kiosk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -333,8 +337,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           workTypeId: hoFormWorkTypeId || undefined,
           workTypeName: hoFormWorkTypeName || 'HomeOffice',
           date: hoFormDate,
-          startTime: hoFormStart,
-          endTime: hoFormEnd,
+          startTime: startIso,
+          endTime: endIso,
           note: hoFormSummary.trim() || null,
         }),
       });

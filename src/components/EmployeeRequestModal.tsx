@@ -122,6 +122,11 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
     : correctionField === 'check_out' ? !!timeOut
     : !!(timeIn && timeOut);
 
+  // Convert local HH:MM time on a given date to UTC ISO string so the server
+  // stores the correct timestamp regardless of server/DB timezone.
+  const localTimeToUtcIso = (date: string, time: string): string =>
+    new Date(`${date}T${time}`).toISOString();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedType || !dateFrom) return;
@@ -143,8 +148,10 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
           note: note || undefined,
           ...(isCorrection ? {
             correctionField,
-            timeIn: (correctionField === 'check_in' || correctionField === 'both') ? timeIn : undefined,
-            timeOut: (correctionField === 'check_out' || correctionField === 'both') ? timeOut : undefined,
+            timeIn: (correctionField === 'check_in' || correctionField === 'both') && timeIn
+              ? localTimeToUtcIso(dateFrom, timeIn) : undefined,
+            timeOut: (correctionField === 'check_out' || correctionField === 'both') && timeOut
+              ? localTimeToUtcIso(dateFrom, timeOut) : undefined,
             linkedLogId: linkedLog?.id ?? undefined,
           } : {}),
         }),

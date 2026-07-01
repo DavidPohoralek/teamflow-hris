@@ -123,7 +123,13 @@ export async function POST(req: NextRequest) {
       if (!startTime || !endTime) {
         return NextResponse.json({ ok: false, error: 'Zadejte čas příchodu i odchodu.' }, { status: 400 })
       }
-      if (endTime <= startTime) {
+
+      // startTime/endTime may be UTC ISO strings (new clients) or legacy "HH:MM"
+      const isIso = startTime.includes('T')
+      const startMs = isIso ? new Date(startTime).getTime() : (() => { const [h, m] = startTime.split(':').map(Number); return h * 3600000 + m * 60000 })()
+      const endMs = isIso ? new Date(endTime).getTime() : (() => { const [h, m] = endTime.split(':').map(Number); return h * 3600000 + m * 60000 })()
+
+      if (endMs <= startMs) {
         return NextResponse.json({ ok: false, error: 'Čas odchodu musí být po čase příchodu.' }, { status: 422 })
       }
 
@@ -141,11 +147,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: `Záznam pro ${date} již existuje.` }, { status: 409 })
       }
 
-      const checkIn = `${date}T${startTime}:00`
-      const checkOut = `${date}T${endTime}:00`
-      const [sh, sm] = startTime.split(':').map(Number)
-      const [eh, em] = endTime.split(':').map(Number)
-      const totalMins = (eh * 60 + em) - (sh * 60 + sm)
+      const checkIn = isIso ? startTime : `${date}T${startTime}:00`
+      const checkOut = isIso ? endTime : `${date}T${endTime}:00`
+      const totalMins = Math.round((endMs - startMs) / 60000)
       const durationHours = Math.round(totalMins / 6) / 10
       const h = Math.floor(totalMins / 60)
       const m = totalMins % 60
