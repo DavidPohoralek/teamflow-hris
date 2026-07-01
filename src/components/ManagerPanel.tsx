@@ -302,13 +302,24 @@ const CATEGORY_COLORS: Record<string, string> = {
   absence: 'bg-red-100 text-red-800',
 };
 
+function fmtCorrectionTime(t: unknown): string | null {
+  if (!t || typeof t !== 'string' || t === '--:--') return null;
+  if (t.includes('T')) {
+    try { return new Date(t).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }); }
+    catch { return null; }
+  }
+  return t;
+}
+
 function formatRequestNote(raw: string | null | undefined): { short: string; full: string } {
   if (!raw) return { short: '—', full: '' };
   try {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     const parts: string[] = [];
-    if (obj.timeIn && obj.timeIn !== '--:--') parts.push(`Příchod: ${obj.timeIn}`);
-    if (obj.timeOut && obj.timeOut !== '--:--') parts.push(`Odchod: ${obj.timeOut}`);
+    const timeInStr = fmtCorrectionTime(obj.timeIn);
+    const timeOutStr = fmtCorrectionTime(obj.timeOut);
+    if (timeInStr) parts.push(`Příchod: ${timeInStr}`);
+    if (timeOutStr) parts.push(`Odchod: ${timeOutStr}`);
     const userNote = typeof obj.userNote === 'string' ? obj.userNote.trim() : '';
     if (userNote) parts.push(userNote);
     const full = parts.join(' · ') || raw;
