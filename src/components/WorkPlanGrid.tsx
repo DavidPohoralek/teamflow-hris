@@ -1230,9 +1230,8 @@ export default function WorkPlanGrid({
   const [myVacation, setMyVacation] = useState(false);
   const [vacationDates, setVacationDates] = useState<Set<string>>(new Set());
 
-  // Department filter
+  // Shift-type filter (pills show unique work type names from current month's schedule)
   const [deptFilter, setDeptFilter] = useState<string | null>(null);
-  const [empDeptMap, setEmpDeptMap] = useState<Record<string, string>>({});
   const [departments, setDepartments] = useState<string[]>([]);
 
   // Mobile week view — start on Monday of current week
@@ -1293,18 +1292,13 @@ export default function WorkPlanGrid({
     fetchWorkTypes();
   }, [fetchWorkTypes]);
 
-  // Build department map from schedule data whenever it loads
+  // Build pill list from unique work type names in the current month's schedule
   useEffect(() => {
     if (!data) return;
-    const map: Record<string, string> = {};
     const depts = new Set<string>();
     for (const entry of data.workPlans) {
-      if (entry.employeeDepartment) {
-        map[entry.employeeId] = entry.employeeDepartment;
-        depts.add(entry.employeeDepartment);
-      }
+      if (entry.workTypeName) depts.add(entry.workTypeName);
     }
-    setEmpDeptMap(map);
     setDepartments(Array.from(depts).sort());
   }, [data]);
 
@@ -1625,7 +1619,7 @@ export default function WorkPlanGrid({
                 let es = myShiftsOnly && sessionEmployee
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
-                if (deptFilter) es = es.filter((e) => empDeptMap[e.employeeId] === deptFilter);
+                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
                 return es;
               })();
               const dayLong = DAY_NAMES_LONG[wd];
@@ -1929,7 +1923,7 @@ export default function WorkPlanGrid({
                 let es = myShiftsOnly && sessionEmployee
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
-                if (deptFilter) es = es.filter((e) => empDeptMap[e.employeeId] === deptFilter);
+                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
                 return es;
               })();
               return (
