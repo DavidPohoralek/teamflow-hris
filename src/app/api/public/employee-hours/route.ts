@@ -77,13 +77,14 @@ export async function GET(req: NextRequest) {
 
     const supabase = getServiceClient()
 
-    // Lookup employee by PIN + org
+    // Lookup employee by PIN + org (active only — .single() fails if multiple rows match)
     const { data: employee, error: empError } = await supabase
       .from('employees')
       .select('id, name, active, vacation_days_per_year')
       .eq('organization_id', orgId)
+      .eq('active', true)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
-      .single()
+      .maybeSingle()
 
     if (empError || !employee) {
       return NextResponse.json({ error: 'Nesprávný PIN' }, { status: 401 })

@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       .from('employees')
       .select('id')
       .eq('organization_id', orgId)
+      .eq('active', true)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
       .maybeSingle();
 
@@ -122,6 +123,7 @@ export async function DELETE(req: NextRequest) {
       .from('employees')
       .select('id')
       .eq('organization_id', orgId)
+      .eq('active', true)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
       .maybeSingle();
 
@@ -179,6 +181,7 @@ export async function GET(req: NextRequest) {
       .from('employees')
       .select('id')
       .eq('organization_id', orgId)
+      .eq('active', true)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
       .maybeSingle();
 
