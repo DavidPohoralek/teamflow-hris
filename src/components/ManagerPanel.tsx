@@ -1682,6 +1682,13 @@ function SettingsTab() {
         <VacationCountingModeSetting />
       </section>
 
+      {/* Výchozí dovolená */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">{t('Výchozí dovolená', 'Default vacation')}</h3>
+        <p className="text-xs text-gray-400 mb-4">{t('Kolik dní dovolené dostane nový zaměstnanec, pokud není zadáno jinak.', 'How many vacation days a new employee gets if not specified otherwise.')}</p>
+        <DefaultVacationDaysSetting />
+      </section>
+
       {/* Počet lidí na prodejně */}
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-1">{t('Počet lidí na prodejně', 'Required staff per day')}</h3>
@@ -2371,6 +2378,55 @@ function VacationCountingModeSetting() {
             onChange={() => setMode('all')} className="accent-blue-600" />
           <span className="text-sm text-gray-700">{t('Celý týden (Po–Ne)', 'All days (Mon–Sun)')}</span>
         </label>
+      </div>
+      <button onClick={handleSave} disabled={saving}
+        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}>
+        {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
+      </button>
+    </div>
+  );
+}
+
+// ─── DefaultVacationDaysSetting ───────────────────────────────────────────────
+
+function DefaultVacationDaysSetting() {
+  const t = useT();
+  const [days, setDays] = useState(20);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    managerFetch('/api/manager/settings')
+      .then((r) => r.json())
+      .then((d: Record<string, unknown>) => {
+        if (typeof d.default_vacation_days === 'number') setDays(d.default_vacation_days);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_vacation_days: days }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="flex items-end gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('Výchozí počet dní', 'Default days')}</label>
+        <input
+          type="number" min={0} max={365} value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
       </div>
       <button onClick={handleSave} disabled={saving}
         className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}>

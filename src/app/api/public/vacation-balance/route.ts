@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
   const extraSettings = (settings as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
   const configs = (extraSettings.employment_type_configs as Record<string, { paidVacation: boolean }> | undefined) ?? {};
   const countWeekends = (extraSettings.vacation_counting_mode as string | undefined) === 'all';
+  const defaultVacationDays = typeof extraSettings.default_vacation_days === 'number' ? extraSettings.default_vacation_days : 20;
   const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
   const empType = employee.employment_type ?? '';
   const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const totalDays = employee.vacation_days_per_year ?? 20;
+  const totalDays = employee.vacation_days_per_year ?? defaultVacationDays;
   const hoursPerDay = 8;
   const totalHours = totalDays * hoursPerDay;
   const currentYear = new Date().getFullYear();

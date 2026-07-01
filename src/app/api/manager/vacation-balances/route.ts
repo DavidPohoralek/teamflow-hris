@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
   const extraSettings = (settingsRes.data as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
   const configs = (extraSettings.employment_type_configs as Record<string, { paidVacation: boolean }> | undefined) ?? {};
   const countWeekends = (extraSettings.vacation_counting_mode as string | undefined) === 'all';
+  const defaultVacationDays = typeof extraSettings.default_vacation_days === 'number' ? extraSettings.default_vacation_days : 20;
   const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
 
   // Group requests by employee
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
   const balances = (empsRes.data ?? []).map((emp: { id: string; name: string; vacation_days_per_year?: number; employment_type?: string }) => {
     const empType = emp.employment_type ?? '';
     const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
-    const totalDays = emp.vacation_days_per_year ?? 20;
+    const totalDays = emp.vacation_days_per_year ?? defaultVacationDays;
     const { usedDays = 0, pendingDays = 0 } = byEmployee[emp.id] ?? {};
     return {
       employeeId: emp.id,
