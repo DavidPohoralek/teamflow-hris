@@ -77,3 +77,28 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ logs, current })
 }
+
+// DELETE /api/manager/homeoffice
+// Body: { logId }
+export async function DELETE(req: NextRequest) {
+  const resolved = await resolveOrgId(req)
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  const { orgId, supabase } = resolved
+
+  let body: { logId?: string }
+  try { body = await req.json() }
+  catch { return NextResponse.json({ error: 'Neplatné tělo.' }, { status: 400 }) }
+
+  const { logId } = body
+  if (!logId) return NextResponse.json({ error: 'Chybí logId.' }, { status: 400 })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('attendance_logs')
+    .delete()
+    .eq('id', logId)
+    .eq('organization_id', orgId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}

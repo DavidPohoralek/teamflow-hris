@@ -1602,8 +1602,11 @@ function HomeOfficeTab() {
   const [error, setError] = useState<string | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
   const [notePopup, setNotePopup] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [empFilter, setEmpFilter] = useState<string | null>(null);
+  const [dayFilter, setDayFilter] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = () => {
     setLoading(true);
     setError(null);
     managerFetch(`/api/manager/homeoffice?month=${month}`)
@@ -1611,10 +1614,49 @@ function HomeOfficeTab() {
       .then((d) => { setLogs(d.logs ?? []); setCurrent(d.current ?? []); })
       .catch(() => setError('Nepodařilo se načíst data.'))
       .finally(() => setLoading(false));
-  }, [month]);
+  };
+
+  useEffect(() => { reload(); }, [month]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset employee filter when logs change
+  useEffect(() => { setEmpFilter(null); setDayFilter(''); }, [month]);
+
+  const handleDelete = async (logId: string) => {
+    if (!confirm(t('Smazat tento záznam?', 'Delete this record?'))) return;
+    setDeletingId(logId);
+    try {
+      await managerFetch('/api/manager/homeoffice', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logId }),
+      });
+      setLogs((prev) => prev.filter((l) => l.id !== logId));
+    } catch {
+      alert(t('Nepodařilo se smazat záznam.', 'Failed to delete record.'));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Unique employees for filter pills
+  const employees = Array.from(
+    new Map(logs.map((l) => [l.employeeId, l.employeeName])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  // Apply filters
+  const filtered = logs.filter((l) => {
+    if (empFilter && l.employeeId !== empFilter) return false;
+    if (dayFilter && l.date !== dayFilter) return false;
+    return true;
+  });
+
+  const pillCls = (active: boolean) =>
+    `px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer whitespace-nowrap ${
+      active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+    }`;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       {/* Note popup */}
       {notePopup && (
         <div className="fixed inset-0 z-50" onClick={() => setNotePopup(null)}>
@@ -1649,16 +1691,12 @@ function HomeOfficeTab() {
       {/* Live presence card */}
       <div>
         <button
-          onClick={() => setLiveOpen((v) => !v)}
+          onClick={() => current.length > 0 && setLiveOpen((v) => !v)}
           className={`w-full text-left flex items-center gap-4 p-5 rounded-2xl border-2 transition-colors ${
-            current.length > 0
-              ? 'bg-green-50 border-green-300 hover:bg-green-100'
-              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+            current.length > 0 ? 'bg-green-50 border-green-300 hover:bg-green-100 cursor-pointer' : 'bg-gray-50 border-gray-200 cursor-default'
           }`}
         >
-          <div className={`text-4xl font-bold ${current.length > 0 ? 'text-green-700' : 'text-gray-400'}`}>
-            {current.length}
-          </div>
+          <div className={`text-4xl font-bold ${current.length > 0 ? 'text-green-700' : 'text-gray-400'}`}>{current.length}</div>
           <div className="flex-1">
             <p className={`text-base font-semibold ${current.length > 0 ? 'text-green-800' : 'text-gray-500'}`}>
               {current.length === 0
@@ -1673,12 +1711,8 @@ function HomeOfficeTab() {
               <p className="text-xs text-green-600 mt-0.5">{liveOpen ? t('Skrýt seznam ↑', 'Hide list ↑') : t('Zobrazit kdo ↓', 'Show who ↓')}</p>
             )}
           </div>
-          {current.length > 0 && (
-            <span className="text-green-400 text-lg">{liveOpen ? '▲' : '▼'}</span>
-          )}
+          {current.length > 0 && <span className="text-green-400 text-lg">{liveOpen ? '▲' : '▼'}</span>}
         </button>
-
-        {/* Expanded live list */}
         {liveOpen && current.length > 0 && (
           <div className="mt-2 rounded-xl border border-green-200 bg-white divide-y divide-green-100 overflow-hidden">
             {current.map((entry) => (
@@ -1695,7 +1729,7 @@ function HomeOfficeTab() {
       </div>
 
       {loading && <LoadingSpinner />}
-      {error && <ErrorMessage message={error} onRetry={() => setMonth((m) => m)} />}
+      {error && <ErrorMessage message={error} onRetry={reload} />}
 
       {!loading && !error && logs.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
@@ -1705,51 +1739,108 @@ function HomeOfficeTab() {
       )}
 
       {!loading && !error && logs.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {[t('Zaměstnanec', 'Employee'), t('Datum', 'Date'), t('Příchod', 'In'), t('Odchod', 'Out'), t('Doba', 'Duration'), t('Zpráva o činnosti', 'Activity report')].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {logs.map((log) => {
-                const noteShort = log.note && log.note.length > NOTE_LIMIT ? log.note.slice(0, NOTE_LIMIT) + '…' : log.note;
-                const hasMore = log.note && log.note.length > NOTE_LIMIT;
-                return (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{log.employeeName}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                      {new Date(log.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkIn)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkOut)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap font-medium">{fmtDuration(log.durationMinutes)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
-                      {log.note ? (
-                        <span className="flex items-start gap-1.5">
-                          <span className="leading-relaxed">{noteShort}</span>
-                          {hasMore && (
-                            <button
-                              onClick={(e) => setNotePopup({ text: log.note!, x: e.clientX, y: e.clientY })}
-                              className="shrink-0 mt-0.5 text-xs text-blue-500 hover:text-blue-700 font-medium underline underline-offset-2 whitespace-nowrap"
-                            >
-                              {t('více', 'more')}
-                            </button>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 italic">{t('Bez zprávy', 'No report')}</span>
-                      )}
-                    </td>
+        <>
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Employee pills */}
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setEmpFilter(null)} className={pillCls(empFilter === null)}>
+                {t('Všichni', 'All')}
+              </button>
+              {employees.map(([id, name]) => (
+                <button key={id} onClick={() => setEmpFilter(empFilter === id ? null : id)} className={pillCls(empFilter === id)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+
+            {/* Day picker */}
+            <div className="flex items-center gap-2 ml-auto">
+              <input
+                type="date"
+                value={dayFilter}
+                min={`${month}-01`}
+                max={(() => { const [y, m] = month.split('-').map(Number); return new Date(y, m, 0).toISOString().slice(0, 10); })()}
+                onChange={(e) => setDayFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {dayFilter && (
+                <button onClick={() => setDayFilter('')} className="text-xs text-gray-400 hover:text-gray-600 underline">
+                  {t('Zrušit', 'Clear')}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Results count */}
+          {(empFilter || dayFilter) && (
+            <p className="text-xs text-gray-400">
+              {t('Zobrazeno', 'Showing')} {filtered.length} / {logs.length} {t('záznamů', 'records')}
+            </p>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="text-center py-10 text-sm text-gray-400">{t('Žádné záznamy odpovídají filtru.', 'No records match the filter.')}</div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {[t('Zaměstnanec', 'Employee'), t('Datum', 'Date'), t('Příchod', 'In'), t('Odchod', 'Out'), t('Doba', 'Duration'), t('Zpráva o činnosti', 'Activity report'), ''].map((h, i) => (
+                      <th key={i} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filtered.map((log) => {
+                    const noteShort = log.note && log.note.length > NOTE_LIMIT ? log.note.slice(0, NOTE_LIMIT) + '…' : log.note;
+                    const hasMore = log.note && log.note.length > NOTE_LIMIT;
+                    return (
+                      <tr key={log.id} className="hover:bg-gray-50 group">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{log.employeeName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                          {new Date(log.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkIn)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkOut)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap font-medium">{fmtDuration(log.durationMinutes)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
+                          {log.note ? (
+                            <span className="flex items-start gap-1.5">
+                              <span className="leading-relaxed">{noteShort}</span>
+                              {hasMore && (
+                                <button
+                                  onClick={(e) => setNotePopup({ text: log.note!, x: e.clientX, y: e.clientY })}
+                                  className="shrink-0 mt-0.5 text-xs text-blue-500 hover:text-blue-700 font-medium underline underline-offset-2 whitespace-nowrap"
+                                >
+                                  {t('více', 'more')}
+                                </button>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 italic">{t('Bez zprávy', 'No report')}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <button
+                            onClick={() => handleDelete(log.id)}
+                            disabled={deletingId === log.id}
+                            className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center w-7 h-7 rounded-full text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all disabled:opacity-40"
+                            title={t('Smazat záznam', 'Delete record')}
+                          >
+                            {deletingId === log.id
+                              ? <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              : '×'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
