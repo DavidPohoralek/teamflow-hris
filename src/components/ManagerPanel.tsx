@@ -1304,6 +1304,8 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showVacationOverview, setShowVacationOverview] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const fetchRequests = useCallback(async (status: string) => {
     setLoading(true);
@@ -1320,7 +1322,7 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
     }
   }, []);
 
-  useEffect(() => { fetchRequests(subTab); }, [subTab, fetchRequests]);
+  useEffect(() => { setSelectedIds(new Set()); fetchRequests(subTab); }, [subTab, fetchRequests]);
 
   const handleAction = async (id: string, status: 'approved' | 'rejected') => {
     try {
@@ -1335,6 +1337,28 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
       managerFetch('/api/requests?status=pending').then((r) => r.json()).then((d) => onCountChange?.((d.requests ?? []).length)).catch(() => {});
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Chyba');
+    }
+  };
+
+  const handleBulkAction = async (status: 'approved' | 'rejected') => {
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          managerFetch(`/api/requests/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+          })
+        )
+      );
+      setSelectedIds(new Set());
+      fetchRequests(subTab);
+      managerFetch('/api/requests?status=pending').then((r) => r.json()).then((d) => onCountChange?.((d.requests ?? []).length)).catch(() => {});
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Chyba');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -1377,6 +1401,32 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
 
       {showVacationOverview && <VacationOverviewPanel />}
 
+      {subTab === 'pending' && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-3 px-3 py-2.5 bg-blue-50 rounded-xl border border-blue-200">
+          <span className="text-sm text-blue-700 font-medium">{selectedIds.size} {t('vybraných', 'selected')}</span>
+          <button
+            onClick={() => handleBulkAction('approved')}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          >
+            ✓ {t('Schválit vybrané', 'Approve selected')} ({selectedIds.size})
+          </button>
+          <button
+            onClick={() => handleBulkAction('rejected')}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+          >
+            ✗ {t('Zamítnout vybrané', 'Reject selected')} ({selectedIds.size})
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-sm text-gray-500 hover:text-gray-700"
+          >
+            {t('Zrušit výběr', 'Clear selection')}
+          </button>
+        </div>
+      )}
+
       {loading && <LoadingSpinner />}
       {error && <ErrorMessage message={error} onRetry={() => fetchRequests(subTab)} />}
 
@@ -1385,6 +1435,20 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {subTab === 'pending' && (
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={requests.length > 0 && selectedIds.size === requests.length}
+                      ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < requests.length; }}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(new Set(requests.map((r) => r.id)));
+                        else setSelectedIds(new Set());
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                    />
+                  </th>
+                )}
                 {[t('Zaměstnanec', 'Employee'), t('Typ', 'Type'), t('Od', 'From'), t('Do', 'To'), t('Hodiny', 'Hours'), t('Poznámka', 'Note'), t('Datum podání', 'Submitted'), ...(subTab === 'pending' ? [t('Akce', 'Actions')] : [])].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
@@ -1393,13 +1457,30 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
             <tbody className="bg-white divide-y divide-gray-200">
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={subTab === 'pending' ? 8 : 7} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={subTab === 'pending' ? 9 : 7} className="px-4 py-8 text-center text-sm text-gray-400">
                     {t('Žádné žádosti', 'No requests')}
                   </td>
                 </tr>
               ) : (
                 requests.map((req) => (
-                  <tr key={req.id} className="hover:bg-gray-50">
+                  <tr key={req.id} className={`hover:bg-gray-50 ${selectedIds.has(req.id) ? 'bg-blue-50' : ''}`}>
+                    {subTab === 'pending' && (
+                      <td className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(req.id)}
+                          onChange={(e) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(req.id);
+                              else next.delete(req.id);
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
                       {req.employees?.name ?? '—'}
                     </td>
