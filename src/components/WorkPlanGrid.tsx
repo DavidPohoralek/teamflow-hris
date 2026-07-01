@@ -719,6 +719,7 @@ interface DayCardProps {
   onClickDay?: (dateStr: string) => void;
   onEditDay?: (dateStr: string) => void;
   onRemoveEmployee?: (dateStr: string, entryId: string) => void;
+  onEditEntry?: (entry: WorkPlanEntry) => void;
   onCopyEntry?: (entry: ClipboardEntry) => void;
   onPaste?: (dateStr: string) => void;
   isMyVacation?: boolean;
@@ -740,6 +741,7 @@ function DayCard({
   onClickDay,
   onEditDay,
   onRemoveEmployee,
+  onEditEntry,
   onCopyEntry,
   onPaste,
   isMyVacation,
@@ -850,6 +852,7 @@ function DayCard({
             sessionEmployeeId={sessionEmployeeId}
             dateStr={dateStr}
             onRemoveEmployee={onRemoveEmployee}
+            onEditEntry={onEditEntry}
             onCopyEntry={onCopyEntry}
             t={t}
           />
@@ -883,6 +886,7 @@ function DayCard({
             sessionEmployeeId={sessionEmployeeId}
             dateStr={dateStr}
             onRemoveEmployee={onRemoveEmployee}
+            onEditEntry={onEditEntry}
             onCopyEntry={onCopyEntry}
             t={t}
             isEvening
@@ -907,17 +911,19 @@ function DayCard({
 // ─── EntryChip ────────────────────────────────────────────────────────────────
 
 function EntryChip({
-  entry, isManagerMode, sessionEmployeeId, dateStr, onRemoveEmployee, onCopyEntry, t, isEvening,
+  entry, isManagerMode, sessionEmployeeId, dateStr, onRemoveEmployee, onEditEntry, onCopyEntry, t, isEvening,
 }: {
   entry: WorkPlanEntry;
   isManagerMode: boolean;
   sessionEmployeeId?: string;
   dateStr: string;
   onRemoveEmployee?: (dateStr: string, entryId: string) => void;
+  onEditEntry?: (entry: WorkPlanEntry) => void;
   onCopyEntry?: (entry: ClipboardEntry) => void;
   t: (cz: string, en: string) => string;
   isEvening?: boolean;
 }) {
+  const canEdit = isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId);
   const color = isEvening ? '#f97316' : (entry.workTypeColor ?? '#94a3b8');
   const timeLabel =
     entry.startTime && entry.endTime
@@ -929,13 +935,14 @@ function EntryChip({
 
   return (
     <div
-      className="group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1 min-w-0"
+      className={`group/chip rounded-md text-xs px-2 py-1 font-medium flex items-center justify-between gap-1 min-w-0 ${canEdit && onEditEntry ? 'cursor-context-menu' : ''}`}
       style={{
         borderLeft: `3px solid ${color}`,
         backgroundColor: `${color}22`,
         color: '#1e293b',
       }}
-      title={`${name} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
+      title={canEdit && onEditEntry ? t('Pravý klik = upravit', 'Right-click = edit') : `${name} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
+      onContextMenu={canEdit && onEditEntry ? (e) => { e.preventDefault(); e.stopPropagation(); onEditEntry(entry); } : undefined}
     >
       <span className="truncate min-w-0">
         <span className="font-semibold">{shortName}</span>
@@ -972,6 +979,99 @@ function EntryChip({
         </span>
       )}
     </div>
+  );
+}
+
+// ─── EditShiftModal ───────────────────────────────────────────────────────────
+
+function EditShiftModal({
+  entry, workTypes, orgId, isManagerMode, sessionPin, onClose, onSuccess,
+}: {
+  entry: WorkPlanEntry;
+  workTypes: WorkType[];
+  orgId: string;
+  isManagerMode: boolean;
+  sessionPin?: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const t = useT();
+  const [workTypeId, setWorkTypeId] = useState(entry.workTypeId ?? '');
+  const [startTime, setStartTime] = useState(entry.startTime?.slice(0, 5) ?? '');
+  const [endTime, setEndTime] = useState(entry.endTime?.slice(0, 5) ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = { orgId, workPlanId: entry.id };
+      if (workTypeId && workTypeId !== entry.workTypeId) body.workTypeId = workTypeId;
+      body.startTime = startTime || null;
+      body.endTime = endTime || null;
+      if (!isManagerMode && sessionPin) body.pin = sessionPin;
+
+      const res = isManagerMode
+        ? await managerFetch('/api/public/work-plans', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch('/api/public/work-plans', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? t('Chyba při ukládání.', 'Save error.')); return; }
+      onSuccess();
+      onClose();
+    } catch { setError(t('Síťová chyba.', 'Network error.')); }
+    finally { setSaving(false); }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold text-slate-800">{t('Upravit směnu', 'Edit shift')}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+        <p className="text-xs text-slate-400 mb-4">{entry.employeeName} · {entry.date}</p>
+
+        <div className="space-y-4">
+          {/* Work type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
+            <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="">{t('— Bez typu —', '— No type —')}</option>
+              {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
+            </select>
+          </div>
+          {/* Times */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+
+        <div className="flex gap-2 mt-5">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition">
+            {t('Zrušit', 'Cancel')}
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 transition disabled:opacity-50">
+            {saving ? '…' : t('Uložit', 'Save')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1222,6 +1322,8 @@ export default function WorkPlanGrid({
   const [pinInputLoading, setPinInputLoading] = useState(false);
   // Day detail — shown when clicking a day without PIN (read-only overview)
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
+  // Edit shift modal
+  const [editingEntry, setEditingEntry] = useState<WorkPlanEntry | null>(null);
   // "Pouze mé směny" — filter grid to show only session employee's entries
   const [myShiftsOnly, setMyShiftsOnly] = useState(false);
   const [showIcsModal, setShowIcsModal] = useState(false);
@@ -1942,6 +2044,7 @@ export default function WorkPlanGrid({
                   onClickDay={handleClickDay}
                   onEditDay={isManagerMode ? setEditingDate : undefined}
                   onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
+                  onEditEntry={(isManagerMode || sessionEmployee) ? setEditingEntry : undefined}
                   onCopyEntry={handleCopyEntry}
                   onPaste={handlePaste}
                   isMyVacation={myVacation && vacationDates.has(dateStr)}
@@ -1967,6 +2070,18 @@ export default function WorkPlanGrid({
           sessionPin={sessionPin || undefined}
           onClose={() => setShowModal(false)}
           onSuccess={handleShiftSuccess}
+        />
+      )}
+
+      {editingEntry && typeof window !== 'undefined' && (
+        <EditShiftModal
+          entry={editingEntry}
+          workTypes={workTypes}
+          orgId={orgId}
+          isManagerMode={isManagerMode}
+          sessionPin={sessionPin || undefined}
+          onClose={() => setEditingEntry(null)}
+          onSuccess={() => { setEditingEntry(null); fetchSchedule(); }}
         />
       )}
 

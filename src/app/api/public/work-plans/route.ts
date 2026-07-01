@@ -211,3 +211,64 @@ export async function DELETE(req: NextRequest) {
 
   return NextResponse.json({ ok: true })
 }
+
+// PATCH /api/public/work-plans
+// Body: { orgId, workPlanId, workTypeId?, startTime?, endTime? }
+// Manager-Token or PIN required
+export async function PATCH(req: NextRequest) {
+  let body: {
+    orgId: string
+    workPlanId: string
+    workTypeId?: string
+    startTime?: string | null
+    endTime?: string | null
+    pin?: string
+  }
+  try { body = await req.json() }
+  catch { return NextResponse.json({ error: 'Neplatné tělo.' }, { status: 400 }) }
+
+  const { orgId, workPlanId, workTypeId, startTime, endTime, pin } = body
+  if (!orgId || !workPlanId) return NextResponse.json({ error: 'Chybí parametry.' }, { status: 400 })
+
+  const supabase = getServiceClient()
+
+  // Auth: Manager-Token or PIN
+  const rawToken = req.headers.get('Manager-Token')
+  const tokenResult = isTokenValid(rawToken ?? '')
+  if (!tokenResult.valid || tokenResult.orgId !== orgId) {
+    // Fall back to PIN auth
+    if (!pin) return NextResponse.json({ error: 'Neplatná autorizace.' }, { status: 401 })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: emp } = await (supabase as any)
+      .from('employees').select('id').eq('organization_id', orgId)
+      .or(`pin_code.eq.${pin},pin.eq.${pin}`).eq('active', true).maybeSingle()
+    if (!emp) return NextResponse.json({ error: 'Neplatný PIN.' }, { status: 401 })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: plan } = await (supabase as any)
+      .from('work_plans').select('employee_id').eq('id', workPlanId).eq('organization_id', orgId).maybeSingle()
+    if (!plan || plan.employee_id !== emp.id)
+      return NextResponse.json({ error: 'Nemáte oprávnění upravit tuto směnu.' }, { status: 403 })
+  }
+
+  // Resolve work type name if workTypeId provided
+  const update: Record<string, unknown> = {}
+  if (workTypeId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: wt } = await (supabase as any).from('work_types').select('name').eq('id', workTypeId).single()
+    if (!wt) return NextResponse.json({ error: 'Typ práce nenalezen.' }, { status: 404 })
+    update.work_type_id = workTypeId
+    update.work_type = wt.name
+  }
+  if (startTime !== undefined) update.start_time = startTime ?? null
+  if (endTime !== undefined) update.end_time = endTime ?? null
+
+  if (!Object.keys(update).length)
+    return NextResponse.json({ error: 'Nic ke změně.' }, { status: 400 })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('work_plans').update(update).eq('id', workPlanId).eq('organization_id', orgId)
+
+  if (error) return NextResponse.json({ error: 'Nepodařilo se upravit směnu.' }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
