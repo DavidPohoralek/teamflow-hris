@@ -90,22 +90,48 @@ export async function GET(req: NextRequest) {
     .gte('date_from', `${currentYear}-01-01`)
     .lte('date_from', `${currentYear}-12-31`);
 
-  let usedDays = 0;
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Split approved vacation into already-consumed (past) vs planned (future)
+  let consumedDays = 0;     // approved & end date already passed → actually used
+  let futurePlannedDays = 0; // approved & start date in future → planned but not yet taken
   let pendingDays = 0;
 
   for (const req of requests ?? []) {
-    const days = countVacationDays(req.date_from, req.date_to ?? null, countWeekends);
-    if (req.status === 'approved') usedDays += days;
-    else if (req.status === 'pending') pendingDays += days;
+    if (req.status === 'approved') {
+      const dateFrom = req.date_from;
+      const dateTo = req.date_to ?? req.date_from;
+      if (dateTo < today) {
+        // Entire period is in the past
+        consumedDays += countVacationDays(dateFrom, dateTo, countWeekends);
+      } else if (dateFrom >= today) {
+        // Entire period is in the future
+        futurePlannedDays += countVacationDays(dateFrom, dateTo, countWeekends);
+      } else {
+        // Period spans today — split: days before today = consumed, today onward = planned
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        consumedDays += countVacationDays(dateFrom, yesterdayStr, countWeekends);
+        futurePlannedDays += countVacationDays(today, dateTo, countWeekends);
+      }
+    } else if (req.status === 'pending') {
+      pendingDays += countVacationDays(req.date_from, req.date_to ?? null, countWeekends);
+    }
   }
 
+  const usedDays = consumedDays + futurePlannedDays; // all approved (for "zbývá" = not yet planned)
   const remainingDays = Math.max(0, totalDays - usedDays);
 
   return NextResponse.json({
     hasPaidVacation: true,
     totalDays,
     totalHours,
-    usedDays,
+    consumedDays,
+    consumedHours: consumedDays * hoursPerDay,
+    futurePlannedDays,
+    futurePlannedHours: futurePlannedDays * hoursPerDay,
+    usedDays,   // all approved = consumedDays + futurePlannedDays (kept for backwards compat)
     usedHours: usedDays * hoursPerDay,
     pendingDays,
     pendingHours: pendingDays * hoursPerDay,
