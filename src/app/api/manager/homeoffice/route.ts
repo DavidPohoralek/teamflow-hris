@@ -8,6 +8,9 @@ function isHO(name: string | null | undefined): boolean {
 }
 
 // GET /api/manager/homeoffice?month=YYYY-MM
+// Returns:
+//   logs    — HO attendance logs for the given month (completed + in-progress)
+//   current — people currently checked in to HO right now (check_out IS NULL, today)
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req)
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
@@ -16,6 +19,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM
 
+  // ── Monthly logs ─────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from('attendance_logs')
@@ -31,10 +35,20 @@ export async function GET(req: NextRequest) {
     query = query.gte('date', first).lte('date', last)
   }
 
+  // ── Current HO presence (open sessions today) ─────────────────────────────
+  const today = new Date().toISOString().slice(0, 10)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: liveData } = await (supabase as any)
+    .from('attendance_logs')
+    .select('id, employee_id, check_in, work_type_name, employees(id, name)')
+    .eq('organization_id', orgId)
+    .eq('date', today)
+    .not('check_in', 'is', null)
+    .is('check_out', null)
+
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Filter to HomeOffice rows (work_type_name = 'HO' | 'HomeOffice' | 'Home Office')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const logs = (data ?? []).filter((row: any) => isHO(row.work_type_name)).map((row: any) => {
     const checkIn = row.check_in ? new Date(row.check_in) : null
@@ -53,5 +67,13 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  return NextResponse.json({ logs })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const current = (liveData ?? []).filter((row: any) => isHO(row.work_type_name)).map((row: any) => ({
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeName: (row.employees as { name?: string } | null)?.name ?? '—',
+    checkIn: row.check_in,
+  }))
+
+  return NextResponse.json({ logs, current })
 }

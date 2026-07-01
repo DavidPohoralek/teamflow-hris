@@ -1570,6 +1570,13 @@ interface HOLog {
   workTypeName: string;
 }
 
+interface HOCurrentEntry {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  checkIn: string;
+}
+
 function fmtTime(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
@@ -1582,35 +1589,49 @@ function fmtDuration(mins: number | null): string {
   return `${h}h ${m}m`;
 }
 
+const NOTE_LIMIT = 90;
+
 function HomeOfficeTab() {
   const t = useT();
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [month, setMonth] = useState(defaultMonth);
   const [logs, setLogs] = useState<HOLog[]>([]);
+  const [current, setCurrent] = useState<HOCurrentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [notePopup, setNotePopup] = useState<{ text: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     managerFetch(`/api/manager/homeoffice?month=${month}`)
       .then((r) => r.json())
-      .then((d) => setLogs(d.logs ?? []))
+      .then((d) => { setLogs(d.logs ?? []); setCurrent(d.current ?? []); })
       .catch(() => setError('Nepodařilo se načíst data.'))
       .finally(() => setLoading(false));
   }, [month]);
 
-  // Per-employee summary
-  const byEmployee = logs.reduce<Record<string, { name: string; days: number; totalMins: number }>>((acc, log) => {
-    if (!acc[log.employeeId]) acc[log.employeeId] = { name: log.employeeName, days: 0, totalMins: 0 };
-    acc[log.employeeId].days += 1;
-    acc[log.employeeId].totalMins += log.durationMinutes ?? 0;
-    return acc;
-  }, {});
-
   return (
     <div className="p-6 space-y-6">
+      {/* Note popup */}
+      {notePopup && (
+        <div className="fixed inset-0 z-50" onClick={() => setNotePopup(null)}>
+          <div
+            className="absolute bg-white border border-gray-200 rounded-xl shadow-2xl p-5 w-80 text-sm text-gray-700 whitespace-pre-wrap"
+            style={{ top: Math.min(notePopup.y + 8, window.innerHeight - 220), left: Math.min(notePopup.x + 8, window.innerWidth - 340) }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t('Zpráva o činnosti', 'Activity report')}</span>
+              <button onClick={() => setNotePopup(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+            </div>
+            <p className="leading-relaxed">{notePopup.text}</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -1625,18 +1646,53 @@ function HomeOfficeTab() {
         />
       </div>
 
-      {/* Per-employee summary cards */}
-      {!loading && !error && Object.values(byEmployee).length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {Object.values(byEmployee).map((emp) => (
-            <div key={emp.name} className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <p className="text-sm font-semibold text-gray-800 truncate">{emp.name}</p>
-              <p className="text-2xl font-bold text-green-700 mt-1">{emp.days}</p>
-              <p className="text-xs text-gray-500">{emp.days === 1 ? t('den', 'day') : t('dní', 'days')} · {fmtDuration(emp.totalMins)}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Live presence card */}
+      <div>
+        <button
+          onClick={() => setLiveOpen((v) => !v)}
+          className={`w-full text-left flex items-center gap-4 p-5 rounded-2xl border-2 transition-colors ${
+            current.length > 0
+              ? 'bg-green-50 border-green-300 hover:bg-green-100'
+              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+          }`}
+        >
+          <div className={`text-4xl font-bold ${current.length > 0 ? 'text-green-700' : 'text-gray-400'}`}>
+            {current.length}
+          </div>
+          <div className="flex-1">
+            <p className={`text-base font-semibold ${current.length > 0 ? 'text-green-800' : 'text-gray-500'}`}>
+              {current.length === 0
+                ? t('Nikdo momentálně na HomeOffice', 'Nobody on Home Office right now')
+                : current.length === 1
+                  ? t('člověk teď na HomeOffice', 'person on Home Office right now')
+                  : current.length < 5
+                    ? t('lidé teď na HomeOffice', 'people on Home Office right now')
+                    : t('lidí teď na HomeOffice', 'people on Home Office right now')}
+            </p>
+            {current.length > 0 && (
+              <p className="text-xs text-green-600 mt-0.5">{liveOpen ? t('Skrýt seznam ↑', 'Hide list ↑') : t('Zobrazit kdo ↓', 'Show who ↓')}</p>
+            )}
+          </div>
+          {current.length > 0 && (
+            <span className="text-green-400 text-lg">{liveOpen ? '▲' : '▼'}</span>
+          )}
+        </button>
+
+        {/* Expanded live list */}
+        {liveOpen && current.length > 0 && (
+          <div className="mt-2 rounded-xl border border-green-200 bg-white divide-y divide-green-100 overflow-hidden">
+            {current.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-sm font-medium text-gray-800">{entry.employeeName}</span>
+                </div>
+                <span className="text-xs text-gray-400">{t('od', 'since')} {fmtTime(entry.checkIn)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {loading && <LoadingSpinner />}
       {error && <ErrorMessage message={error} onRetry={() => setMonth((m) => m)} />}
@@ -1659,22 +1715,38 @@ function HomeOfficeTab() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{log.employeeName}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                    {new Date(log.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkIn)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkOut)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap font-medium">{fmtDuration(log.durationMinutes)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
-                    {log.note
-                      ? <span className="block leading-relaxed">{log.note}</span>
-                      : <span className="text-gray-300 italic">{t('Bez zprávy', 'No report')}</span>}
-                  </td>
-                </tr>
-              ))}
+              {logs.map((log) => {
+                const noteShort = log.note && log.note.length > NOTE_LIMIT ? log.note.slice(0, NOTE_LIMIT) + '…' : log.note;
+                const hasMore = log.note && log.note.length > NOTE_LIMIT;
+                return (
+                  <tr key={log.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{log.employeeName}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {new Date(log.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkIn)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkOut)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap font-medium">{fmtDuration(log.durationMinutes)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
+                      {log.note ? (
+                        <span className="flex items-start gap-1.5">
+                          <span className="leading-relaxed">{noteShort}</span>
+                          {hasMore && (
+                            <button
+                              onClick={(e) => setNotePopup({ text: log.note!, x: e.clientX, y: e.clientY })}
+                              className="shrink-0 mt-0.5 text-xs text-blue-500 hover:text-blue-700 font-medium underline underline-offset-2 whitespace-nowrap"
+                            >
+                              {t('více', 'more')}
+                            </button>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 italic">{t('Bez zprávy', 'No report')}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
