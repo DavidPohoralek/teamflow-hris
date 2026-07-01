@@ -27,7 +27,14 @@ type KioskScreen =
   | 'checkout'
   | 'success-checkin'
   | 'success-checkout'
+  | 'ho-activity'
   | 'error';
+
+function isHomeOffice(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase().replace(/\s+/g, '');
+  return n === 'ho' || n === 'homeoffice';
+}
 
 interface AttendanceKioskProps {
   orgId: string;
@@ -98,13 +105,25 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [errorMessage, setErrorMessage] = useState('');
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load work types
+  // HomeOffice activity report
+  const [requireHoReport, setRequireHoReport] = useState(false);
+  const [hoLogId, setHoLogId] = useState<string | null>(null);
+  const [hoNote, setHoNote] = useState('');
+  const [hoLoading, setHoLoading] = useState(false);
+
+  // Load work types + settings
   useEffect(() => {
     fetch(`/api/public/work-types?orgId=${orgId}`)
       .then((r) => r.json())
       .then((json: { workTypes?: WorkType[] } | WorkType[]) => {
         const list = Array.isArray(json) ? json : (json.workTypes ?? []);
         setWorkTypes(list.filter((wt) => wt.category === 'shift' || wt.category === 'presence'));
+      })
+      .catch(() => {});
+    fetch(`/api/public/company-settings?orgId=${orgId}`)
+      .then((r) => r.json())
+      .then((d: Record<string, unknown>) => {
+        if (d.require_ho_activity_report) setRequireHoReport(true);
       })
       .catch(() => {});
   }, [orgId]);
@@ -121,6 +140,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setSuccessMessage('');
       setErrorMessage('');
       setPinError(false);
+      setHoLogId(null);
+      setHoNote('');
     }, 3000);
   }, []);
 
@@ -222,18 +243,23 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       const res = await fetch('/api/public/kiosk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'checkout',
-          orgId,
-          employeeId,
-          pin,
-        }),
+        body: JSON.stringify({ action: 'checkout', orgId, employeeId, pin }),
       });
       if (!res.ok) throw new Error();
+      const json = await res.json() as { logId?: string; workTypeName?: string };
       const duration = presence ? formatDuration(presence.checkIn) : '';
-      setSuccessMessage(`${t('Odchod zaznamenán. Odpracováno:', 'Clocked out. Time worked:')} ${duration}`);
-      setScreen('success-checkout');
-      resetKiosk();
+      const checkoutWt = json.workTypeName ?? presence?.workTypeName;
+
+      if (requireHoReport && isHomeOffice(checkoutWt) && json.logId) {
+        setHoLogId(json.logId);
+        setHoNote('');
+        setSuccessMessage(`${t('Odchod zaznamenán. Odpracováno:', 'Clocked out. Time worked:')} ${duration}`);
+        setScreen('ho-activity');
+      } else {
+        setSuccessMessage(`${t('Odchod zaznamenán. Odpracováno:', 'Clocked out. Time worked:')} ${duration}`);
+        setScreen('success-checkout');
+        resetKiosk();
+      }
     } catch {
       setErrorMessage(t('Chyba při záznamu odchodu. Zkuste to prosím znovu.', 'Error recording clock-out. Please try again.'));
       setScreen('error');
@@ -241,6 +267,22 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleHoNoteSubmit = async (skip = false) => {
+    if (!skip && hoLogId && hoNote.trim()) {
+      setHoLoading(true);
+      try {
+        await fetch('/api/public/attendance-note', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logId: hoLogId, orgId, pin, note: hoNote.trim() }),
+        });
+      } catch { /* show success regardless */ }
+      finally { setHoLoading(false); }
+    }
+    setScreen('success-checkout');
+    resetKiosk();
   };
 
   const pinButtons = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '←', '0', '✓'];
@@ -376,6 +418,43 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 <span className="inline-block w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : null}
               {t('Zaznamenat odchod', 'Clock out')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* HomeOffice Activity Dialog */}
+      {screen === 'ho-activity' && (
+        <div className="w-full max-w-lg flex flex-col items-center gap-6">
+          <div className="text-center">
+            <div className="text-6xl mb-3">🏠</div>
+            <h1 className="text-3xl font-bold text-slate-100">{t('Zpráva o činnosti', 'Activity report')}</h1>
+            <p className="text-slate-400 mt-2 text-lg">{t('Co jste dnes na HomeOffice dělal(a)?', 'What did you work on from home today?')}</p>
+          </div>
+          <textarea
+            value={hoNote}
+            onChange={(e) => setHoNote(e.target.value)}
+            placeholder={t('Např. Zpracování faktur, videokonference s klientem, příprava prezentace...', 'E.g. Invoice processing, client video call, preparing presentation...')}
+            className="w-full bg-slate-700 text-white rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+            rows={5}
+            autoFocus
+          />
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={() => handleHoNoteSubmit(true)}
+              className="flex-1 min-h-[56px] bg-slate-700 hover:bg-slate-600 text-white text-base font-semibold rounded-xl transition-all active:scale-95"
+            >
+              {t('Přeskočit', 'Skip')}
+            </button>
+            <button
+              onClick={() => handleHoNoteSubmit(false)}
+              disabled={!hoNote.trim() || hoLoading}
+              className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {hoLoading
+                ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : null}
+              {t('Odeslat zprávu', 'Submit report')}
             </button>
           </div>
         </div>

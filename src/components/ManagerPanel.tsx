@@ -322,7 +322,7 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications'>(initialTab ?? 'employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showTour, setShowTour] = useState(false);
@@ -343,6 +343,7 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
     { id: 'employees' as const, label: t('Zaměstnanci', 'Employees'), icon: '👥' },
     { id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' },
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
+    { id: 'homeoffice' as const, label: t('HomeOffice', 'Home Office'), icon: '🏠' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     { id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' },
   ];
@@ -427,6 +428,7 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
           {activeTab === 'employees' && <EmployeesTab />}
           {activeTab === 'work-types' && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
+          {activeTab === 'homeoffice' && <HomeOfficeTab />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && <SettingsTab />}
         </div>
@@ -1554,6 +1556,133 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
   );
 }
 
+// ─── HomeOffice Tab ───────────────────────────────────────────────────────────
+
+interface HOLog {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  durationMinutes: number | null;
+  note: string | null;
+  workTypeName: string;
+}
+
+function fmtTime(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDuration(mins: number | null): string {
+  if (mins === null) return '—';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h ${m}m`;
+}
+
+function HomeOfficeTab() {
+  const t = useT();
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [month, setMonth] = useState(defaultMonth);
+  const [logs, setLogs] = useState<HOLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    managerFetch(`/api/manager/homeoffice?month=${month}`)
+      .then((r) => r.json())
+      .then((d) => setLogs(d.logs ?? []))
+      .catch(() => setError('Nepodařilo se načíst data.'))
+      .finally(() => setLoading(false));
+  }, [month]);
+
+  // Per-employee summary
+  const byEmployee = logs.reduce<Record<string, { name: string; days: number; totalMins: number }>>((acc, log) => {
+    if (!acc[log.employeeId]) acc[log.employeeId] = { name: log.employeeName, days: 0, totalMins: 0 };
+    acc[log.employeeId].days += 1;
+    acc[log.employeeId].totalMins += log.durationMinutes ?? 0;
+    return acc;
+  }, {});
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">🏠 {t('HomeOffice přehled', 'Home Office Overview')}</h2>
+          <p className="text-sm text-gray-400 mt-0.5">{t('Záznamy docházky z HomeOffice vč. zpráv o činnosti', 'Home office attendance records including activity reports')}</p>
+        </div>
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+
+      {/* Per-employee summary cards */}
+      {!loading && !error && Object.values(byEmployee).length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {Object.values(byEmployee).map((emp) => (
+            <div key={emp.name} className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <p className="text-sm font-semibold text-gray-800 truncate">{emp.name}</p>
+              <p className="text-2xl font-bold text-green-700 mt-1">{emp.days}</p>
+              <p className="text-xs text-gray-500">{emp.days === 1 ? t('den', 'day') : t('dní', 'days')} · {fmtDuration(emp.totalMins)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loading && <LoadingSpinner />}
+      {error && <ErrorMessage message={error} onRetry={() => setMonth((m) => m)} />}
+
+      {!loading && !error && logs.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+          <div className="text-5xl mb-3">🏠</div>
+          <p className="text-sm">{t('Žádné HomeOffice záznamy za toto období', 'No home office records for this period')}</p>
+        </div>
+      )}
+
+      {!loading && !error && logs.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {[t('Zaměstnanec', 'Employee'), t('Datum', 'Date'), t('Příchod', 'In'), t('Odchod', 'Out'), t('Doba', 'Duration'), t('Zpráva o činnosti', 'Activity report')].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {logs.map((log) => (
+                <tr key={log.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{log.employeeName}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    {new Date(log.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkIn)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtTime(log.checkOut)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap font-medium">{fmtDuration(log.durationMinutes)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
+                    {log.note
+                      ? <span className="block leading-relaxed">{log.note}</span>
+                      : <span className="text-gray-300 italic">{t('Bez zprávy', 'No report')}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
@@ -1739,18 +1868,25 @@ function SettingsTab() {
       {/* Attendance */}
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-4">{t('Docházka', 'Attendance')}</h3>
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={kioskEnabled}
-            onClick={() => setKioskEnabled((v) => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${kioskEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${kioskEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-          <span className="text-sm text-gray-700">{t('Kiosk povolen', 'Kiosk enabled')}</span>
-        </label>
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={kioskEnabled}
+              onClick={() => setKioskEnabled((v) => !v)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${kioskEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${kioskEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+            <span className="text-sm text-gray-700">{t('Kiosk povolen', 'Kiosk enabled')}</span>
+          </label>
+          <ToggleSetting
+            label={t('Zpráva o činnosti na HomeOffice', 'HomeOffice activity report')}
+            description={t('Zaměstnanci budou po odhlášení z HomeOffice vyzváni k vyplnění zprávy o tom, co v daný den na HomeOffice dělali.', 'Employees will be prompted to submit a brief activity report after clocking out from HomeOffice.')}
+            settingKey="require_ho_activity_report"
+          />
+        </div>
       </section>
 
       {/* Planning features */}

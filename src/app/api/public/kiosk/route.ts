@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     // action === 'checkout'
     const { data: log, error: logError } = await supabase
       .from('attendance_logs')
-      .select('id, check_in')
+      .select('id, check_in, work_type_name')
       .eq('organization_id', orgId)
       .eq('employee_id', employee.id)
       .eq('date', today)
@@ -147,8 +147,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      logId: log.id,
       employee: { name: employee.name },
       duration: durationLabel,
+      workTypeName: (log as unknown as { work_type_name?: string }).work_type_name ?? null,
     })
   } catch (err) {
     console.error('Kiosk route error:', err)

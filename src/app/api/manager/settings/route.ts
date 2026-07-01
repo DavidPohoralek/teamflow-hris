@@ -36,6 +36,7 @@ const EXTRA_KEYS = [
   'required_sun',
   'vacation_counting_mode',
   'default_vacation_days',
+  'require_ho_activity_report',
 ];
 
 // GET /api/manager/settings
