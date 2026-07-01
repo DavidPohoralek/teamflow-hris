@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const { orgId, pin, action, workTypeId, workTypeName } = body as {
       orgId: string
       pin: string
-      action: 'checkin' | 'checkout'
+      action: 'checkin' | 'checkout' | 'ho-record'
       workTypeId?: string
       workTypeName?: string
     }
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Chybí povinné parametry' }, { status: 400 })
     }
 
-    if (action !== 'checkin' && action !== 'checkout') {
+    if (action !== 'checkin' && action !== 'checkout' && action !== 'ho-record') {
       return NextResponse.json({ ok: false, error: 'Neplatná akce' }, { status: 400 })
     }
 
@@ -113,7 +113,65 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // action === 'checkout'
+    // ── action === 'ho-record' ─────────────────────────────────────────────
+    if (action === 'ho-record') {
+      const { date: recordDate, startTime, endTime, note } = body as {
+        date?: string; startTime: string; endTime: string; note?: string | null
+      }
+      const date = recordDate ?? today
+
+      if (!startTime || !endTime) {
+        return NextResponse.json({ ok: false, error: 'Zadejte čas příchodu i odchodu.' }, { status: 400 })
+      }
+      if (endTime <= startTime) {
+        return NextResponse.json({ ok: false, error: 'Čas odchodu musí být po čase příchodu.' }, { status: 422 })
+      }
+
+      // Duplicate check — one completed HO record per day
+      const { data: existing } = await supabase
+        .from('attendance_logs')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('employee_id', employee.id)
+        .eq('date', date)
+        .not('check_out', 'is', null)
+        .maybeSingle()
+
+      if (existing) {
+        return NextResponse.json({ ok: false, error: `Záznam pro ${date} již existuje.` }, { status: 409 })
+      }
+
+      const checkIn = `${date}T${startTime}:00`
+      const checkOut = `${date}T${endTime}:00`
+      const [sh, sm] = startTime.split(':').map(Number)
+      const [eh, em] = endTime.split(':').map(Number)
+      const totalMins = (eh * 60 + em) - (sh * 60 + sm)
+      const durationHours = Math.round(totalMins / 6) / 10
+      const h = Math.floor(totalMins / 60)
+      const m = totalMins % 60
+      const durationLabel = m > 0 ? `${h}h ${m}m` : `${h}h`
+
+      const insertData: Record<string, unknown> = {
+        organization_id: orgId,
+        employee_id: employee.id,
+        date,
+        check_in: checkIn,
+        check_out: checkOut,
+        note: note ?? null,
+        work_type_name: workTypeName ?? 'HomeOffice',
+      }
+      if (workTypeId) insertData.work_type_id = workTypeId
+
+      const { error: insertError } = await supabase.from('attendance_logs').insert(insertData)
+      if (insertError) {
+        console.error('Kiosk ho-record error:', insertError)
+        return NextResponse.json({ ok: false, error: 'Chyba při zápisu záznamu.' }, { status: 500 })
+      }
+
+      return NextResponse.json({ ok: true, durationHours, durationLabel })
+    }
+
+    // ── action === 'checkout' ──────────────────────────────────────────────
     const { data: log, error: logError } = await supabase
       .from('attendance_logs')
       .select('id, check_in, work_type_name')

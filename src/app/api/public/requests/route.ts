@@ -17,7 +17,7 @@ function getServiceClient() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { orgId, pin, type, dateFrom, dateTo, note, hours, timeIn, timeOut } = body as {
+    const { orgId, pin, type, dateFrom, dateTo, note, hours, timeIn, timeOut, correctionField, linkedLogId } = body as {
       orgId: string;
       pin: string;
       type: RequestType;
@@ -27,11 +27,19 @@ export async function POST(req: NextRequest) {
       hours?: number;
       timeIn?: string;
       timeOut?: string;
+      correctionField?: 'check_in' | 'check_out' | 'both';
+      linkedLogId?: string;
     };
 
-    // For correction: embed times as JSON in note so approval route can read them reliably
-    const storedNote = (type === 'correction' && timeIn && timeOut)
-      ? JSON.stringify({ timeIn, timeOut, userNote: note ?? '' })
+    // For correction: embed all correction metadata as JSON in note
+    const storedNote = type === 'correction'
+      ? JSON.stringify({
+          field: correctionField ?? 'both',
+          timeIn: timeIn ?? null,
+          timeOut: timeOut ?? null,
+          linkedLogId: linkedLogId ?? null,
+          userNote: note ?? '',
+        })
       : (note ?? null);
 
     if (!orgId || !pin || !type || !dateFrom) {

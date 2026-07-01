@@ -28,12 +28,22 @@ type KioskScreen =
   | 'success-checkin'
   | 'success-checkout'
   | 'ho-activity'
+  | 'ho-form'
   | 'error';
 
 function isHomeOffice(name: string | null | undefined): boolean {
   if (!name) return false;
   const n = name.toLowerCase().replace(/\s+/g, '');
   return n === 'ho' || n === 'homeoffice';
+}
+
+function localDateStr(daysBack = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysBack);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
 }
 
 interface AttendanceKioskProps {
@@ -105,11 +115,20 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [errorMessage, setErrorMessage] = useState('');
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // HomeOffice activity report
+  // HomeOffice activity report (post-checkout note)
   const [requireHoReport, setRequireHoReport] = useState(false);
   const [hoLogId, setHoLogId] = useState<string | null>(null);
   const [hoNote, setHoNote] = useState('');
   const [hoLoading, setHoLoading] = useState(false);
+
+  // HomeOffice retrospective form
+  const [hoFormDate, setHoFormDate] = useState('');
+  const [hoFormStart, setHoFormStart] = useState('');
+  const [hoFormEnd, setHoFormEnd] = useState('');
+  const [hoFormSummary, setHoFormSummary] = useState('');
+  const [hoFormError, setHoFormError] = useState('');
+  const [hoFormWorkTypeId, setHoFormWorkTypeId] = useState('');
+  const [hoFormWorkTypeName, setHoFormWorkTypeName] = useState('');
 
   // Load work types + settings
   useEffect(() => {
@@ -142,6 +161,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setPinError(false);
       setHoLogId(null);
       setHoNote('');
+      setHoFormDate('');
+      setHoFormStart('');
+      setHoFormEnd('');
+      setHoFormSummary('');
+      setHoFormError('');
+      setHoFormWorkTypeId('');
+      setHoFormWorkTypeName('');
     }, 3000);
   }, []);
 
@@ -285,6 +311,49 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     resetKiosk();
   };
 
+  const handleHoRecord = async () => {
+    setHoFormError('');
+    if (!hoFormStart || !hoFormEnd) {
+      setHoFormError(t('Zadejte čas příchodu i odchodu.', 'Enter both start and end time.'));
+      return;
+    }
+    if (hoFormEnd <= hoFormStart) {
+      setHoFormError(t('Čas odchodu musí být po čase příchodu.', 'End time must be after start time.'));
+      return;
+    }
+    setHoLoading(true);
+    try {
+      const res = await fetch('/api/public/kiosk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ho-record',
+          orgId,
+          pin,
+          workTypeId: hoFormWorkTypeId || undefined,
+          workTypeName: hoFormWorkTypeName || 'HomeOffice',
+          date: hoFormDate,
+          startTime: hoFormStart,
+          endTime: hoFormEnd,
+          note: hoFormSummary.trim() || null,
+        }),
+      });
+      const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; durationLabel?: string };
+      if (!res.ok) {
+        setHoFormError(json.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
+        setHoLoading(false);
+        return;
+      }
+      setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.durationLabel ?? ''}`);
+      setScreen('success-checkin');
+      resetKiosk();
+    } catch {
+      setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
+    } finally {
+      setHoLoading(false);
+    }
+  };
+
   const pinButtons = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '←', '0', '✓'];
 
   if (screen === 'pin') {
@@ -310,53 +379,93 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
           {/* Work type selection */}
           {(() => {
+            const hoWorkTypes = workTypes.filter((wt) => isHomeOffice(wt.name));
+            const regularTypes = workTypes.filter((wt) => !isHomeOffice(wt.name));
             const primaryWt = employeeDepartment
-              ? workTypes.find((wt) => wt.name.toLowerCase() === employeeDepartment.toLowerCase())
+              ? regularTypes.find((wt) => wt.name.toLowerCase() === employeeDepartment.toLowerCase())
               : null;
-            const visibleTypes = (primaryWt && !showAllWorkTypes) ? [primaryWt] : workTypes;
+            const visibleRegular = (primaryWt && !showAllWorkTypes) ? [primaryWt] : regularTypes;
             return (
               <div className="w-full flex flex-col items-center gap-4">
-                {/* Mobile list */}
-                <div className="flex flex-col gap-2 sm:hidden w-full">
-                  {visibleTypes.map((wt, idx) => {
-                    const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-                    const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
-                    const isSelected = selectedWorkType?.id === wt.id;
-                    return (
-                      <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                        className={`${colorClass} flex items-center gap-3 px-4 py-3 rounded-xl w-full text-white font-semibold text-base transition-all duration-150 active:scale-[0.98] ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1e293b] brightness-110' : 'opacity-80'}`}
+                {/* HomeOffice banner — distinct section for retrospective entry */}
+                {hoWorkTypes.length > 0 && (
+                  <div className="w-full">
+                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 text-center">{t('HomeOffice', 'HomeOffice')}</p>
+                    {hoWorkTypes.map((wt) => (
+                      <button
+                        key={wt.id}
+                        onClick={() => {
+                          setHoFormDate(localDateStr(0));
+                          setHoFormStart('');
+                          setHoFormEnd('');
+                          setHoFormSummary('');
+                          setHoFormError('');
+                          setHoFormWorkTypeId(wt.id);
+                          setHoFormWorkTypeName(wt.name);
+                          setScreen('ho-form');
+                        }}
+                        className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-emerald-700/40 hover:bg-emerald-700/60 border border-emerald-500/40 hover:border-emerald-400/70 text-white font-semibold text-base sm:text-lg transition-all duration-150 active:scale-[0.98]"
                       >
-                        <span className="text-2xl shrink-0">{wt.icon ?? icon}</span>
-                        <span className="flex-1 text-left">{wt.name}</span>
-                        {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                        <span className="text-3xl shrink-0">🏠</span>
+                        <div className="flex-1 text-left">
+                          <div className="font-bold">{wt.name}</div>
+                          <div className="text-emerald-300 text-sm font-normal">{t('Zpětné zadání docházky', 'Retrospective attendance entry')}</div>
+                        </div>
+                        <span className="text-emerald-400 text-xl">→</span>
                       </button>
-                    );
-                  })}
-                </div>
-                {/* Desktop grid */}
-                <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
-                  {visibleTypes.map((wt, idx) => {
-                    const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-                    const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
-                    const isSelected = selectedWorkType?.id === wt.id;
-                    return (
-                      <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                        className={`${colorClass} flex flex-col items-center justify-center gap-3 p-6 rounded-2xl min-h-[120px] text-white font-semibold text-xl transition-all duration-150 active:scale-95 ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}`}
+                    ))}
+                  </div>
+                )}
+
+                {/* Regular work types */}
+                {visibleRegular.length > 0 && (
+                  <>
+                    {hoWorkTypes.length > 0 && (
+                      <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">{t('Přítomnost na pracovišti', 'On-site attendance')}</p>
+                    )}
+                    {/* Mobile list */}
+                    <div className="flex flex-col gap-2 sm:hidden w-full">
+                      {visibleRegular.map((wt, idx) => {
+                        const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+                        const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                        const isSelected = selectedWorkType?.id === wt.id;
+                        return (
+                          <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
+                            className={`${colorClass} flex items-center gap-3 px-4 py-3 rounded-xl w-full text-white font-semibold text-base transition-all duration-150 active:scale-[0.98] ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1e293b] brightness-110' : 'opacity-80'}`}
+                          >
+                            <span className="text-2xl shrink-0">{wt.icon ?? icon}</span>
+                            <span className="flex-1 text-left">{wt.name}</span>
+                            {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Desktop grid */}
+                    <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
+                      {visibleRegular.map((wt, idx) => {
+                        const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+                        const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                        const isSelected = selectedWorkType?.id === wt.id;
+                        return (
+                          <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
+                            className={`${colorClass} flex flex-col items-center justify-center gap-3 p-6 rounded-2xl min-h-[120px] text-white font-semibold text-xl transition-all duration-150 active:scale-95 ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}`}
+                          >
+                            <span className="text-4xl">{wt.icon ?? icon}</span>
+                            <span>{wt.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* "Více" button */}
+                    {primaryWt && !showAllWorkTypes && (
+                      <button
+                        onClick={() => setShowAllWorkTypes(true)}
+                        className="text-slate-400 hover:text-slate-200 text-sm font-medium underline underline-offset-2 transition-colors mt-1"
                       >
-                        <span className="text-4xl">{wt.icon ?? icon}</span>
-                        <span>{wt.name}</span>
+                        {t('Více možností', 'More options')}
                       </button>
-                    );
-                  })}
-                </div>
-                {/* "Více" button — only shown when primary dept is set and we're not already expanded */}
-                {primaryWt && !showAllWorkTypes && (
-                  <button
-                    onClick={() => setShowAllWorkTypes(true)}
-                    className="text-slate-400 hover:text-slate-200 text-sm font-medium underline underline-offset-2 transition-colors mt-1"
-                  >
-                    {t('Více možností', 'More options')}
-                  </button>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -418,6 +527,119 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 <span className="inline-block w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : null}
               {t('Zaznamenat odchod', 'Clock out')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* HomeOffice Retrospective Form */}
+      {screen === 'ho-form' && (
+        <div className="w-full max-w-lg flex flex-col items-center gap-5">
+          <div className="text-center">
+            <div className="text-5xl mb-2">🏠</div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-100">{t('HomeOffice — Zpětné zadání', 'HomeOffice — Retrospective entry')}</h1>
+            <p className="text-slate-400 mt-1 text-base">{t('Zadejte kdy jste pracoval(a) z domova', 'Enter when you worked from home')}</p>
+          </div>
+
+          {/* Date picker with quick buttons */}
+          <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+            <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Datum', 'Date')}</label>
+            <div className="flex gap-2 flex-wrap">
+              {[0, 1].map((back) => {
+                const d = localDateStr(back);
+                const label = back === 0 ? t('Dnes', 'Today') : t('Včera', 'Yesterday');
+                return (
+                  <button
+                    key={back}
+                    onClick={() => setHoFormDate(d)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${hoFormDate === d ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+              <input
+                type="date"
+                value={hoFormDate}
+                max={localDateStr(0)}
+                onChange={(e) => setHoFormDate(e.target.value)}
+                className="flex-1 min-w-[140px] bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+              />
+            </div>
+          </div>
+
+          {/* Time range */}
+          <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+            <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
+            <div className="flex gap-3 items-center">
+              <div className="flex-1 flex flex-col gap-1">
+                <span className="text-slate-400 text-xs">{t('Od', 'From')}</span>
+                <input
+                  type="time"
+                  value={hoFormStart}
+                  onChange={(e) => setHoFormStart(e.target.value)}
+                  className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                />
+              </div>
+              <span className="text-slate-500 text-2xl mt-4">–</span>
+              <div className="flex-1 flex flex-col gap-1">
+                <span className="text-slate-400 text-xs">{t('Do', 'To')}</span>
+                <input
+                  type="time"
+                  value={hoFormEnd}
+                  onChange={(e) => setHoFormEnd(e.target.value)}
+                  className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+            {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (
+              <p className="text-emerald-400 text-sm text-center">
+                {(() => {
+                  const [sh, sm] = hoFormStart.split(':').map(Number);
+                  const [eh, em] = hoFormEnd.split(':').map(Number);
+                  const totalMins = (eh * 60 + em) - (sh * 60 + sm);
+                  const h = Math.floor(totalMins / 60);
+                  const m = totalMins % 60;
+                  return `${t('Celkem', 'Total')}: ${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m` : ''}`;
+                })()}
+              </p>
+            )}
+          </div>
+
+          {/* Activity summary */}
+          <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+            <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Popis činnosti (volitelné)', 'Activity summary (optional)')}</label>
+            <textarea
+              value={hoFormSummary}
+              onChange={(e) => setHoFormSummary(e.target.value)}
+              placeholder={t('Např. Zpracování faktur, videokonference, příprava prezentace...', 'E.g. Invoice processing, video call, preparing presentation...')}
+              rows={3}
+              className="w-full bg-slate-700 text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+            />
+          </div>
+
+          {/* Error */}
+          {hoFormError && (
+            <p className="text-red-400 text-sm text-center bg-red-900/30 rounded-xl px-4 py-2 w-full">{hoFormError}</p>
+          )}
+
+          {/* Buttons */}
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={() => setScreen('checkin')}
+              className="flex-1 min-h-[56px] bg-slate-700 hover:bg-slate-600 text-white text-base font-semibold rounded-xl transition-all active:scale-95"
+            >
+              {t('Zpět', 'Back')}
+            </button>
+            <button
+              onClick={handleHoRecord}
+              disabled={!hoFormDate || !hoFormStart || !hoFormEnd || hoLoading}
+              className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {hoLoading
+                ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : null}
+              {t('Uložit docházku', 'Save attendance')}
             </button>
           </div>
         </div>
