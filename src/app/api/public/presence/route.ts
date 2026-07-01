@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   if (pin) {
     const { data: employee, error: empError } = await supabase
       .from('employees')
-      .select('id, name, active')
+      .select('id, name, active, department')
       .eq('organization_id', orgId)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
       .eq('active', true)
@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       employeeId: employee.id,
       employeeName: employee.name,
+      employeeDepartment: (employee as { department?: string | null }).department ?? null,
       presence: openLog
         ? { checkIn: openLog.check_in, workTypeName: openLog.work_type_name ?? null }
         : null,

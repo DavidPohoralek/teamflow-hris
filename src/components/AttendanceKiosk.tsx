@@ -88,6 +88,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
   const [employeeName, setEmployeeName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
+  const [employeeDepartment, setEmployeeDepartment] = useState<string | null>(null);
+  const [showAllWorkTypes, setShowAllWorkTypes] = useState(false);
   const [presence, setPresence] = useState<PresenceRecord | null>(null);
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType | null>(null);
@@ -153,6 +155,16 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       const data = await res.json();
       setEmployeeName(data.employeeName ?? 'Zaměstnanec');
       setEmployeeId(data.employeeId ?? '');
+      const dept = data.employeeDepartment ?? null;
+      setEmployeeDepartment(dept);
+      setShowAllWorkTypes(false);
+      // Auto-select the primary department work type if it exists
+      if (dept) {
+        const match = workTypes.find((wt) => wt.name.toLowerCase() === dept.toLowerCase());
+        setSelectedWorkType(match ?? null);
+      } else {
+        setSelectedWorkType(null);
+      }
       if (data.presence) {
         setPresence(data.presence);
         setScreen('checkout');
@@ -254,58 +266,59 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           </h1>
           <p className="text-slate-400 text-sm sm:text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
 
-          {/* Mobile: compact list; Desktop: grid cards */}
-          <div className="w-full">
-            {/* Mobile list */}
-            <div className="flex flex-col gap-2 sm:hidden">
-              {workTypes.map((wt, idx) => {
-                const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-                const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
-                const isSelected = selectedWorkType?.id === wt.id;
-                return (
+          {/* Work type selection */}
+          {(() => {
+            const primaryWt = employeeDepartment
+              ? workTypes.find((wt) => wt.name.toLowerCase() === employeeDepartment.toLowerCase())
+              : null;
+            const visibleTypes = (primaryWt && !showAllWorkTypes) ? [primaryWt] : workTypes;
+            return (
+              <div className="w-full flex flex-col items-center gap-4">
+                {/* Mobile list */}
+                <div className="flex flex-col gap-2 sm:hidden w-full">
+                  {visibleTypes.map((wt, idx) => {
+                    const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+                    const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                    const isSelected = selectedWorkType?.id === wt.id;
+                    return (
+                      <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
+                        className={`${colorClass} flex items-center gap-3 px-4 py-3 rounded-xl w-full text-white font-semibold text-base transition-all duration-150 active:scale-[0.98] ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1e293b] brightness-110' : 'opacity-80'}`}
+                      >
+                        <span className="text-2xl shrink-0">{wt.icon ?? icon}</span>
+                        <span className="flex-1 text-left">{wt.name}</span>
+                        {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Desktop grid */}
+                <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
+                  {visibleTypes.map((wt, idx) => {
+                    const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+                    const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                    const isSelected = selectedWorkType?.id === wt.id;
+                    return (
+                      <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
+                        className={`${colorClass} flex flex-col items-center justify-center gap-3 p-6 rounded-2xl min-h-[120px] text-white font-semibold text-xl transition-all duration-150 active:scale-95 ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}`}
+                      >
+                        <span className="text-4xl">{wt.icon ?? icon}</span>
+                        <span>{wt.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* "Více" button — only shown when primary dept is set and we're not already expanded */}
+                {primaryWt && !showAllWorkTypes && (
                   <button
-                    key={wt.id}
-                    onClick={() => setSelectedWorkType(wt)}
-                    className={`
-                      ${colorClass}
-                      flex items-center gap-3 px-4 py-3 rounded-xl w-full
-                      text-white font-semibold text-base
-                      transition-all duration-150 active:scale-[0.98]
-                      ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1e293b] brightness-110' : 'opacity-80'}
-                    `}
+                    onClick={() => setShowAllWorkTypes(true)}
+                    className="text-slate-400 hover:text-slate-200 text-sm font-medium underline underline-offset-2 transition-colors mt-1"
                   >
-                    <span className="text-2xl shrink-0">{wt.icon ?? icon}</span>
-                    <span className="flex-1 text-left">{wt.name}</span>
-                    {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                    {t('Více možností', 'More options')}
                   </button>
-                );
-              })}
-            </div>
-            {/* Desktop grid */}
-            <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {workTypes.map((wt, idx) => {
-                const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-                const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
-                const isSelected = selectedWorkType?.id === wt.id;
-                return (
-                  <button
-                    key={wt.id}
-                    onClick={() => setSelectedWorkType(wt)}
-                    className={`
-                      ${colorClass}
-                      flex flex-col items-center justify-center gap-3 p-6 rounded-2xl
-                      min-h-[120px] text-white font-semibold text-xl
-                      transition-all duration-150 active:scale-95
-                      ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}
-                    `}
-                  >
-                    <span className="text-4xl">{wt.icon ?? icon}</span>
-                    <span>{wt.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="flex gap-3 w-full mt-1">
             <button
