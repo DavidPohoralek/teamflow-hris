@@ -378,6 +378,23 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   // Employee PIN session
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
+
+  // Restore session from localStorage on mount (persists across tab switches)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('hris_employee_session');
+      if (stored) {
+        const parsed = JSON.parse(stored) as { id: string; name: string; pin: string; orgId: string };
+        if (parsed.orgId === orgId && parsed.id && parsed.name && parsed.pin) {
+          setSessionPin(parsed.pin);
+          setSessionEmployee({ id: parsed.id, name: parsed.name });
+          fetch(`/api/public/vacation-balance?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(parsed.pin)}`)
+            .then(r => r.json()).then(b => setVacBalance(b)).catch(() => {});
+        }
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showEmployeeVacModal, setShowEmployeeVacModal] = useState(false);
   const [clickedDate, setClickedDate] = useState<string | undefined>(undefined);
   // Toolbar PIN widget state (same UX as WorkPlanGrid)
@@ -526,6 +543,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       const json = await res.json();
       setSessionPin(pinInputValue);
       setSessionEmployee({ id: json.employeeId, name: json.employeeName });
+      try { localStorage.setItem('hris_employee_session', JSON.stringify({ id: json.employeeId, name: json.employeeName, pin: pinInputValue, orgId })); } catch { /* ignore */ }
       // Load vacation balance
       fetch(`/api/public/vacation-balance?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pinInputValue)}`)
         .then(r => r.json()).then(b => setVacBalance(b)).catch(() => {});
@@ -651,7 +669,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
                   <button
-                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); setMyVacationOnly(false); setVacBalance(null); }}
+                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); setMyVacationOnly(false); setVacBalance(null); localStorage.removeItem('hris_employee_session'); }}
                     className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1"
                     title="Odhlásit"
                   >✕</button>

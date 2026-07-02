@@ -1318,6 +1318,21 @@ export default function WorkPlanGrid({
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
   const [pinInputValue, setPinInputValue] = useState('');
+
+  // Restore session from localStorage on mount (persists across tab switches)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('hris_employee_session');
+      if (stored) {
+        const parsed = JSON.parse(stored) as { id: string; name: string; pin: string; orgId: string };
+        if (parsed.orgId === orgId && parsed.id && parsed.name && parsed.pin) {
+          setSessionPin(parsed.pin);
+          setSessionEmployee({ id: parsed.id, name: parsed.name });
+        }
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [pinInputError, setPinInputError] = useState(false);
   const [pinInputLoading, setPinInputLoading] = useState(false);
   // Day detail — shown when clicking a day without PIN (read-only overview)
@@ -1464,6 +1479,7 @@ export default function WorkPlanGrid({
       const json = await res.json();
       setSessionPin(pinInputValue);
       setSessionEmployee({ id: json.employeeId, name: json.employeeName });
+      try { localStorage.setItem('hris_employee_session', JSON.stringify({ id: json.employeeId, name: json.employeeName, pin: pinInputValue, orgId })); } catch { /* ignore */ }
       setPinInputValue('');
     } catch {
       setPinInputError(true);
@@ -1658,7 +1674,7 @@ export default function WorkPlanGrid({
                 <div className="ml-auto flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
-                  <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); }} className="text-emerald-400 hover:text-emerald-700 text-xs">✕</button>
+                  <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); localStorage.removeItem('hris_employee_session'); }} className="text-emerald-400 hover:text-emerald-700 text-xs">✕</button>
                 </div>
               </div>
             ) : (
@@ -1928,7 +1944,7 @@ export default function WorkPlanGrid({
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
                   <button
-                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); }}
+                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); localStorage.removeItem('hris_employee_session'); }}
                     className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs"
                     title={t('Odhlásit', 'Log out')}
                   >✕</button>
