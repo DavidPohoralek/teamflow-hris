@@ -194,18 +194,44 @@ export async function PUT(
           console.error('Correction attendance_log update error:', logError.message, logError);
         }
       }
-    } else if (timeIn && timeOut) {
-      // No linked log (old behaviour or both-field correction) → insert new record
-      const { error: logError } = await svc.from('attendance_logs').insert({
-        organization_id: orgId,
-        employee_id: existing.employee_id,
-        date,
-        check_in: toTimestamp(timeIn),
-        check_out: toTimestamp(timeOut),
-        note: 'Oprava docházky (schváleno)',
-      });
-      if (logError) {
-        console.error('Correction attendance_log insert error:', logError.message, logError);
+    } else if (timeIn || timeOut) {
+      // No linked log — try to find the single existing log for this date and UPDATE it.
+      // Only fall back to INSERT when no log exists (avoids duplicate records).
+      const { data: existingLogs } = await svc
+        .from('attendance_logs')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('employee_id', existing.employee_id)
+        .eq('date', date);
+
+      const logs = existingLogs ?? [];
+      if (logs.length === 1) {
+        // Exactly one log → safe to update it
+        const patch: Record<string, string | null> = {};
+        if (timeIn) patch.check_in = toTimestamp(timeIn);
+        if (timeOut) patch.check_out = toTimestamp(timeOut);
+        const { error: logError } = await svc
+          .from('attendance_logs')
+          .update(patch)
+          .eq('id', logs[0].id)
+          .eq('organization_id', orgId)
+          .eq('employee_id', existing.employee_id);
+        if (logError) {
+          console.error('Correction attendance_log update (no linkedId) error:', logError.message, logError);
+        }
+      } else if (timeIn && timeOut) {
+        // 0 or 2+ logs — insert a new complete record as fallback
+        const { error: logError } = await svc.from('attendance_logs').insert({
+          organization_id: orgId,
+          employee_id: existing.employee_id,
+          date,
+          check_in: toTimestamp(timeIn),
+          check_out: toTimestamp(timeOut),
+          note: 'Oprava docházky (schváleno)',
+        });
+        if (logError) {
+          console.error('Correction attendance_log insert error:', logError.message, logError);
+        }
       }
     }
   }
