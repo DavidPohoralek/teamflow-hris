@@ -924,7 +924,7 @@ function EntryChip({
   isEvening?: boolean;
 }) {
   const canEdit = isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId);
-  const color = isEvening ? '#f97316' : (entry.workTypeColor ?? '#94a3b8');
+  const color = entry.workTypeColor ?? '#94a3b8';
   const timeLabel =
     entry.startTime && entry.endTime
       ? ` ${entry.startTime.slice(0, 5)}–${entry.endTime.slice(0, 5)}`
