@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import WorkPlanGrid from '@/components/WorkPlanGrid'
 import AttendanceKiosk from '@/components/AttendanceKiosk'
-import AttendanceManager from '@/components/AttendanceManager'
 import PresenceDashboard from '@/components/PresenceDashboard'
 import EmployeeHoursPortal from '@/components/EmployeeHoursPortal'
 import ManagerLoginModal from '@/components/ManagerLoginModal'
@@ -390,9 +389,7 @@ export default function HomePage() {
       <main className="flex-1 overflow-hidden bg-slate-50 flex flex-col">
         {/* Kiosk tabs: fill remaining height, no outer scroll */}
         {activeTab === 'attendance' && (
-          isManagerMode
-            ? <div className="flex-1 overflow-auto"><AttendanceManager orgId={orgId} /></div>
-            : <AttendanceKiosk orgId={orgId} />
+          <AttendanceKiosk orgId={orgId} />
         )}
 
         {activeTab === 'my-hours' && (

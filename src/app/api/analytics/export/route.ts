@@ -5,7 +5,7 @@ import { resolveOrgId } from '@/lib/resolveOrg';
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase } = resolved;
+  const { orgId, supabase, departments } = resolved;
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
   const overtimeThreshold = settings['bonus_overtime_threshold'] ?? 0;
   const overtimeBonusPct = settings['bonus_overtime_pct'] ?? 25;
 
+  let empQuery = sb.from('employees').select('id, name, target_hours, employment_type, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
+  if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
+
   const [empRes, logsRes, plansRes, vacRes] = await Promise.all([
-    sb.from('employees').select('id, name, target_hours, employment_type, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name'),
+    empQuery,
     sb.from('attendance_logs').select('employee_id, check_in, check_out, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
     sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
     sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
