@@ -2219,6 +2219,7 @@ export default function WorkPlanGrid({
                   const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
                   const eMin = toMin(eveningConfig.start ?? '17:00');
                   es = es.filter((e) => {
+                    if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
                     const startMin = e.startTime ? toMin(e.startTime) : null;
                     const endMin = e.endTime ? toMin(e.endTime) : null;
                     return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
