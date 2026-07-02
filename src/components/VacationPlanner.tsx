@@ -170,6 +170,109 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
   );
 }
 
+// ─── VacationDayPicker ───────────────────────────────────────────────────────
+// Click a day to set start; Shift+click extends the range.
+// No weekend exclusion — all days are selectable.
+function VacationDayPicker({ dateFrom, dateTo, onChange }: {
+  dateFrom: string;
+  dateTo: string;
+  onChange: (from: string, to: string) => void;
+}) {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const [viewMonth, setViewMonth] = useState(() =>
+    dateFrom ? dateFrom.slice(0, 7) : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  );
+
+  // Sync view when caller provides an initial date after mount
+  useEffect(() => {
+    if (dateFrom && !dateFrom.startsWith(viewMonth)) setViewMonth(dateFrom.slice(0, 7));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom]);
+
+  const [yr, mo] = viewMonth.split('-').map(Number);
+  const firstDow = (new Date(yr, mo - 1, 1).getDay() + 6) % 7; // 0 = Mon
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const cells: (string | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => {
+      const d = i + 1;
+      return `${yr}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const handleDayClick = (dateStr: string, e: React.MouseEvent) => {
+    if (e.shiftKey && dateFrom) {
+      const [a, b] = [dateFrom, dateStr].sort();
+      onChange(a, a === b ? '' : b);
+    } else {
+      onChange(dateStr, '');
+    }
+  };
+
+  const to = dateTo || dateFrom;
+  const monthLabel = new Date(yr, mo - 1, 1).toLocaleString('cs-CZ', { month: 'long', year: 'numeric' });
+  const DAY_HDRS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+
+  return (
+    <div className="select-none">
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={() => setViewMonth(prevMonth(viewMonth))}
+          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors leading-none">‹</button>
+        <span className="text-sm font-semibold text-slate-700 capitalize">{monthLabel}</span>
+        <button type="button" onClick={() => setViewMonth(nextMonth(viewMonth))}
+          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors leading-none">›</button>
+      </div>
+
+      <div className="grid grid-cols-7 mb-1">
+        {DAY_HDRS.map((d, i) => (
+          <div key={d} className={`text-center text-xs font-medium py-0.5 ${i >= 5 ? 'text-slate-400' : 'text-slate-500'}`}>{d}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {cells.map((dateStr, i) => {
+          if (!dateStr) return <div key={i} />;
+          const dayNum = parseInt(dateStr.slice(-2));
+          const dow = i % 7; // 0=Mon … 6=Sun
+          const isWeekend = dow >= 5;
+          const isFrom = dateStr === dateFrom;
+          const isTo = dateTo ? dateStr === dateTo : false;
+          const inRange = dateFrom && dateTo && dateStr > dateFrom && dateStr < dateTo;
+          const isToday = dateStr === todayStr;
+          const isEndpoint = isFrom || isTo;
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              onClick={(e) => handleDayClick(dateStr, e)}
+              className={[
+                'text-xs py-1.5 rounded-lg transition-all cursor-pointer font-medium',
+                isEndpoint ? 'bg-emerald-600 text-white shadow-sm' : '',
+                inRange && !isEndpoint ? 'bg-emerald-100 text-emerald-800' : '',
+                !isEndpoint && !inRange && isWeekend ? 'text-slate-400 hover:bg-slate-100' : '',
+                !isEndpoint && !inRange && !isWeekend ? 'text-slate-700 hover:bg-slate-100' : '',
+                isToday && !isEndpoint ? 'ring-1 ring-inset ring-blue-400' : '',
+              ].filter(Boolean).join(' ')}
+            >
+              {dayNum}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 text-xs text-center text-slate-400 min-h-[1rem]">
+        {dateFrom
+          ? dateTo && dateTo !== dateFrom
+            ? `${new Date(dateFrom + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })} – ${new Date(dateTo + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}`
+            : new Date(dateFrom + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'Klikni na den · Shift+klik pro rozsah'}
+      </div>
+    </div>
+  );
+}
+
 // ─── Employee Vacation Modal ──────────────────────────────────────────────────
 // Assumes employee is already authenticated via PIN session in toolbar.
 // shiftDays: set of YYYY-MM-DD strings where the employee has planned shifts.
@@ -275,18 +378,11 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
             </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Od *', 'From *')}</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} required
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Do', 'To')}</label>
-            <input type="date" value={dateTo} min={dateFrom} onChange={(e) => setDateTo(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-        </div>
+        <VacationDayPicker
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+        />
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">{t('Poznámka', 'Note')}</label>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
