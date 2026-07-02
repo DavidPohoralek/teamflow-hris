@@ -1720,8 +1720,13 @@ export default function WorkPlanGrid({
                   : allEntries;
                 if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
                 if (eveningFilter && eveningConfig?.enabled) {
-                  const eH = parseInt((eveningConfig.start ?? '17:00').split(':')[0]);
-                  es = es.filter((e) => e.startTime && parseInt(e.startTime.split(':')[0]) >= eH);
+                  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+                  const eMin = toMin(eveningConfig.start ?? '17:00');
+                  es = es.filter((e) => {
+                    const startMin = e.startTime ? toMin(e.startTime) : null;
+                    const endMin = e.endTime ? toMin(e.endTime) : null;
+                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
+                  });
                 }
                 return es;
               })();
@@ -2051,8 +2056,13 @@ export default function WorkPlanGrid({
                   : allEntries;
                 if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
                 if (eveningFilter && eveningConfig?.enabled) {
-                  const eH = parseInt((eveningConfig.start ?? '17:00').split(':')[0]);
-                  es = es.filter((e) => e.startTime && parseInt(e.startTime.split(':')[0]) >= eH);
+                  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+                  const eMin = toMin(eveningConfig.start ?? '17:00');
+                  es = es.filter((e) => {
+                    const startMin = e.startTime ? toMin(e.startTime) : null;
+                    const endMin = e.endTime ? toMin(e.endTime) : null;
+                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
+                  });
                 }
                 return es;
               })();
