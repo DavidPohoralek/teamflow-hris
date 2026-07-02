@@ -170,28 +170,39 @@ function AddVacationModal({ orgId, employees, onClose, onSaved }: {
   );
 }
 
+// Group sorted date strings into contiguous ranges.
+function groupConsecutiveDays(days: Set<string>): Array<{ from: string; to: string }> {
+  const sorted = Array.from(days).sort();
+  if (!sorted.length) return [];
+  const groups: Array<{ from: string; to: string }> = [];
+  let from = sorted[0], to = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const diff = (new Date(sorted[i] + 'T00:00:00').getTime() - new Date(to + 'T00:00:00').getTime()) / 86400000;
+    if (diff === 1) { to = sorted[i]; }
+    else { groups.push({ from, to }); from = to = sorted[i]; }
+  }
+  groups.push({ from, to });
+  return groups;
+}
+
 // ─── VacationDayPicker ───────────────────────────────────────────────────────
-// Click a day to set start; Shift+click extends the range.
-// No weekend exclusion — all days are selectable.
-function VacationDayPicker({ dateFrom, dateTo, onChange }: {
-  dateFrom: string;
-  dateTo: string;
-  onChange: (from: string, to: string) => void;
+// Click = toggle individual day. Shift+click = add range from last click.
+function VacationDayPicker({ selectedDays, onChange }: {
+  selectedDays: Set<string>;
+  onChange: (days: Set<string>) => void;
 }) {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const [viewMonth, setViewMonth] = useState(() =>
-    dateFrom ? dateFrom.slice(0, 7) : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const initMonth = selectedDays.size > 0
+    ? Array.from(selectedDays).sort()[0].slice(0, 7)
+    : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [viewMonth, setViewMonth] = useState(initMonth);
+  const [lastClicked, setLastClicked] = useState<string | null>(
+    selectedDays.size > 0 ? Array.from(selectedDays).sort()[0] : null
   );
 
-  // Sync view when caller provides an initial date after mount
-  useEffect(() => {
-    if (dateFrom && !dateFrom.startsWith(viewMonth)) setViewMonth(dateFrom.slice(0, 7));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom]);
-
   const [yr, mo] = viewMonth.split('-').map(Number);
-  const firstDow = (new Date(yr, mo - 1, 1).getDay() + 6) % 7; // 0 = Mon
+  const firstDow = (new Date(yr, mo - 1, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(yr, mo, 0).getDate();
   const cells: (string | null)[] = [
     ...Array(firstDow).fill(null),
@@ -203,19 +214,31 @@ function VacationDayPicker({ dateFrom, dateTo, onChange }: {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const handleDayClick = (dateStr: string, e: React.MouseEvent) => {
-    if (dateFrom && (e.shiftKey || !dateTo)) {
-      // 2nd click (or shift+click): set end of range
-      const [a, b] = [dateFrom, dateStr].sort();
-      onChange(a, a === b ? '' : b);
+    const next = new Set(selectedDays);
+    if (e.shiftKey && lastClicked && lastClicked !== dateStr) {
+      // Shift+click: add every day in range from lastClicked to dateStr
+      const [a, b] = [lastClicked, dateStr].sort();
+      const cur = new Date(a + 'T00:00:00');
+      const end = new Date(b + 'T00:00:00');
+      while (cur <= end) { next.add(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
     } else {
-      // 1st click or 3rd click (reset): start fresh
-      onChange(dateStr, '');
+      // Normal click: toggle individual day
+      if (next.has(dateStr)) next.delete(dateStr); else next.add(dateStr);
     }
+    setLastClicked(dateStr);
+    onChange(next);
   };
 
-  const to = dateTo || dateFrom;
   const monthLabel = new Date(yr, mo - 1, 1).toLocaleString('cs-CZ', { month: 'long', year: 'numeric' });
   const DAY_HDRS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+  const groups = groupConsecutiveDays(selectedDays);
+  const summaryText = groups.length === 0
+    ? 'Klikni na den · Shift+klik pro rozsah'
+    : groups.map(g =>
+        g.from === g.to
+          ? new Date(g.from + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })
+          : `${new Date(g.from + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })} – ${new Date(g.to + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}`
+      ).join(', ');
 
   return (
     <div className="select-none">
@@ -237,13 +260,9 @@ function VacationDayPicker({ dateFrom, dateTo, onChange }: {
         {cells.map((dateStr, i) => {
           if (!dateStr) return <div key={i} />;
           const dayNum = parseInt(dateStr.slice(-2));
-          const dow = i % 7; // 0=Mon … 6=Sun
-          const isWeekend = dow >= 5;
-          const isFrom = dateStr === dateFrom;
-          const isTo = dateTo ? dateStr === dateTo : false;
-          const inRange = dateFrom && dateTo && dateStr > dateFrom && dateStr < dateTo;
+          const isWeekend = (i % 7) >= 5;
+          const isSelected = selectedDays.has(dateStr);
           const isToday = dateStr === todayStr;
-          const isEndpoint = isFrom || isTo;
           return (
             <button
               key={dateStr}
@@ -251,11 +270,10 @@ function VacationDayPicker({ dateFrom, dateTo, onChange }: {
               onClick={(e) => handleDayClick(dateStr, e)}
               className={[
                 'text-xs py-1.5 rounded-lg transition-all cursor-pointer font-medium',
-                isEndpoint ? 'bg-emerald-600 text-white shadow-sm' : '',
-                inRange && !isEndpoint ? 'bg-emerald-100 text-emerald-800' : '',
-                !isEndpoint && !inRange && isWeekend ? 'text-slate-400 hover:bg-slate-100' : '',
-                !isEndpoint && !inRange && !isWeekend ? 'text-slate-700 hover:bg-slate-100' : '',
-                isToday && !isEndpoint ? 'ring-1 ring-inset ring-blue-400' : '',
+                isSelected ? 'bg-emerald-600 text-white shadow-sm' : 'hover:bg-slate-100',
+                !isSelected && isWeekend ? 'text-slate-400' : '',
+                !isSelected && !isWeekend ? 'text-slate-700' : '',
+                isToday && !isSelected ? 'ring-1 ring-inset ring-blue-400' : '',
               ].filter(Boolean).join(' ')}
             >
               {dayNum}
@@ -264,12 +282,10 @@ function VacationDayPicker({ dateFrom, dateTo, onChange }: {
         })}
       </div>
 
-      <div className="mt-2 text-xs text-center text-slate-400 min-h-[1rem]">
-        {dateFrom
-          ? dateTo && dateTo !== dateFrom
-            ? `${new Date(dateFrom + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })} – ${new Date(dateTo + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}`
-            : new Date(dateFrom + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })
-          : 'Klikni na den · Shift+klik pro rozsah'}
+      <div className="mt-2 text-xs text-center min-h-[1rem]">
+        {groups.length > 0
+          ? <span className="text-slate-600">{summaryText} <span className="text-slate-400">({selectedDays.size} {selectedDays.size === 1 ? 'den' : selectedDays.size < 5 ? 'dny' : 'dní'})</span></span>
+          : <span className="text-slate-400">{summaryText}</span>}
       </div>
     </div>
   );
@@ -288,8 +304,9 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
   onSaved: () => void;
 }) {
   const t = useT();
-  const [dateFrom, setDateFrom] = useState(initialDate ?? '');
-  const [dateTo, setDateTo] = useState('');
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(() =>
+    initialDate ? new Set([initialDate]) : new Set()
+  );
   const [note, setNote] = useState('');
   const [dayType, setDayType] = useState<'full' | 'partial'>('full');
   const [hours, setHours] = useState<string>('4');
@@ -297,43 +314,32 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Compute conflicting shift days in the requested range
-  function getConflicts(from: string, to: string): string[] {
-    if (!from) return [];
-    const end = to || from;
-    const result: string[] = [];
-    const cur = new Date(from + 'T00:00:00');
-    const last = new Date(end + 'T00:00:00');
-    while (cur <= last) {
-      const d = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
-      if (shiftDays.has(d)) result.push(d);
-      cur.setDate(cur.getDate() + 1);
-    }
-    return result;
-  }
-
-  const conflicts = getConflicts(dateFrom, dateTo);
+  const conflicts = Array.from(selectedDays).filter(d => shiftDays.has(d));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dateFrom) { setError(t('Zadejte datum od.', 'Please enter a start date.')); return; }
+    if (selectedDays.size === 0) { setError(t('Vyberte alespoň jeden den.', 'Please select at least one day.')); return; }
     if (conflicts.length > 0) {
       setError(`Máte naplánované směny na: ${conflicts.map((d) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ')).join(', ')}. Nejprve si nechte zrušit směny a pak teprve požádejte o dovolenou.`);
       return;
     }
     setSaving(true); setError(null);
     try {
-      const res = await fetch('/api/public/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId, pin, type: 'vacation', dateFrom,
-          dateTo: dateTo || undefined,
-          note: note || undefined,
-          hours: dayType === 'partial' ? parseFloat(hours) : undefined,
-        }),
-      });
-      if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Chyba'); return; }
+      const groups = groupConsecutiveDays(selectedDays);
+      for (const group of groups) {
+        const res = await fetch('/api/public/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orgId, pin, type: 'vacation',
+            dateFrom: group.from,
+            dateTo: group.to !== group.from ? group.to : undefined,
+            note: note || undefined,
+            hours: dayType === 'partial' ? parseFloat(hours) : undefined,
+          }),
+        });
+        if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Chyba'); return; }
+      }
       setSuccess(true);
       onSaved();
       setTimeout(() => onClose(), 1800);
@@ -381,9 +387,8 @@ function EmployeeVacationModal({ orgId, pin, employee, initialDate, shiftDays, o
           )}
         </div>
         <VacationDayPicker
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onChange={(from, to) => { setDateFrom(from); setDateTo(to); }}
+          selectedDays={selectedDays}
+          onChange={setSelectedDays}
         />
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">{t('Poznámka', 'Note')}</label>
