@@ -546,7 +546,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                         <span className="text-3xl shrink-0">🏠</span>
                         <div className="flex-1 text-left">
                           <div className="font-bold">{wt.name}</div>
-                          <div className="text-emerald-300 text-sm font-normal">{t('Zpětné zadání docházky', 'Retrospective attendance entry')}</div>
+                          <div className="text-emerald-300 text-sm font-normal">{t('Zpětné zadání docházky / Stopky', 'Retrospective entry / Timer')}</div>
                         </div>
                         <span className="text-emerald-400 text-xl">→</span>
                       </button>
