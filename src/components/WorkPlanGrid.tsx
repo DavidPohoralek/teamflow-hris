@@ -724,6 +724,7 @@ interface DayCardProps {
   onPaste?: (dateStr: string) => void;
   isMyVacation?: boolean;
   isToday?: boolean;
+  expanded?: boolean;
 }
 
 function DayCard({
@@ -746,6 +747,7 @@ function DayCard({
   onPaste,
   isMyVacation,
   isToday,
+  expanded,
 }: DayCardProps) {
   const t = useT();
   const day = new Date(dateStr + 'T00:00:00');
@@ -767,7 +769,7 @@ function DayCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`group rounded-xl border h-[106px] p-2.5 flex flex-col gap-1.5 transition-colors relative overflow-hidden ${
+      className={`group rounded-xl border p-2.5 flex flex-col gap-1.5 transition-colors relative ${expanded ? 'min-h-[100px]' : 'h-[106px] overflow-hidden'} ${
         isMyVacation
           ? 'bg-pink-50 border-pink-300 shadow-sm cursor-pointer hover:border-pink-400'
           : isPasteMode
@@ -828,8 +830,8 @@ function DayCard({
         </div>
       </div>
 
-      {/* Chips — scrollable, above hatching */}
-      <div className="relative z-10 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 scrollbar-thin">
+      {/* Chips — scrollable in month view, full list in week view */}
+      <div className={`relative z-10 flex flex-col gap-1 ${expanded ? '' : 'overflow-y-auto flex-1 min-h-0 scrollbar-thin'}`}>
         {entries.map((entry, idx) => (
           <EntryChip
             key={idx}
@@ -1319,6 +1321,12 @@ export default function WorkPlanGrid({
   // Evening-only filter — show only shifts starting at/after eveningConfig.start
   const [eveningFilter, setEveningFilter] = useState(false);
 
+  // Desktop view mode: month (default) or week
+  const [desktopViewMode, setDesktopViewMode] = useState<'month' | 'week'>('month');
+  const [desktopWeekStart, setDesktopWeekStart] = useState<Date>(() => getWeekStart(new Date()));
+  // Extra plans for the adjacent month when the visible week spans two months
+  const [weekExtraPlans, setWeekExtraPlans] = useState<WorkPlanEntry[]>([]);
+
   // Mobile week view — start on Monday of current week
   const [mobileWeekStart, setMobileWeekStart] = useState<Date>(() => getWeekStart(new Date()));
 
@@ -1415,6 +1423,40 @@ export default function WorkPlanGrid({
       })
       .catch(() => {});
   }, [orgId]);
+
+  // Desktop week navigation
+  const handleDesktopPrevWeek = useCallback(() => {
+    setDesktopWeekStart(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 7);
+      const newMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (newMonth !== month) onMonthChange(newMonth);
+      return d;
+    });
+  }, [month, onMonthChange]);
+
+  const handleDesktopNextWeek = useCallback(() => {
+    setDesktopWeekStart(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 7);
+      const newMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (newMonth !== month) onMonthChange(newMonth);
+      return d;
+    });
+  }, [month, onMonthChange]);
+
+  // When week spans two months, also fetch the adjacent month's data
+  useEffect(() => {
+    if (desktopViewMode !== 'week') { setWeekExtraPlans([]); return; }
+    const weekDays = getWeekDays(desktopWeekStart);
+    const otherMonths = weekDays.map(d => d.slice(0, 7)).filter(m => m !== month);
+    const extraMonth = otherMonths.find(m => m !== month);
+    if (!extraMonth) { setWeekExtraPlans([]); return; }
+    fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(extraMonth)}`)
+      .then(r => r.json())
+      .then(json => setWeekExtraPlans(json.workPlans ?? []))
+      .catch(() => setWeekExtraPlans([]));
+  }, [desktopViewMode, desktopWeekStart, month, orgId]);
 
   const handleShiftSuccess = useCallback(() => {
     fetchSchedule();
@@ -1562,8 +1604,8 @@ export default function WorkPlanGrid({
   const entriesByDate = new Map<string, WorkPlanEntry[]>();
   const metaByDate = new Map<string, ScheduleDayMeta>();
 
-  if (data) {
-    for (const entry of data.workPlans) {
+  if (data || weekExtraPlans.length > 0) {
+    for (const entry of [...(data?.workPlans ?? []), ...weekExtraPlans]) {
       const list = entriesByDate.get(entry.date) ?? [];
       list.push(entry);
       entriesByDate.set(entry.date, list);
@@ -1573,7 +1615,7 @@ export default function WorkPlanGrid({
       list.sort((a: WorkPlanEntry, b: WorkPlanEntry) => (workTypeSortOrder.get(a.workTypeId ?? '') ?? 999) - (workTypeSortOrder.get(b.workTypeId ?? '') ?? 999));
       entriesByDate.set(date, list);
     });
-    for (const meta of data.scheduleDays) {
+    for (const meta of data?.scheduleDays ?? []) {
       metaByDate.set(meta.date, meta);
     }
   }
@@ -1584,6 +1626,20 @@ export default function WorkPlanGrid({
     t('Neděle', 'Sunday'), t('Pondělí', 'Monday'), t('Úterý', 'Tuesday'),
     t('Středa', 'Wednesday'), t('Čtvrtek', 'Thursday'), t('Pátek', 'Friday'), t('Sobota', 'Saturday'),
   ];
+
+  // Desktop week view computed values
+  const desktopWeekDays = getWeekDays(desktopWeekStart);
+  const desktopWeekLabel = (() => {
+    const last = new Date(desktopWeekStart);
+    last.setDate(last.getDate() + 6);
+    const d1 = desktopWeekStart.getDate();
+    const d2 = last.getDate();
+    const m1 = desktopWeekStart.getMonth();
+    const m2 = last.getMonth();
+    const y = last.getFullYear();
+    if (m1 === m2) return `${d1}. – ${d2}. ${MONTH_NAMES[m1]} ${y}`;
+    return `${d1}. ${MONTH_NAMES[m1]} – ${d2}. ${MONTH_NAMES[m2]} ${y}`;
+  })();
 
   return (
     <div className="w-full">
@@ -1816,24 +1872,59 @@ export default function WorkPlanGrid({
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-        {/* Month navigation */}
+        {/* View mode toggle */}
+        <div className="flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+          <button
+            onClick={() => setDesktopViewMode('month')}
+            title={t('Měsíční pohled', 'Month view')}
+            className={`px-2.5 py-2 transition-colors ${desktopViewMode === 'month' ? 'bg-slate-700 text-white' : 'bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="1" y="1" width="6" height="6" rx="1"/>
+              <rect x="9" y="1" width="6" height="6" rx="1"/>
+              <rect x="1" y="9" width="6" height="6" rx="1"/>
+              <rect x="9" y="9" width="6" height="6" rx="1"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              setDesktopViewMode('week');
+              const ws = getWeekStart(new Date());
+              setDesktopWeekStart(ws);
+              const newMonth = `${ws.getFullYear()}-${String(ws.getMonth() + 1).padStart(2, '0')}`;
+              if (newMonth !== month) onMonthChange(newMonth);
+            }}
+            title={t('Týdenní pohled', 'Week view')}
+            className={`px-2.5 py-2 transition-colors border-l border-slate-200 ${desktopViewMode === 'week' ? 'bg-slate-700 text-white' : 'bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="1" y="2" width="2" height="12" rx="0.5"/>
+              <rect x="4.5" y="2" width="2" height="12" rx="0.5"/>
+              <rect x="8" y="2" width="2" height="12" rx="0.5"/>
+              <rect x="11.5" y="2" width="2" height="12" rx="0.5"/>
+              <rect x="13" y="2" width="2" height="12" rx="0.5"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Month / Week navigation */}
         <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
           <button
-            onClick={() => onMonthChange(prevMonth(month))}
+            onClick={desktopViewMode === 'week' ? handleDesktopPrevWeek : () => onMonthChange(prevMonth(month))}
             className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-            aria-label={t('Předchozí měsíc', 'Previous month')}
+            aria-label={desktopViewMode === 'week' ? t('Předchozí týden', 'Previous week') : t('Předchozí měsíc', 'Previous month')}
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-slate-800 min-w-[150px] text-center px-2">
-            {formatMonthLabel(month, MONTH_NAMES)}
+          <span className="text-sm font-semibold text-slate-800 min-w-[160px] text-center px-2">
+            {desktopViewMode === 'week' ? desktopWeekLabel : formatMonthLabel(month, MONTH_NAMES)}
           </span>
           <button
-            onClick={() => onMonthChange(nextMonth(month))}
+            onClick={desktopViewMode === 'week' ? handleDesktopNextWeek : () => onMonthChange(nextMonth(month))}
             className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-            aria-label={t('Následující měsíc', 'Next month')}
+            aria-label={desktopViewMode === 'week' ? t('Další týden', 'Next week') : t('Následující měsíc', 'Next month')}
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -2021,8 +2112,8 @@ export default function WorkPlanGrid({
         </div>
       )}
 
-      {/* Calendar grid */}
-      {!loading && !error && (
+      {/* ── DESKTOP MONTH GRID ───────────────────────────────────────── */}
+      {desktopViewMode === 'month' && !loading && !error && (
         <>
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-1 mb-1.5 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
@@ -2094,6 +2185,73 @@ export default function WorkPlanGrid({
           </div>
 
           {/* Legend */}
+          <Legend workTypes={workTypes} isManagerMode={isManagerMode} onChanged={fetchWorkTypes} />
+        </>
+      )}
+
+      {/* ── DESKTOP WEEK GRID ────────────────────────────────────────── */}
+      {desktopViewMode === 'week' && !loading && !error && (
+        <>
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-2 mb-2 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
+            {DAY_NAMES_SHORT.map((d, idx) => (
+              <div key={idx} className={`text-center text-xs font-semibold py-0.5 ${idx >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Week cells — expanded DayCards */}
+          <div className="grid grid-cols-7 gap-2 items-start">
+            {desktopWeekDays.map((dateStr) => {
+              const wd = mondayWeekday(dateStr);
+              const isWeekend = wd === 5 || wd === 6;
+              const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
+              const allEntries = entriesByDate.get(dateStr) ?? [];
+              const visibleEntries = (() => {
+                let es = myShiftsOnly && sessionEmployee
+                  ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                  : allEntries;
+                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                if (eveningFilter && eveningConfig?.enabled) {
+                  const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
+                  const eMin = toMin(eveningConfig.start ?? '17:00');
+                  es = es.filter((e) => {
+                    const startMin = e.startTime ? toMin(e.startTime) : null;
+                    const endMin = e.endTime ? toMin(e.endTime) : null;
+                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
+                  });
+                }
+                return es;
+              })();
+              return (
+                <DayCard
+                  key={dateStr}
+                  dateStr={dateStr}
+                  entries={visibleEntries}
+                  scheduleMeta={metaByDate.get(dateStr)}
+                  isManagerMode={isManagerMode}
+                  isWeekend={isWeekend}
+                  isClosed={isClosed}
+                  clipboard={clipboard}
+                  sessionEmployeeId={sessionEmployee?.id}
+                  dayNamesShort={DAY_NAMES_SHORT}
+                  eveningConfig={eveningConfig}
+                  orgId={orgId}
+                  onClickDay={handleClickDay}
+                  onEditDay={isManagerMode ? setEditingDate : undefined}
+                  onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
+                  onEditEntry={(isManagerMode || sessionEmployee) ? setEditingEntry : undefined}
+                  onCopyEntry={handleCopyEntry}
+                  onPaste={handlePaste}
+                  isMyVacation={myVacation && vacationDates.has(dateStr)}
+                  isToday={dateStr === todayStr}
+                  expanded={true}
+                />
+              );
+            })}
+          </div>
+
           <Legend workTypes={workTypes} isManagerMode={isManagerMode} onChanged={fetchWorkTypes} />
         </>
       )}
