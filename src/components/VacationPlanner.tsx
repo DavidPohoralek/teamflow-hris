@@ -203,10 +203,12 @@ function VacationDayPicker({ dateFrom, dateTo, onChange }: {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const handleDayClick = (dateStr: string, e: React.MouseEvent) => {
-    if (e.shiftKey && dateFrom) {
+    if (dateFrom && (e.shiftKey || !dateTo)) {
+      // 2nd click (or shift+click): set end of range
       const [a, b] = [dateFrom, dateStr].sort();
       onChange(a, a === b ? '' : b);
     } else {
+      // 1st click or 3rd click (reset): start fresh
       onChange(dateStr, '');
     }
   };
