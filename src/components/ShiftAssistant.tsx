@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
 import NotificationsPanel from './NotificationsPanel';
+import ShiftConfirmationsDashboard from './ShiftConfirmationsDashboard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -253,6 +254,7 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: { id: string; reason: string }[] } | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unconfirmedCount, setUnconfirmedCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
@@ -455,13 +457,21 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowNotifications(true)}
-            className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"
+            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all
+              ${unconfirmedCount > 0
+                ? 'border-amber-300 bg-amber-50 text-amber-700 shadow-[0_0_0_3px_rgba(251,191,36,0.25)] animate-pulse'
+                : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             title={t('Notifikace', 'Notifications')}
           >
             🔔
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold">
                 {unreadCount}
+              </span>
+            )}
+            {unconfirmedCount > 0 && unreadCount === 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-xs font-bold">
+                {unconfirmedCount}
               </span>
             )}
           </button>
@@ -719,6 +729,7 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
               >✕</button>
             </div>
             <div className="flex-1 overflow-y-auto">
+              <ShiftConfirmationsDashboard month={month} onUnconfirmedCount={setUnconfirmedCount} />
               <NotificationsPanel onUnreadChange={setUnreadCount} />
             </div>
           </div>

@@ -1318,6 +1318,32 @@ export default function WorkPlanGrid({
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
   const [pinInputValue, setPinInputValue] = useState('');
+  // Shift confirmation for current month
+  const [shiftConfirmed, setShiftConfirmed] = useState<boolean | null>(null);
+  const [confirmingShift, setConfirmingShift] = useState(false);
+
+  // Check confirmation status when session or month changes
+  useEffect(() => {
+    if (!sessionPin || !sessionEmployee) { setShiftConfirmed(null); return; }
+    fetch(`/api/public/shift-confirm?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}&month=${encodeURIComponent(month)}`)
+      .then(r => r.json())
+      .then(d => setShiftConfirmed(d.confirmed ?? false))
+      .catch(() => setShiftConfirmed(false));
+  }, [sessionEmployee, sessionPin, month, orgId]);
+
+  const handleConfirmShifts = useCallback(async () => {
+    if (!sessionPin || confirmingShift || shiftConfirmed) return;
+    setConfirmingShift(true);
+    try {
+      const res = await fetch('/api/public/shift-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, pin: sessionPin, month }),
+      });
+      if (res.ok) setShiftConfirmed(true);
+    } catch { /* ignore */ }
+    finally { setConfirmingShift(false); }
+  }, [sessionPin, orgId, month, confirmingShift, shiftConfirmed]);
 
   // Restore session from localStorage on mount (persists across tab switches)
   useEffect(() => {
@@ -1671,10 +1697,24 @@ export default function WorkPlanGrid({
                 >
                   🌴 {t('Dovolená', 'Vacation')}
                 </button>
+                {shiftConfirmed === false && (
+                  <button
+                    onClick={handleConfirmShifts}
+                    disabled={confirmingShift}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50"
+                  >
+                    {confirmingShift ? '…' : '✓ Potvrdit směny'}
+                  </button>
+                )}
+                {shiftConfirmed === true && (
+                  <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-600">
+                    ✓ Potvrzeno
+                  </span>
+                )}
                 <div className="ml-auto flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
-                  <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); localStorage.removeItem('hris_employee_session'); }} className="text-emerald-400 hover:text-emerald-700 text-xs">✕</button>
+                  <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); setShiftConfirmed(null); localStorage.removeItem('hris_employee_session'); }} className="text-emerald-400 hover:text-emerald-700 text-xs">✕</button>
                 </div>
               </div>
             ) : (
@@ -1939,12 +1979,27 @@ export default function WorkPlanGrid({
                     )}
                   </>
                 )}
+                {/* Shift confirmation button */}
+                {shiftConfirmed === false && (
+                  <button
+                    onClick={handleConfirmShifts}
+                    disabled={confirmingShift}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50"
+                  >
+                    {confirmingShift ? '…' : `✓ ${t('Potvrdit směny', 'Confirm shifts')}`}
+                  </button>
+                )}
+                {shiftConfirmed === true && (
+                  <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-emerald-200 bg-emerald-50 text-emerald-600">
+                    ✓ {t('Potvrzeno', 'Confirmed')}
+                  </span>
+                )}
                 {/* Session badge */}
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
                   <button
-                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); localStorage.removeItem('hris_employee_session'); }}
+                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); setShiftConfirmed(null); localStorage.removeItem('hris_employee_session'); }}
                     className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs"
                     title={t('Odhlásit', 'Log out')}
                   >✕</button>
