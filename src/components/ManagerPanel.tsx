@@ -484,6 +484,183 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
 
 // ─── Employees Tab ────────────────────────────────────────────────────────────
 
+interface AttLogRow {
+  id: string;
+  date: string;
+  check_in: string | null;
+  check_out: string | null;
+  note: string | null;
+  work_type_name: string | null;
+}
+
+function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: string; onClose: () => void }) {
+  const now = new Date();
+  const [month, setMonth] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  const [logs, setLogs] = useState<AttLogRow[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchLogs = useCallback(async (m: string) => {
+    setLoadingLogs(true);
+    try {
+      const res = await managerFetch(`/api/attendance?employee_id=${encodeURIComponent(empId)}&month=${encodeURIComponent(m)}`);
+      const json = await res.json();
+      setLogs(json.data ?? []);
+    } catch { setLogs([]); }
+    finally { setLoadingLogs(false); }
+  }, [empId]);
+
+  useEffect(() => { fetchLogs(month); }, [fetchLogs, month]);
+
+  const handleDelete = async (logId: string) => {
+    setDeletingId(logId);
+    try {
+      const res = await managerFetch(`/api/attendance/${logId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setLogs(prev => prev.filter(l => l.id !== logId));
+        setDeleteConfirmId(null);
+      }
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
+  };
+
+  const fmtTime = (iso: string | null) => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  };
+  const fmtDate = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const fmtDuration = (ci: string | null, co: string | null) => {
+    if (!ci || !co) return '—';
+    const mins = Math.round((new Date(co).getTime() - new Date(ci).getTime()) / 60000);
+    if (mins < 0) return '—';
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return `${h}h ${m > 0 ? m + 'min' : ''}`.trim();
+  };
+
+  const prevMonth = () => {
+    const [y, m] = month.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+  const nextMonth = () => {
+    const [y, m] = month.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+  const monthLabel = new Date(month + '-01').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+
+  const totalH = logs.reduce((sum, l) => {
+    if (!l.check_in || !l.check_out) return sum;
+    return sum + (new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 3600000;
+  }, 0);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">{empName}</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Záznamy docházky — správa manažera</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5 transition">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        {/* Month picker */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 shrink-0">
+          <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span className="text-sm font-semibold text-slate-700 capitalize">{monthLabel}</span>
+          <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        {/* Summary bar */}
+        {!loadingLogs && logs.length > 0 && (
+          <div className="px-6 py-2 bg-blue-50 border-b border-blue-100 shrink-0 flex gap-4 text-xs text-blue-700 font-medium">
+            <span>{logs.length} záznamů</span>
+            <span>{totalH.toFixed(2)} h celkem</span>
+          </div>
+        )}
+
+        {/* Log table */}
+        <div className="flex-1 overflow-y-auto">
+          {loadingLogs ? (
+            <div className="flex items-center justify-center py-12">
+              <span className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : logs.length === 0 ? (
+            <p className="text-center text-slate-400 text-sm py-12">Žádné záznamy pro {monthLabel}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-800 text-slate-300 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Datum</th>
+                  <th className="px-4 py-3 text-left">Příchod</th>
+                  <th className="px-4 py-3 text-left">Odchod</th>
+                  <th className="px-4 py-3 text-left">Odprac.</th>
+                  <th className="px-4 py-3 text-left">Kategorie</th>
+                  <th className="px-4 py-3 text-right">Akce</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log, i) => (
+                  <tr key={log.id} className={`border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-amber-50/40 transition-colors`}>
+                    <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">{fmtDate(log.date)}</td>
+                    <td className="px-4 py-3 text-slate-600">{fmtTime(log.check_in)}</td>
+                    <td className="px-4 py-3 text-slate-600">{fmtTime(log.check_out)}</td>
+                    <td className="px-4 py-3 text-slate-700 font-medium">{fmtDuration(log.check_in, log.check_out)}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        {log.work_type_name ?? log.note ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {deleteConfirmId === log.id ? (
+                        <span className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleDelete(log.id)}
+                            disabled={deletingId === log.id}
+                            className="px-2 py-1 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 transition"
+                          >
+                            {deletingId === log.id ? '…' : 'Smazat'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition"
+                          >
+                            Zrušit
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmId(log.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                          title="Smazat záznam"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                          </svg>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmployeesTab() {
   const t = useT();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -493,6 +670,7 @@ function EmployeesTab() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [vacBalances, setVacBalances] = useState<Record<string, { remainingDays: number; usedDays: number; pendingDays: number; totalDays: number; hasPaidVacation: boolean }>>({});
+  const [logsEmp, setLogsEmp] = useState<{ id: string; name: string } | null>(null);
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
@@ -627,6 +805,13 @@ function EmployeesTab() {
                       >
                         {t('Upravit', 'Edit')}
                       </button>
+                      <button
+                        onClick={() => setLogsEmp({ id: emp.id, name: emp.name })}
+                        className="text-slate-500 hover:text-slate-800 text-sm mr-3"
+                        title="Záznamy docházky"
+                      >
+                        {t('Záznamy', 'Logs')}
+                      </button>
                       {deleteConfirm === emp.id ? (
                         <span className="text-sm">
                           <button onClick={() => handleDelete(emp.id)} className="text-red-600 hover:text-red-800 mr-1">{t('Smazat?', 'Delete?')}</button>
@@ -653,6 +838,14 @@ function EmployeesTab() {
           allLabels={Array.from(new Set(employees.flatMap((e) => e.labels ?? [])))}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); fetchEmployees(); }}
+        />
+      )}
+
+      {logsEmp && (
+        <EmpLogsModal
+          empId={logsEmp.id}
+          empName={logsEmp.name}
+          onClose={() => setLogsEmp(null)}
         />
       )}
     </div>

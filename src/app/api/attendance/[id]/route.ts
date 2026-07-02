@@ -83,3 +83,31 @@ export async function PUT(
 
   return NextResponse.json({ data });
 }
+
+// DELETE /api/attendance/:id — manager only, removes the log entirely
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const resolved = await resolveOrgId(req);
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  const { orgId, supabase } = resolved;
+
+  const { data, error } = await supabase
+    .from('attendance_logs')
+    .delete()
+    .eq('id', params.id)
+    .eq('organization_id', orgId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('DELETE attendance error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: 'Záznam nenalezen.' }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
