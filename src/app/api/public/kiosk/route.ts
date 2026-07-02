@@ -130,18 +130,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Čas odchodu musí být po čase příchodu.' }, { status: 422 })
       }
 
-      // Duplicate check — one completed HO record per day
-      const { data: existing } = await supabase
+      // Overlap check — allow multiple records per day as long as times don't overlap
+      const { data: existingLogs } = await supabase
         .from('attendance_logs')
-        .select('id')
+        .select('id, check_in, check_out')
         .eq('organization_id', orgId)
         .eq('employee_id', employee.id)
         .eq('date', date)
         .not('check_out', 'is', null)
-        .maybeSingle()
 
-      if (existing) {
-        return NextResponse.json({ ok: false, error: `Záznam pro ${date} již existuje.` }, { status: 409 })
+      for (const log of (existingLogs ?? []) as { id: string; check_in: string; check_out: string }[]) {
+        const exStart = new Date(log.check_in).getTime()
+        const exEnd = new Date(log.check_out).getTime()
+        if (startMs < exEnd && endMs > exStart) {
+          return NextResponse.json(
+            { ok: false, error: `Záznam se překrývá s existujícím záznamem pro ${date}.` },
+            { status: 409 }
+          )
+        }
       }
 
       const checkIn = isIso ? startTime : `${date}T${startTime}:00`
