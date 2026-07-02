@@ -754,19 +754,6 @@ function DayCard({
   const isEmpty = entries.length === 0;
   const isWeekendEmpty = isWeekend && isEmpty;
   const isPasteMode = !!clipboard;
-  const [showEveningPanel, setShowEveningPanel] = useState(false);
-
-  // Split entries into morning / evening based on start_time
-  const eveningStartH = eveningConfig?.enabled
-    ? parseInt((eveningConfig.start ?? '17:00').split(':')[0])
-    : null;
-  const morningEntries = eveningStartH !== null
-    ? entries.filter((e) => !e.startTime || parseInt(e.startTime.split(':')[0]) < eveningStartH)
-    : entries;
-  const eveningEntries = eveningStartH !== null
-    ? entries.filter((e) => e.startTime && parseInt(e.startTime.split(':')[0]) >= eveningStartH)
-    : [];
-
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking a button inside
     if ((e.target as HTMLElement).closest('button')) return;
@@ -843,10 +830,9 @@ function DayCard({
 
       {/* Chips — scrollable, above hatching */}
       <div className="relative z-10 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 scrollbar-thin">
-        {/* Morning entries */}
-        {morningEntries.map((entry, idx) => (
+        {entries.map((entry, idx) => (
           <EntryChip
-            key={`m-${idx}`}
+            key={idx}
             entry={entry}
             isManagerMode={isManagerMode}
             sessionEmployeeId={sessionEmployeeId}
@@ -855,55 +841,10 @@ function DayCard({
             onEditEntry={onEditEntry}
             onCopyEntry={onCopyEntry}
             t={t}
-          />
-        ))}
-
-        {/* Evening divider — only when evening shift is enabled */}
-        {eveningConfig?.enabled && (
-          <div className="flex items-center gap-1 my-0.5">
-            <div className="flex-1 border-t border-orange-200" />
-            <button
-              onClick={(e) => { e.stopPropagation(); if (isManagerMode && orgId) setShowEveningPanel(true); }}
-              className={`flex items-center gap-0.5 text-[9px] font-semibold px-1 py-0.5 rounded ${
-                eveningEntries.length >= eveningConfig.minStaff
-                  ? 'text-orange-500 bg-orange-50'
-                  : 'text-orange-400 bg-orange-50 hover:bg-orange-100'
-              } ${isManagerMode ? 'cursor-pointer' : 'cursor-default'}`}
-              title={isManagerMode ? t('Zobrazit kandidáty pro večerní směnu', 'Show evening shift candidates') : ''}
-            >
-              🌙 {eveningEntries.length}/{eveningConfig.minStaff}
-            </button>
-            <div className="flex-1 border-t border-orange-200" />
-          </div>
-        )}
-
-        {/* Evening entries */}
-        {eveningEntries.map((entry, idx) => (
-          <EntryChip
-            key={`e-${idx}`}
-            entry={entry}
-            isManagerMode={isManagerMode}
-            sessionEmployeeId={sessionEmployeeId}
-            dateStr={dateStr}
-            onRemoveEmployee={onRemoveEmployee}
-            onEditEntry={onEditEntry}
-            onCopyEntry={onCopyEntry}
-            t={t}
-            isEvening
           />
         ))}
       </div>
 
-      {/* Evening candidates panel */}
-      {showEveningPanel && orgId && eveningConfig && (
-        <EveningCandidatesModal
-          orgId={orgId}
-          dateStr={dateStr}
-          eveningConfig={eveningConfig}
-          onClose={() => setShowEveningPanel(false)}
-          onSuccess={() => { setShowEveningPanel(false); /* parent will refresh via onClickDay */ }}
-        />
-      )}
     </div>
   );
 }
@@ -911,7 +852,7 @@ function DayCard({
 // ─── EntryChip ────────────────────────────────────────────────────────────────
 
 function EntryChip({
-  entry, isManagerMode, sessionEmployeeId, dateStr, onRemoveEmployee, onEditEntry, onCopyEntry, t, isEvening,
+  entry, isManagerMode, sessionEmployeeId, dateStr, onRemoveEmployee, onEditEntry, onCopyEntry, t,
 }: {
   entry: WorkPlanEntry;
   isManagerMode: boolean;
@@ -921,7 +862,6 @@ function EntryChip({
   onEditEntry?: (entry: WorkPlanEntry) => void;
   onCopyEntry?: (entry: ClipboardEntry) => void;
   t: (cz: string, en: string) => string;
-  isEvening?: boolean;
 }) {
   const canEdit = isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId);
   const color = entry.workTypeColor ?? '#94a3b8';
@@ -1376,6 +1316,8 @@ export default function WorkPlanGrid({
   // Shift-type filter (pills show unique work type names from current month's schedule)
   const [deptFilter, setDeptFilter] = useState<string | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
+  // Evening-only filter — show only shifts starting at/after eveningConfig.start
+  const [eveningFilter, setEveningFilter] = useState(false);
 
   // Mobile week view — start on Monday of current week
   const [mobileWeekStart, setMobileWeekStart] = useState<Date>(() => getWeekStart(new Date()));
@@ -1777,6 +1719,10 @@ export default function WorkPlanGrid({
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
                 if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                if (eveningFilter && eveningConfig?.enabled) {
+                  const eH = parseInt((eveningConfig.start ?? '17:00').split(':')[0]);
+                  es = es.filter((e) => e.startTime && parseInt(e.startTime.split(':')[0]) >= eH);
+                }
                 return es;
               })();
               const dayLong = DAY_NAMES_LONG[wd];
@@ -1908,6 +1854,14 @@ export default function WorkPlanGrid({
                 {dept}
               </button>
             ))}
+            {eveningConfig?.enabled && (
+              <button
+                onClick={() => setEveningFilter(v => !v)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+              >
+                🌙 {t('Večerní', 'Evening')}
+              </button>
+            )}
           </div>
         )}
 
@@ -2096,6 +2050,10 @@ export default function WorkPlanGrid({
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
                 if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                if (eveningFilter && eveningConfig?.enabled) {
+                  const eH = parseInt((eveningConfig.start ?? '17:00').split(':')[0]);
+                  es = es.filter((e) => e.startTime && parseInt(e.startTime.split(':')[0]) >= eH);
+                }
                 return es;
               })();
               return (
