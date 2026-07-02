@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
-// GET /api/employees — list all active employees for the authenticated user's org
+// GET /api/employees — list active employees, filtered by dept scope for scoped managers
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase } = resolved;
+  const { orgId, supabase, departments } = resolved;
 
-  const { data: employees, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
     .from('employees')
     .select('*')
     .eq('organization_id', orgId)
     .eq('active', true)
     .order('name');
+
+  if (departments && departments.length > 0) {
+    query = query.in('department', departments);
+  }
+
+  const { data: employees, error } = await query;
 
   if (error) {
     console.error('[GET /api/employees]', error);
@@ -22,11 +29,15 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ employees });
 }
 
-// POST /api/employees — create a new employee
+// POST /api/employees — create a new employee (admin only)
 export async function POST(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase } = resolved;
+  const { orgId, supabase, isAdmin } = resolved;
+
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Pouze administrátor může vytvářet zaměstnance.' }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -50,6 +61,9 @@ export async function POST(req: NextRequest) {
     pin,
     vacation_days_per_year,
     employment_type,
+    is_manager,
+    managed_departments,
+    manager_permissions,
   } = body as Record<string, unknown>;
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -76,10 +90,14 @@ export async function POST(req: NextRequest) {
     pin: typeof pin === 'string' ? pin.trim() || null : null,
     vacation_days_per_year: typeof vacation_days_per_year === 'number' ? vacation_days_per_year : 20,
     employment_type: typeof employment_type === 'string' ? employment_type : 'hpp',
+    is_manager: typeof is_manager === 'boolean' ? is_manager : false,
+    managed_departments: Array.isArray(managed_departments) ? (managed_departments as string[]) : null,
+    manager_permissions: Array.isArray(manager_permissions) ? (manager_permissions as string[]) : [],
     active: true,
   };
 
-  const { data: employee, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: employee, error } = await (supabase as any)
     .from('employees')
     .insert(insert)
     .select()

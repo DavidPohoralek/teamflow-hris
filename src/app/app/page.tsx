@@ -8,6 +8,7 @@ import PresenceDashboard from '@/components/PresenceDashboard'
 import EmployeeHoursPortal from '@/components/EmployeeHoursPortal'
 import ManagerLoginModal from '@/components/ManagerLoginModal'
 import ManagerPanel from '@/components/ManagerPanel'
+import { getManagerScope, type ManagerScope } from '@/lib/managerFetch'
 import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistant from '@/components/ShiftAssistant'
@@ -40,11 +41,19 @@ function isManagerSessionValid(): boolean {
   try {
     const raw = localStorage.getItem(MANAGER_SESSION_KEY)
     if (!raw) return false
-    // Token format: base64(orgId:timestamp)
     const decoded = atob(raw)
-    const parts = decoded.split(':')
-    if (parts.length < 2) return false
-    const ts = parseInt(parts[parts.length - 1], 10)
+    let ts: number
+    if (decoded.includes('|')) {
+      // v2 token: base64(orgId|employeeId|role|departments|permissions|timestamp)
+      const parts = decoded.split('|')
+      if (parts.length < 6) return false
+      ts = parseInt(parts[5], 10)
+    } else {
+      // v1 legacy token: base64(orgId:timestamp)
+      const parts = decoded.split(':')
+      if (parts.length < 2) return false
+      ts = parseInt(parts[parts.length - 1], 10)
+    }
     if (isNaN(ts)) return false
     return new Date().getTime() - ts < SESSION_DURATION_MS
   } catch {
@@ -64,6 +73,7 @@ export default function HomePage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('schedule')
   const [isManagerMode, setIsManagerMode] = useState(false)
+  const [managerScope, setManagerScope] = useState<ManagerScope | null>(null)
   const [showManagerLogin, setShowManagerLogin] = useState(false)
   const [showManagerPanel, setShowManagerPanel] = useState(false)
   const [managerPanelTab, setManagerPanelTab] = useState<'notifications' | undefined>(undefined)
@@ -137,19 +147,23 @@ export default function HomePage() {
         try {
           const raw = localStorage.getItem(MANAGER_SESSION_KEY)
           const decoded = atob(raw!)
-          const tokenOrgId = decoded.split(':')[0]
+          const tokenOrgId = decoded.includes('|') ? decoded.split('|')[0] : decoded.split(':')[0]
           if (tokenOrgId !== data.id) {
             localStorage.removeItem(MANAGER_SESSION_KEY)
             setIsManagerMode(false)
+            setManagerScope(null)
           } else {
             setIsManagerMode(true)
+            setManagerScope(getManagerScope())
           }
         } catch {
           localStorage.removeItem(MANAGER_SESSION_KEY)
           setIsManagerMode(false)
+          setManagerScope(null)
         }
       } else {
         setIsManagerMode(false)
+        setManagerScope(null)
       }
       // Load org logo
       fetch(`/api/public/org-logo?orgId=${data.id}`)
@@ -183,6 +197,7 @@ export default function HomePage() {
 
   function handleManagerSuccess() {
     setIsManagerMode(true)
+    setManagerScope(getManagerScope())
     setShowManagerLogin(false)
     setActiveTab('management')
   }
@@ -190,7 +205,8 @@ export default function HomePage() {
   function handleManagerLogout() {
     localStorage.removeItem(MANAGER_SESSION_KEY)
     setIsManagerMode(false)
-    if (activeTab === 'management') {
+    setManagerScope(null)
+    if (activeTab === 'management' || activeTab === 'analytics' || activeTab === 'assistant') {
       setActiveTab('schedule')
     }
   }
@@ -418,20 +434,30 @@ export default function HomePage() {
 
         {activeTab === 'assistant' && isManagerMode && (
           <div className="flex-1 overflow-auto">
-            <ShiftAssistant
-              orgId={orgId}
-              month={currentMonth}
-              onMonthChange={(m) => setCurrentMonth(m)}
-              onOpenNotifications={() => {
-                setManagerPanelTab('notifications');
-                setShowManagerPanel(true);
-              }}
-            />
+            {managerScope && !managerScope.isAdmin && !managerScope.permissions.includes('shift_assistant') ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+                <div className="text-5xl">🔒</div>
+                <h3 className="text-xl font-semibold text-slate-700">{t('Přístup zamítnut', 'Access denied')}</h3>
+                <p className="text-slate-400 max-w-xs text-sm">
+                  {t('Pro přístup k Asistentovi směn potřebujete oprávnění shift_assistant. Kontaktujte administrátora.', 'You need the shift_assistant permission to access this feature. Contact your administrator.')}
+                </p>
+              </div>
+            ) : (
+              <ShiftAssistant
+                orgId={orgId}
+                month={currentMonth}
+                onMonthChange={(m) => setCurrentMonth(m)}
+                onOpenNotifications={() => {
+                  setManagerPanelTab('notifications');
+                  setShowManagerPanel(true);
+                }}
+              />
+            )}
           </div>
         )}
 
         {activeTab === 'management' && isManagerMode && (
-          <ManagerPanel orgId={orgId} onClose={() => setActiveTab('schedule')} initialTab={managerPanelTab} />
+          <ManagerPanel orgId={orgId} onClose={() => setActiveTab('schedule')} initialTab={managerPanelTab} scope={managerScope} />
         )}
       </main>
 

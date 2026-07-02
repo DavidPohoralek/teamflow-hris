@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { buildAdminToken } from '@/lib/managerAuth'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -31,9 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Nesprávné heslo' }, { status: 401 })
     }
 
-    const timestamp = Date.now()
-    const token = Buffer.from(`${orgId}:${timestamp}`).toString('base64')
-
+    const token = buildAdminToken(orgId)
     return NextResponse.json({ ok: true, token })
   } catch (err) {
     console.error('Verify-manager route error:', err)

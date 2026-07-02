@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
-import { managerFetch } from '@/lib/managerFetch';
+import { managerFetch, type ManagerScope } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
 import ThemeSelector from './ThemeSelector';
@@ -263,6 +263,9 @@ interface Employee {
   max_saturdays?: number;
   tier?: number;
   active: boolean;
+  is_manager?: boolean;
+  managed_departments?: string[] | null;
+  manager_permissions?: string[] | null;
 }
 
 interface WorkType {
@@ -290,6 +293,7 @@ interface ManagerPanelProps {
   orgId: string;
   onClose: () => void;
   lang?: 'cs' | 'en';
+  scope?: ManagerScope | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -331,7 +335,7 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanelProps & { initialTab?: 'notifications' }) {
+export default function ManagerPanel({ onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
@@ -436,12 +440,29 @@ export default function ManagerPanel({ onClose, initialTab, lang }: ManagerPanel
 
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto">
-          {activeTab === 'employees' && <EmployeesTab />}
+          {scope && !scope.isAdmin && (
+            <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2">
+              <span className="text-amber-500 text-sm">🔒</span>
+              <p className="text-xs text-amber-700 font-medium">
+                {t('Manažerský přístup', 'Manager access')}
+                {scope.departments && scope.departments.length > 0
+                  ? ` — ${t('oddělení', 'departments')}: ${scope.departments.join(', ')}`
+                  : ` — ${t('všechna oddělení', 'all departments')}`}
+              </p>
+            </div>
+          )}
+          {activeTab === 'employees' && <EmployeesTab isAdmin={scope?.isAdmin !== false} />}
           {activeTab === 'work-types' && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
-          {activeTab === 'settings' && <SettingsTab />}
+          {activeTab === 'settings' && (scope?.isAdmin !== false) && <SettingsTab />}
+          {activeTab === 'settings' && scope?.isAdmin === false && (
+            <div className="flex flex-col items-center justify-center h-64 gap-3 text-center p-8">
+              <div className="text-4xl">🔒</div>
+              <p className="text-slate-500 text-sm">{t('Nastavení je dostupné pouze pro administrátora.', 'Settings are only available to administrators.')}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -661,7 +682,7 @@ function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: str
   );
 }
 
-function EmployeesTab() {
+function EmployeesTab({ isAdmin = true }: { isAdmin?: boolean }) {
   const t = useT();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -714,12 +735,14 @@ function EmployeesTab() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm text-gray-500">{employees.length} zaměstnanců</p>
-        <button
-          onClick={() => { setEditingEmployee(null); setShowForm(true); }}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          {t('+ Přidat zaměstnance', '+ Add employee')}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => { setEditingEmployee(null); setShowForm(true); }}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            {t('+ Přidat zaměstnance', '+ Add employee')}
+          </button>
+        )}
       </div>
 
       {loading && <LoadingSpinner />}
@@ -838,6 +861,7 @@ function EmployeesTab() {
           allLabels={Array.from(new Set(employees.flatMap((e) => e.labels ?? [])))}
           onClose={() => setShowForm(false)}
           onSaved={() => { setShowForm(false); fetchEmployees(); }}
+          isAdmin={isAdmin}
         />
       )}
 
@@ -860,6 +884,7 @@ interface EmployeeFormProps {
   allLabels: string[];
   onClose: () => void;
   onSaved: () => void;
+  isAdmin?: boolean;
 }
 
 function TagInput({ value, onChange, suggestions }: { value: string[]; onChange: (v: string[]) => void; suggestions: string[] }) {
@@ -946,7 +971,7 @@ function useWorkTypes() {
   return workTypes;
 }
 
-function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved }: EmployeeFormProps) {
+function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isAdmin = true }: EmployeeFormProps) {
   const t = useT();
   const { types: empTypes } = useEmploymentTypes();
   const deptOptions = useWorkTypes().filter((wt) => wt.category === 'shift');
@@ -964,6 +989,9 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved }: E
     tier: employee?.tier ?? 0,
     can_saturday: employee?.can_saturday ?? false,
     max_saturdays: employee?.max_saturdays ?? 0,
+    is_manager: employee?.is_manager ?? false,
+    managed_departments: (employee?.managed_departments ?? []) as string[],
+    manager_permissions: (employee?.manager_permissions ?? []) as string[],
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1153,6 +1181,70 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved }: E
               </FormField>
             </div>
           </div>
+
+          {/* RBAC — only admin can grant manager access */}
+          {isAdmin && (
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('Manažerský přístup (RBAC)', 'Manager access (RBAC)')}</p>
+              <FormField label="">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_manager}
+                    onChange={(e) => set('is_manager', e.target.checked)}
+                    className="w-4 h-4 rounded accent-blue-600"
+                  />
+                  <span className="text-sm text-slate-700">{t('Je manažer (může se přihlásit PINem)', 'Is manager (can log in with PIN)')}</span>
+                </label>
+              </FormField>
+              {form.is_manager && (
+                <>
+                  <FormField label={t('Povolená oddělení (prázdné = všechna)', 'Allowed departments (empty = all)')}>
+                    {deptOptions.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {deptOptions.map((wt) => {
+                          const active = form.managed_departments.includes(wt.name);
+                          return (
+                            <button
+                              key={wt.id}
+                              type="button"
+                              onClick={() => {
+                                set('managed_departments', active
+                                  ? form.managed_departments.filter((d) => d !== wt.name)
+                                  : [...form.managed_departments, wt.name]);
+                              }}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all ${active ? 'border-current shadow-sm' : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                              style={active ? { borderColor: wt.color, backgroundColor: `${wt.color}22`, color: wt.color } : {}}
+                            >
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
+                              {wt.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">{t('Nejsou definována žádná oddělení.', 'No departments defined.')}</p>
+                    )}
+                  </FormField>
+                  <FormField label={t('Oprávnění', 'Permissions')}>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.manager_permissions.includes('shift_assistant')}
+                        onChange={(e) => {
+                          set('manager_permissions', e.target.checked
+                            ? [...form.manager_permissions, 'shift_assistant']
+                            : form.manager_permissions.filter((p) => p !== 'shift_assistant'));
+                        }}
+                        className="w-4 h-4 rounded accent-blue-600"
+                      />
+                      <span className="text-sm text-slate-700">{t('Asistent směn', 'Shift assistant')}</span>
+                    </label>
+                  </FormField>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2 justify-end">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">{t('Zrušit', 'Cancel')}</button>

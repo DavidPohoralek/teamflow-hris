@@ -3,16 +3,28 @@ import { resolveOrgId } from '@/lib/resolveOrg';
 
 // GET /api/requests
 // Query params:
-//   status=pending|approved|rejected  (optional, omit for all)
-//   month=YYYY-MM                     (optional, filters date_from within that month)
+//   status=pending|approved|rejected  (optional)
+//   month=YYYY-MM                     (optional)
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase } = resolved;
+  const { orgId, supabase, departments } = resolved;
 
   const { searchParams } = new URL(req.url);
   const statusFilter = searchParams.get('status');
   const monthFilter = searchParams.get('month'); // YYYY-MM
+
+  // If scoped manager has department restrictions, fetch allowed employee IDs first
+  let allowedEmpIds: string[] | null = null;
+  if (departments && departments.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: deptEmps } = await (supabase as any)
+      .from('employees')
+      .select('id')
+      .eq('organization_id', orgId)
+      .in('department', departments);
+    allowedEmpIds = (deptEmps ?? []).map((e: { id: string }) => e.id);
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
@@ -42,16 +54,18 @@ export async function GET(req: NextRequest) {
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false });
 
-  // Status filter
+  if (allowedEmpIds !== null) {
+    query = query.in('employee_id', allowedEmpIds);
+  }
+
   if (statusFilter && ['pending', 'approved', 'rejected'].includes(statusFilter)) {
     query = query.eq('status', statusFilter);
   }
 
-  // Month filter — date_from in YYYY-MM
   if (monthFilter && /^\d{4}-\d{2}$/.test(monthFilter)) {
     const [year, month] = monthFilter.split('-').map(Number);
     const firstDay = `${monthFilter}-01`;
-    const lastDay = new Date(year, month, 0).toISOString().slice(0, 10); // last day of month
+    const lastDay = new Date(year, month, 0).toISOString().slice(0, 10);
     query = query.gte('date_from', firstDay).lte('date_from', lastDay);
   }
 
@@ -75,7 +89,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { employee_id, type, date_from, date_to, note } = body;
 
-  // Basic validation
   if (!employee_id || !type || !date_from) {
     return NextResponse.json(
       { error: 'Povinné pole chybí: employee_id, type, date_from.' },
@@ -91,7 +104,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verify employee belongs to the same org
   const { data: targetEmployee, error: empError } = await supabase
     .from('employees')
     .select('id')

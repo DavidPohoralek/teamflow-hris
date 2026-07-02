@@ -33,9 +33,8 @@ export async function PUT(
 ) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase } = resolved;
+  const { orgId, supabase, isAdmin } = resolved;
 
-  // Verify the employee belongs to this org before touching it
   const { data: existing, error: fetchError } = await supabase
     .from('employees')
     .select('id')
@@ -70,16 +69,15 @@ export async function PUT(
     pin,
     vacation_days_per_year,
     employment_type,
+    is_manager,
+    managed_departments,
+    manager_permissions,
   } = body as Record<string, unknown>;
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
-    return NextResponse.json(
-      { error: 'name must be a non-empty string' },
-      { status: 422 }
-    );
+    return NextResponse.json({ error: 'name must be a non-empty string' }, { status: 422 });
   }
 
-  // Build a partial update — only include fields that were provided in the body
   const update: Record<string, unknown> = {};
   if (name !== undefined) update.name = (name as string).trim();
   if (email !== undefined) update.email = typeof email === 'string' ? email.trim() || null : null;
@@ -109,11 +107,21 @@ export async function PUT(
   if (employment_type !== undefined)
     update.employment_type = typeof employment_type === 'string' ? employment_type : 'hpp';
 
+  // RBAC fields — only admin can change manager permissions
+  if (isAdmin) {
+    if (is_manager !== undefined) update.is_manager = typeof is_manager === 'boolean' ? is_manager : false;
+    if (managed_departments !== undefined)
+      update.managed_departments = Array.isArray(managed_departments) ? managed_departments : null;
+    if (manager_permissions !== undefined)
+      update.manager_permissions = Array.isArray(manager_permissions) ? manager_permissions : [];
+  }
+
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 422 });
   }
 
-  const { data: employee, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: employee, error } = await (supabase as any)
     .from('employees')
     .update(update)
     .eq('id', params.id)

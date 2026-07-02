@@ -18,7 +18,15 @@ async function getOrgDlcToken(supabase: unknown, orgId: string): Promise<string 
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase } = resolved;
+  const { orgId, supabase, isAdmin, permissions } = resolved;
+
+  // ── RBAC gate — scoped managers need shift_assistant permission ────────────
+  if (!isAdmin && !permissions.includes('shift_assistant')) {
+    return NextResponse.json(
+      { error: 'Nemáte oprávnění k Asistentovi směn. Kontaktujte administrátora.' },
+      { status: 403 },
+    );
+  }
 
   // ── License gate ──────────────────────────────────────────────────────────
   const dlcToken = await getOrgDlcToken(supabase, orgId);
