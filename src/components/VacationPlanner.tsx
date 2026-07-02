@@ -531,7 +531,6 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           if (key in s && !s[key]) closed.add(wd);
         }
         setClosedWeekdays(closed);
-        setVacCountWeekends((s.vacation_counting_mode as string) === 'all');
       })
       .catch(() => {});
   }, [orgId]);
