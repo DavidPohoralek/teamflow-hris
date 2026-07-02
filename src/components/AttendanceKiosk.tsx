@@ -29,7 +29,18 @@ type KioskScreen =
   | 'success-checkout'
   | 'ho-activity'
   | 'ho-form'
+  | 'ho-stopwatch'
   | 'error';
+
+const HO_SW_KEY = 'hris_ho_stopwatch';
+
+interface HoStopwatchData {
+  orgId: string;
+  employeeId: string;
+  workTypeId: string;
+  workTypeName: string;
+  startAt: string; // ISO string
+}
 
 function isHomeOffice(name: string | null | undefined): boolean {
   if (!name) return false;
@@ -123,7 +134,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
   // HomeOffice retrospective form
   const [hoFormDate, setHoFormDate] = useState('');
-  const [hoFormMode, setHoFormMode] = useState<'range' | 'hours'>('range');
+  const [hoFormMode, setHoFormMode] = useState<'range' | 'hours' | 'stopwatch'>('range');
   const [hoFormStart, setHoFormStart] = useState('');
   const [hoFormEnd, setHoFormEnd] = useState('');
   const [hoFormHours, setHoFormHours] = useState('');
@@ -131,6 +142,10 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [hoFormError, setHoFormError] = useState('');
   const [hoFormWorkTypeId, setHoFormWorkTypeId] = useState('');
   const [hoFormWorkTypeName, setHoFormWorkTypeName] = useState('');
+
+  // HO Stopwatch — persisted in localStorage so kiosk can be shared while timer runs
+  const [hoSw, setHoSw] = useState<HoStopwatchData | null>(null);
+  const [hoSwDisplay, setHoSwDisplay] = useState('00:00:00');
 
   // Load work types + settings
   useEffect(() => {
@@ -148,6 +163,33 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       })
       .catch(() => {});
   }, [orgId]);
+
+  // Restore active stopwatch from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HO_SW_KEY);
+      if (!raw) return;
+      const data: HoStopwatchData = JSON.parse(raw);
+      if (data.orgId === orgId) setHoSw(data);
+    } catch { /* ignore */ }
+  }, [orgId]);
+
+  // Tick elapsed time while ho-stopwatch screen is active
+  useEffect(() => {
+    if (screen !== 'ho-stopwatch' || !hoSw) return;
+    const tick = () => {
+      const ms = Date.now() - new Date(hoSw.startAt).getTime();
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      setHoSwDisplay(
+        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [screen, hoSw]);
 
   const resetKiosk = useCallback(() => {
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -214,6 +256,20 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       } else {
         setSelectedWorkType(null);
       }
+      // Check for an active HO stopwatch for this employee
+      try {
+        const raw = localStorage.getItem(HO_SW_KEY);
+        if (raw) {
+          const sw: HoStopwatchData = JSON.parse(raw);
+          if (sw.orgId === orgId && sw.employeeId === data.employeeId) {
+            setHoSw(sw);
+            setScreen('ho-stopwatch');
+            setLoading(false);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+
       if (data.presence) {
         setPresence(data.presence);
         setScreen('checkout');
@@ -311,6 +367,58 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     }
     setScreen('success-checkout');
     resetKiosk();
+  };
+
+  const handleHoStopwatchStart = () => {
+    const sw: HoStopwatchData = {
+      orgId,
+      employeeId,
+      workTypeId: hoFormWorkTypeId,
+      workTypeName: hoFormWorkTypeName || 'HomeOffice',
+      startAt: new Date().toISOString(),
+    };
+    localStorage.setItem(HO_SW_KEY, JSON.stringify(sw));
+    setHoSw(sw);
+    setScreen('ho-stopwatch');
+  };
+
+  const handleHoStopwatchStop = async () => {
+    if (!hoSw) return;
+    setHoLoading(true);
+    try {
+      const startAt = new Date(hoSw.startAt);
+      const endAt = new Date();
+      const date = `${startAt.getFullYear()}-${String(startAt.getMonth() + 1).padStart(2, '0')}-${String(startAt.getDate()).padStart(2, '0')}`;
+      const res = await fetch('/api/public/kiosk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ho-record',
+          orgId,
+          pin,
+          workTypeId: hoSw.workTypeId || undefined,
+          workTypeName: hoSw.workTypeName,
+          date,
+          startTime: startAt.toISOString(),
+          endTime: endAt.toISOString(),
+          note: null,
+        }),
+      });
+      const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; durationLabel?: string };
+      if (!res.ok) {
+        setHoFormError(json.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
+        return;
+      }
+      localStorage.removeItem(HO_SW_KEY);
+      setHoSw(null);
+      setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.durationLabel ?? hoSwDisplay}`);
+      setScreen('success-checkin');
+      resetKiosk();
+    } catch {
+      setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
+    } finally {
+      setHoLoading(false);
+    }
   };
 
   const handleHoRecord = async () => {
@@ -597,9 +705,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             </div>
           </div>
 
-          {/* Time range / Hours toggle */}
+          {/* Time range / Hours / Stopwatch toggle */}
           <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
               <div className="flex rounded-lg overflow-hidden border border-slate-600 text-sm">
                 <button
@@ -613,6 +721,12 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                   className={`px-3 py-1 transition-all ${hoFormMode === 'hours' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                 >
                   {t('Počet hodin', 'Total hours')}
+                </button>
+                <button
+                  onClick={() => setHoFormMode('stopwatch')}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'stopwatch' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                >
+                  ⏱ {t('Stopky', 'Timer')}
                 </button>
               </div>
             </div>
@@ -679,6 +793,21 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 )}
               </>
             )}
+            {hoFormMode === 'stopwatch' && (
+              <div className="flex flex-col items-center gap-4 py-2">
+                <p className="text-slate-400 text-sm text-center">
+                  {t('Stopky se spustí hned po kliknutí. Kdykoli se vrátíte a zadáte PIN — stopky zastavíte a docházka se uloží.', 'The timer starts immediately. Come back anytime, enter your PIN — stop the timer and your attendance is saved.')}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleHoStopwatchStart}
+                  className="w-full min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-lg font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+                >
+                  <span className="text-2xl">⏱</span>
+                  {t('Spustit stopky', 'Start timer')}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Activity summary */}
@@ -706,15 +835,57 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             >
               {t('Zpět', 'Back')}
             </button>
+            {hoFormMode !== 'stopwatch' && (
+              <button
+                onClick={handleHoRecord}
+                disabled={!hoFormDate || (hoFormMode === 'range' ? (!hoFormStart || !hoFormEnd) : (!hoFormHours || parseFloat(hoFormHours.replace(',', '.')) <= 0)) || hoLoading}
+                className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {hoLoading ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                {t('Uložit docházku', 'Save attendance')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* HomeOffice Stopwatch Screen */}
+      {screen === 'ho-stopwatch' && hoSw && (
+        <div className="w-full max-w-lg flex flex-col items-center gap-6">
+          <div className="text-center">
+            <div className="text-5xl mb-2">⏱</div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-100">{hoSw.workTypeName}</h1>
+            <p className="text-slate-400 mt-1 text-sm">
+              {t('Zahájeno', 'Started')}: {new Date(hoSw.startAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+
+          {/* Big timer display */}
+          <div className="bg-slate-800 rounded-2xl px-10 py-8 text-center w-full">
+            <div className="text-6xl sm:text-7xl font-mono font-bold text-emerald-400 tracking-widest tabular-nums">
+              {hoSwDisplay}
+            </div>
+            <p className="text-slate-500 text-sm mt-2">{t('hh:mm:ss', 'hh:mm:ss')}</p>
+          </div>
+
+          {hoFormError && (
+            <p className="text-red-400 text-sm text-center bg-red-900/30 rounded-xl px-4 py-2 w-full">{hoFormError}</p>
+          )}
+
+          <div className="flex gap-3 w-full">
             <button
-              onClick={handleHoRecord}
-              disabled={!hoFormDate || (hoFormMode === 'range' ? (!hoFormStart || !hoFormEnd) : (!hoFormHours || parseFloat(hoFormHours.replace(',', '.')) <= 0)) || hoLoading}
-              className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              onClick={() => { setHoFormError(''); setScreen('pin'); setPin(''); }}
+              className="flex-1 min-h-[56px] bg-slate-700 hover:bg-slate-600 text-white text-base font-semibold rounded-xl transition-all active:scale-95"
             >
-              {hoLoading
-                ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : null}
-              {t('Uložit docházku', 'Save attendance')}
+              {t('Zpět na kiosk', 'Back to kiosk')}
+            </button>
+            <button
+              onClick={handleHoStopwatchStop}
+              disabled={hoLoading}
+              className="flex-[2] min-h-[56px] bg-amber-600 hover:bg-amber-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {hoLoading ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+              {t('Ukončit a uložit', 'Stop & save')}
             </button>
           </div>
         </div>
