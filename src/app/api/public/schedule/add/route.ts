@@ -69,6 +69,40 @@ export async function POST(req: NextRequest) {
     .eq('id', workTypeId)
     .maybeSingle();
 
+  // Overlap check: reject if employee already has a shift that day with overlapping (or identical) times
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existingPlans } = await (supabase as any)
+    .from('work_plans')
+    .select('id, start_time, end_time, work_type')
+    .eq('organization_id', orgId)
+    .eq('employee_id', employee.id)
+    .eq('date', date)
+    .eq('active', true);
+
+  if (existingPlans && existingPlans.length > 0) {
+    for (const plan of existingPlans as { id: string; start_time: string | null; end_time: string | null; work_type: string | null }[]) {
+      // Exact duplicate
+      if (plan.start_time === (startTime ?? null) && plan.end_time === (endTime ?? null)) {
+        const timeStr = plan.start_time ? `${plan.start_time}–${plan.end_time ?? ''}` : '';
+        return NextResponse.json(
+          { error: `Tento den již máš směnu${timeStr ? ' ' + timeStr : ''} (${plan.work_type ?? ''}). Nelze přidat duplicitní záznam.` },
+          { status: 409 }
+        );
+      }
+      // Time overlap (lexicographic comparison works for HH:MM)
+      const ns = startTime ?? null, ne = endTime ?? null;
+      const es = plan.start_time, ee = plan.end_time;
+      if (ns && ne && es && ee) {
+        if (ns < ee && ne > es) {
+          return NextResponse.json(
+            { error: `Tento den již máš směnu ${es}–${ee} (${plan.work_type ?? ''}), která se překrývá s požadovaným časem.` },
+            { status: 409 }
+          );
+        }
+      }
+    }
+  }
+
   // Insert work_plan
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertError } = await (supabase as any)

@@ -89,22 +89,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Typ práce nebyl nalezen.' }, { status: 404 })
   }
 
-  // Duplicate check: same employee + date + same start/end time
+  // Overlap check: reject if employee already has a shift that day with overlapping (or identical) times
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: existing } = await (supabase as any)
     .from('work_plans')
-    .select('id, start_time, end_time')
+    .select('id, start_time, end_time, work_type')
     .eq('organization_id', orgId)
     .eq('employee_id', employeeId)
     .eq('date', date)
     .eq('active', true)
 
-  if (existing?.length) {
-    const dup = existing.some((e: { start_time: string | null; end_time: string | null }) =>
-      e.start_time === (startTime ?? null) && e.end_time === (endTime ?? null)
-    )
-    if (dup) {
-      return NextResponse.json({ error: 'Tato směna již existuje (stejný čas).' }, { status: 409 })
+  for (const plan of (existing ?? []) as { id: string; start_time: string | null; end_time: string | null; work_type: string | null }[]) {
+    // Exact duplicate
+    if (plan.start_time === (startTime ?? null) && plan.end_time === (endTime ?? null)) {
+      const timeStr = plan.start_time ? `${plan.start_time}–${plan.end_time ?? ''}` : '';
+      return NextResponse.json(
+        { error: `Zaměstnanec má v tento den již směnu${timeStr ? ' ' + timeStr : ''} (${plan.work_type ?? ''}). Nelze přidat duplicitní záznam.` },
+        { status: 409 }
+      )
+    }
+    // Time overlap (lexicographic HH:MM comparison)
+    const ns = startTime ?? null, ne = endTime ?? null;
+    const es = plan.start_time, ee = plan.end_time;
+    if (ns && ne && es && ee && ns < ee && ne > es) {
+      return NextResponse.json(
+        { error: `Zaměstnanec má v tento den směnu ${es}–${ee} (${plan.work_type ?? ''}), která se překrývá.` },
+        { status: 409 }
+      )
     }
   }
 
