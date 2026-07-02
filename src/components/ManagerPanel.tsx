@@ -354,13 +354,15 @@ export default function ManagerPanel({ onClose, initialTab, lang, scope }: Manag
       .catch(() => {});
   }, []);
 
+  const isAdmin = scope?.isAdmin !== false;
+
   const tabs = [
     { id: 'employees' as const, label: t('Zaměstnanci', 'Employees'), icon: '👥' },
-    { id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' },
+    ...(isAdmin ? [{ id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' }] : []),
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
     { id: 'homeoffice' as const, label: t('HomeOffice', 'Home Office'), icon: '🏠' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
-    { id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' },
+    ...(isAdmin ? [{ id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' }] : []),
   ];
 
   return (
@@ -451,18 +453,12 @@ export default function ManagerPanel({ onClose, initialTab, lang, scope }: Manag
               </p>
             </div>
           )}
-          {activeTab === 'employees' && <EmployeesTab isAdmin={scope?.isAdmin !== false} />}
-          {activeTab === 'work-types' && <WorkTypesTab />}
+          {activeTab === 'employees' && <EmployeesTab isAdmin={isAdmin} />}
+          {activeTab === 'work-types' && isAdmin && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
-          {activeTab === 'settings' && (scope?.isAdmin !== false) && <SettingsTab />}
-          {activeTab === 'settings' && scope?.isAdmin === false && (
-            <div className="flex flex-col items-center justify-center h-64 gap-3 text-center p-8">
-              <div className="text-4xl">🔒</div>
-              <p className="text-slate-500 text-sm">{t('Nastavení je dostupné pouze pro administrátora.', 'Settings are only available to administrators.')}</p>
-            </div>
-          )}
+          {activeTab === 'settings' && isAdmin && <SettingsTab />}
         </div>
       </div>
 

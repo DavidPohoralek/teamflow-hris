@@ -14,10 +14,22 @@ function isHO(name: string | null | undefined): boolean {
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req)
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-  const { orgId, supabase } = resolved
+  const { orgId, supabase, departments } = resolved
 
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM
+
+  // If scoped manager, resolve allowed employee IDs by department
+  let allowedEmpIds: string[] | null = null
+  if (departments && departments.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: deptEmps } = await (supabase as any)
+      .from('employees')
+      .select('id')
+      .eq('organization_id', orgId)
+      .in('department', departments)
+    allowedEmpIds = (deptEmps ?? []).map((e: { id: string }) => e.id)
+  }
 
   // ── Monthly logs ─────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,6 +39,10 @@ export async function GET(req: NextRequest) {
     .eq('organization_id', orgId)
     .order('date', { ascending: false })
     .order('check_in', { ascending: false })
+
+  if (allowedEmpIds !== null) {
+    query = query.in('employee_id', allowedEmpIds)
+  }
 
   if (month) {
     const [year, mon] = month.split('-').map(Number)
@@ -38,13 +54,18 @@ export async function GET(req: NextRequest) {
   // ── Current HO presence (open sessions today) ─────────────────────────────
   const today = new Date().toISOString().slice(0, 10)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: liveData } = await (supabase as any)
+  let liveQuery = (supabase as any)
     .from('attendance_logs')
     .select('id, employee_id, check_in, work_type_name, employees(id, name)')
     .eq('organization_id', orgId)
     .eq('date', today)
     .not('check_in', 'is', null)
     .is('check_out', null)
+  if (allowedEmpIds !== null) {
+    liveQuery = liveQuery.in('employee_id', allowedEmpIds)
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: liveData } = await liveQuery
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
