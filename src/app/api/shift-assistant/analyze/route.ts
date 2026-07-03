@@ -198,17 +198,29 @@ function analyzeLocally(
   absences: { fullDay: AbsenceRecord[]; partial: AbsenceRecord[] },
   workPlans: WorkPlanRecord[],
 ) {
-  // Build per-employee assigned hours + days from confirmed work plans
+  // Build per-employee assigned hours + days from confirmed work plans AND draft assignments
   const assignedHoursMap = new Map<string, number>();
   const assignedDaysMap = new Map<string, number>();
   for (const emp of employees) {
     assignedHoursMap.set(emp.id, 0);
     assignedDaysMap.set(emp.id, 0);
   }
+  // Confirmed shifts from work_plans table
+  const confirmedKeys = new Set<string>(); // "employeeId|date"
   for (const wp of workPlans) {
     const h = shiftHoursFromTimes(wp.startTime, wp.endTime);
     assignedHoursMap.set(wp.employeeId, (assignedHoursMap.get(wp.employeeId) ?? 0) + h);
     assignedDaysMap.set(wp.employeeId, (assignedDaysMap.get(wp.employeeId) ?? 0) + 1);
+    confirmedKeys.add(`${wp.employeeId}|${wp.date}`);
+  }
+  // Draft assignments (already planned in draft but not yet written to work_plans)
+  for (const day of draftDays) {
+    const dayH = shiftHoursFromTimes(day.startTime, day.endTime);
+    for (const empId of day.assignedEmployees) {
+      if (confirmedKeys.has(`${empId}|${day.date}`)) continue; // already counted above
+      assignedHoursMap.set(empId, (assignedHoursMap.get(empId) ?? 0) + dayH);
+      assignedDaysMap.set(empId, (assignedDaysMap.get(empId) ?? 0) + 1);
+    }
   }
 
   // Absence lookup: "employeeId|date"
@@ -260,7 +272,7 @@ function analyzeLocally(
         const badges: string[] = [];
         const reasons: string[] = [];
         const warnings: string[] = [];
-        if (remaining >= shiftH) reasons.push(`Zbývá ${remaining.toFixed(1)} h z fondu`);
+        reasons.push(`Naplánováno ${assignedH.toFixed(1)} h / ${e.targetHours} h`);
         if (e.storeRating >= 4) { reasons.push('Vysoké hodnocení pro Prodejnu'); badges.push('★★'); }
         if (e.prodejnaTier >= 2) { reasons.push('Zkušený na Prodejně'); badges.push('Prodejna'); }
         if (projected > e.targetHours) warnings.push(`Přesáhne fond (${e.targetHours} h)`);
@@ -322,7 +334,7 @@ function analyzeLocally(
         if (c.freeForEvening) reasons.push(`Směna končí v ${c.shiftEnd}, večerní začíná ${ev.from}`);
         else reasons.push(`Může zůstat od ${from} do ${ev.to}`);
         const remaining = e.targetHours - assignedH;
-        if (remaining > 0) reasons.push(`Zbývá ${remaining.toFixed(1)} h`);
+        reasons.push(`Naplánováno ${assignedH.toFixed(1)} h / ${e.targetHours} h`);
         if (projected > e.targetHours) warnings.push(`Přesáhne fond (${e.targetHours} h)`);
         const sugg: SuggestionOut = {
           id: `${day.date}-${e.id}-CA`,

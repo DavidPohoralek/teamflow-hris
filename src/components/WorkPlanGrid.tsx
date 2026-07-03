@@ -1395,6 +1395,41 @@ export default function WorkPlanGrid({
     setDepartments(Array.from(depts).sort());
   }, [data]);
 
+  // Employee targets — fetch once per manager session to show planned vs target
+  const [employeeTargets, setEmployeeTargets] = useState<Map<string, { name: string; target: number }>>(new Map());
+  useEffect(() => {
+    if (!isManagerMode) return;
+    managerFetch('/api/employees')
+      .then((r) => r.json())
+      .then((d: { employees?: { id: string; name: string; target_hours?: number }[] }) => {
+        const map = new Map<string, { name: string; target: number }>();
+        for (const e of d.employees ?? []) map.set(e.id, { name: e.name, target: e.target_hours ?? 160 });
+        setEmployeeTargets(map);
+      })
+      .catch(() => {});
+  }, [isManagerMode]);
+
+  // Planned hours per employee (live — recalculated from data.workPlans on every refresh)
+  const plannedHoursPerEmp = (() => {
+    if (!data) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const wp of data.workPlans) {
+      if (!wp.employeeId) continue;
+      const [sh, sm] = (wp.startTime ?? '').split(':').map(Number);
+      const [eh, em] = (wp.endTime ?? '').split(':').map(Number);
+      let h = 8;
+      if (wp.startTime && wp.endTime && !isNaN(sh) && !isNaN(eh)) {
+        const startM = (sh || 0) * 60 + (sm || 0);
+        let endM = (eh || 0) * 60 + (em || 0);
+        if (endM <= startM) endM += 24 * 60;
+        h = Math.round((endM - startM) / 6) / 10;
+      }
+      map.set(wp.employeeId, (map.get(wp.employeeId) ?? 0) + h);
+    }
+    return map;
+  })();
+  const [showPlannedPanel, setShowPlannedPanel] = useState(true);
+
   useEffect(() => {
     if (!orgId) return;
     fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
@@ -2093,6 +2128,56 @@ export default function WorkPlanGrid({
           </button>
         </div>
       </div>
+
+      {/* ── PLANNED HOURS PANEL (manager only) ──────────────────────────── */}
+      {isManagerMode && data && plannedHoursPerEmp.size > 0 && (
+        <div className="mb-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <button
+            onClick={() => setShowPlannedPanel(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 transition-colors"
+          >
+            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Naplánované hodiny — {month}
+            </span>
+            <svg className={`w-4 h-4 text-slate-400 transition-transform ${showPlannedPanel ? '' : '-rotate-90'}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+          {showPlannedPanel && (
+            <div className="border-t border-slate-100 px-4 py-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-2">
+                {Array.from(plannedHoursPerEmp.entries())
+                  .sort((a, b) => {
+                    const na = employeeTargets.get(a[0])?.name ?? '';
+                    const nb = employeeTargets.get(b[0])?.name ?? '';
+                    return na.localeCompare(nb, 'cs');
+                  })
+                  .map(([empId, planned]) => {
+                    const info = employeeTargets.get(empId);
+                    const name = info?.name ?? data.workPlans.find(wp => wp.employeeId === empId)?.employeeName ?? empId;
+                    const target = info?.target ?? 160;
+                    const pct = Math.min(100, Math.round((planned / target) * 100));
+                    const color = pct >= 100 ? 'bg-emerald-500' : pct >= 75 ? 'bg-blue-500' : pct >= 50 ? 'bg-amber-400' : 'bg-slate-300';
+                    return (
+                      <div key={empId} className="flex flex-col gap-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-700 truncate">{name}</span>
+                          <span className="text-xs font-bold text-slate-800 shrink-0 tabular-nums">
+                            {Math.round(planned * 10) / 10}h
+                            <span className="text-slate-400 font-normal">/{target}h</span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loading / error states */}
       {loading && (
