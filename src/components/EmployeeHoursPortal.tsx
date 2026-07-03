@@ -15,6 +15,7 @@ interface AttendanceRecord {
   departure: string | null;
   worked: number | null;
   category: string;
+  satBonusHours?: number | null;
 }
 
 interface BenefitDef {
@@ -31,6 +32,7 @@ interface EmployeeHoursData {
     hours: number;
     days: number;
     monthKey?: string;
+    saturdayBonusHours?: number;
   };
   lastMonth: {
     hours: number;
@@ -138,6 +140,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             hours: json.thisMonth?.hours ?? 0,
             days: json.thisMonth?.days ?? 0,
             monthKey: json.thisMonth?.monthKey,
+            saturdayBonusHours: json.thisMonth?.saturdayBonusHours ?? 0,
           },
           lastMonth: {
             hours: json.lastMonth?.hours ?? 0,
@@ -151,12 +154,14 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             check_out?: string | null; departure?: string | null;
             duration?: number | null; worked?: number | null;
             work_type_name?: string | null; category?: string | null;
+            sat_bonus_hours?: number | null;
           }) => ({
             date: l.date,
             arrival: l.check_in ?? l.arrival ?? '',
             departure: l.check_out ?? l.departure ?? null,
             worked: l.duration ?? l.worked ?? null,
             category: l.work_type_name ?? l.category ?? '—',
+            satBonusHours: l.sat_bonus_hours ?? null,
           })),
         };
         setData(normalized);
@@ -415,6 +420,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                     ))}
                     <span className="ml-auto text-xs text-slate-400 self-center">{filtered.length} záznamů</span>
                   </div>
+                  {(() => {
+                    const totalSatBonus = filtered.reduce((s, r) => s + (r.satBonusHours ?? 0), 0);
+                    return (
                   <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
                     <table className="w-full min-w-[420px] text-sm">
                       <thead>
@@ -439,18 +447,31 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                 <td className="px-4 py-3 text-slate-600">{formatTime(rec.departure)}</td>
                                 <td className="px-4 py-3 text-slate-700 font-medium">{formatHours(rec.worked)}</td>
                                 <td className="px-4 py-3">
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isComplete ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                                     <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{rec.category}</span>
+                                    {(rec.satBonusHours ?? 0) > 0 && (
+                                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                        +{rec.satBonusHours!.toFixed(2)}h bonus
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
                             );
                           })
                         )}
+                        {totalSatBonus > 0 && (
+                          <tr className="bg-amber-50 border-t-2 border-amber-200">
+                            <td colSpan={3} className="px-4 py-2.5 text-xs font-semibold text-amber-700">Bonus za soboty (zobrazené období)</td>
+                            <td colSpan={2} className="px-4 py-2.5 text-sm font-bold text-amber-700">+{totalSatBonus.toFixed(2)} h</td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
+                    );
+                  })()}
                 </>
               );
             })()}

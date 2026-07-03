@@ -31,20 +31,35 @@ export async function GET(req: NextRequest) {
   const overtimeBonusPct: number = typeof extra['bonus_overtime_pct'] === 'number' ? extra['bonus_overtime_pct'] : Number(extra['bonus_overtime_pct'] ?? 0);
   const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : [];
 
+  // Benefit definitions from extra_settings
+  const BENEFIT_DEFS = [
+    { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',  hoursKey: 'benefit_blood_hours' },
+    { key: 'english', czLabel: 'Angličtina',      enLabel: 'English lessons', hoursKey: 'benefit_english_hours' },
+    { key: 'gym',     czLabel: 'Cvičení',         enLabel: 'Gym',             hoursKey: 'benefit_gym_hours' },
+  ];
+  const activeBenefits = BENEFIT_DEFS.filter((b) => extra[b.hoursKey] != null).map((b) => ({
+    ...b,
+    hoursPerUnit: Number(extra[b.hoursKey]),
+  }));
+
   let empQuery = sb.from('employees').select('id, name, department, target_hours, employment_type, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
   if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
 
-  const [empRes, logsRes, plansRes, vacRes] = await Promise.all([
+  const [empRes, logsRes, plansRes, vacRes, benefitLogsRes] = await Promise.all([
     empQuery,
     sb.from('attendance_logs').select('employee_id, check_in, check_out, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
     sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
     sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
+    activeBenefits.length > 0
+      ? sb.from('employee_benefit_logs').select('employee_id, benefit_key, count').eq('organization_id', orgId).eq('month', month)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number }[] = empRes.data ?? [];
   const logs: { employee_id: string; check_in: string; check_out: string; date: string }[] = logsRes.data ?? [];
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
+  const benefitLogs: { employee_id: string; benefit_key: string; count: number }[] = benefitLogsRes.data ?? [];
 
   function isSat(dateStr: string) { return new Date(dateStr + 'T00:00:00').getDay() === 6; }
 
@@ -83,9 +98,21 @@ export async function GET(req: NextRequest) {
     if (overtimeThreshold > 0 && workedHours > overtimeThreshold) {
       otBonusHours = (workedHours - overtimeThreshold) * (overtimeBonusPct / 100);
     }
-    const totalBonusHours = satBonusHours + otBonusHours;
-
     const targetHours = emp.target_hours ?? 160;
+
+    // Benefit hours for this employee this month
+    const empBenefitLogs = benefitLogs.filter((bl) => bl.employee_id === emp.id);
+    const benefitHours: Record<string, number> = {};
+    let totalBenefitHours = 0;
+    for (const b of activeBenefits) {
+      const log = empBenefitLogs.find((bl) => bl.benefit_key === b.key);
+      const h = log ? Math.round(log.count * b.hoursPerUnit * 100) / 100 : 0;
+      benefitHours[b.key] = h;
+      totalBenefitHours += h;
+    }
+    totalBenefitHours = Math.round(totalBenefitHours * 100) / 100;
+
+    const totalBonusHours = Math.round((satBonusHours + otBonusHours + totalBenefitHours) * 100) / 100;
 
     return {
       name: emp.name,
@@ -95,7 +122,9 @@ export async function GET(req: NextRequest) {
       saturdayHours: Math.round(saturdayHours * 100) / 100,
       satBonusHours: Math.round(satBonusHours * 100) / 100,
       otBonusHours: Math.round(otBonusHours * 100) / 100,
-      totalBonusHours: Math.round(totalBonusHours * 100) / 100,
+      benefitHours,
+      totalBenefitHours,
+      totalBonusHours,
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
       vacDays: countVacDays(emp.id),
@@ -110,9 +139,20 @@ export async function GET(req: NextRequest) {
 
   const fmt = (n: number) => n.toFixed(2);
 
-  const header = isEn
-    ? ['Name', 'Employment type', 'Data source', 'Hours worked', 'Of which Saturday', 'Saturday bonus (h)', 'Overtime bonus (h)', 'Total bonus (h)', 'Target hours', 'Difference', 'Vacation days used'].join(';')
-    : ['Jméno', 'Pracovní poměr', 'Zdroj dat', 'Odpracováno (h)', 'Z toho soboty (h)', 'Bonus soboty (h)', 'Bonus přesčas (h)', 'Bonus celkem (h)', 'Fond hodin (h)', 'Rozdíl (h)', 'Dovolená čerpáno (dní)'].join(';');
+  // Dynamic benefit columns
+  const benefitHeaders = activeBenefits.map((b) =>
+    isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)`
+  );
+
+  const baseHeaders = isEn
+    ? ['Name', 'Employment type', 'Data source', 'Hours worked', 'Of which Saturday', 'Saturday bonus (h)', 'Overtime bonus (h)']
+    : ['Jméno', 'Pracovní poměr', 'Zdroj dat', 'Odpracováno (h)', 'Z toho soboty (h)', 'Bonus soboty (h)', 'Bonus přesčas (h)'];
+
+  const tailHeaders = isEn
+    ? [...benefitHeaders, 'Total bonus (h)', 'Target hours', 'Difference', 'Vacation days used']
+    : [...benefitHeaders, 'Bonus celkem (h)', 'Fond hodin (h)', 'Rozdíl (h)', 'Dovolená čerpáno (dní)'];
+
+  const header = [...baseHeaders, ...tailHeaders].join(';');
 
   const csvRows = rows.map((r) =>
     [
@@ -123,6 +163,7 @@ export async function GET(req: NextRequest) {
       fmt(r.saturdayHours),
       fmt(r.satBonusHours),
       fmt(r.otBonusHours),
+      ...activeBenefits.map((b) => fmt(r.benefitHours[b.key] ?? 0)),
       fmt(r.totalBonusHours),
       fmt(r.targetHours),
       fmt(r.delta),

@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     // Lookup employee by PIN + org (active only — .single() fails if multiple rows match)
     const { data: employee, error: empError } = await supabase
       .from('employees')
-      .select('id, name, active, vacation_days_per_year')
+      .select('id, name, active, department, vacation_days_per_year')
       .eq('organization_id', orgId)
       .eq('active', true)
       .or(`pin_code.eq.${pin},pin.eq.${pin}`)
@@ -101,26 +101,46 @@ export async function GET(req: NextRequest) {
     const thisRange = monthRange(thisYear, thisMonthNum)
     const lastRange = monthRange(lastYear, lastMonthNum)
 
-    // Fetch 3 months of logs for stats + recent display
+    // Fetch 3 months of logs + settings in parallel
     const threeMonthsAgo = new Date(thisYear, thisMonthNum - 4, 1)
     const earliestDate = threeMonthsAgo.toISOString().slice(0, 10)
+    const thisYearStart = `${thisYear}-01-01`
+    const thisYearEnd = `${thisYear}-12-31`
 
-    const { data: allLogs, error: logsError } = await supabase
-      .from('attendance_logs')
-      .select('date, check_in, check_out, work_type_name')
-      .eq('organization_id', orgId)
-      .eq('employee_id', employee.id)
-      .gte('date', earliestDate)
-      .order('date', { ascending: false })
-      .order('check_in', { ascending: false })
-      .limit(200)
+    const [logsResult, vacResult, settingsResult] = await Promise.all([
+      supabase
+        .from('attendance_logs')
+        .select('date, check_in, check_out, work_type_name')
+        .eq('organization_id', orgId)
+        .eq('employee_id', employee.id)
+        .gte('date', earliestDate)
+        .order('date', { ascending: false })
+        .order('check_in', { ascending: false })
+        .limit(200),
+      supabase
+        .from('requests')
+        .select('date_from, date_to')
+        .eq('organization_id', orgId)
+        .eq('employee_id', employee.id)
+        .eq('type', 'vacation')
+        .eq('status', 'approved')
+        .gte('date_from', thisYearStart)
+        .lte('date_from', thisYearEnd),
+      supabase
+        .from('company_settings')
+        .select('extra_settings')
+        .eq('organization_id', orgId)
+        .maybeSingle(),
+    ])
 
-    if (logsError) {
-      console.error('employee-hours GET logs error:', logsError)
-      return NextResponse.json({ error: logsError.message }, { status: 500 })
+    if (logsResult.error) {
+      console.error('employee-hours GET logs error:', logsResult.error)
+      return NextResponse.json({ error: logsResult.error.message }, { status: 500 })
     }
 
-    const logs: AttendanceRow[] = allLogs ?? []
+    const logs: AttendanceRow[] = logsResult.data ?? []
+    const vacationReqs = vacResult.data ?? []
+    const extra = (settingsResult.data as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {}
 
     // Partition by month
     const thisMonthLogs = logs.filter((l) => l.date >= thisRange.firstDay && l.date <= thisRange.lastDay)
@@ -129,12 +149,28 @@ export async function GET(req: NextRequest) {
     const thisStats = calcStats(thisMonthLogs)
     const lastStats = calcStats(lastMonthLogs)
 
+    // Saturday bonus eligibility
+    const satBonusPct: number = extra['bonus_saturday_pct'] != null ? Number(extra['bonus_saturday_pct']) : 0
+    const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : []
+    const empDept: string = (employee as { department?: string | null }).department ?? ''
+    const satEligible = satBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept))
+    const isSat = (dateStr: string): boolean => new Date(dateStr + 'T12:00:00').getDay() === 6
+
     // All logs for display (sorted by date desc, check_in desc)
+    let thisMonthSatBonusHours = 0
     const recentLogs = logs.map((l) => {
       const durationHours =
         l.check_in && l.check_out
           ? (new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 3_600_000
           : null
+
+      let satBonusHours: number | null = null
+      if (satEligible && durationHours !== null && isSat(l.date)) {
+        satBonusHours = Math.round(durationHours * (satBonusPct / 100) * 100) / 100
+        if (l.date >= thisRange.firstDay && l.date <= thisRange.lastDay) {
+          thisMonthSatBonusHours += satBonusHours
+        }
+      }
 
       return {
         date: l.date,
@@ -142,25 +178,14 @@ export async function GET(req: NextRequest) {
         check_out: l.check_out,
         duration: durationHours,
         work_type_name: l.work_type_name ?? null,
+        sat_bonus_hours: satBonusHours,
       }
     })
+    thisMonthSatBonusHours = Math.round(thisMonthSatBonusHours * 100) / 100
 
-    // Fetch vacation requests (approved) for this year
-    const thisYearStart = `${thisYear}-01-01`
-    const thisYearEnd = `${thisYear}-12-31`
-    const { data: vacationReqs } = await supabase
-      .from('requests')
-      .select('date_from, date_to')
-      .eq('organization_id', orgId)
-      .eq('employee_id', employee.id)
-      .eq('type', 'vacation')
-      .eq('status', 'approved')
-      .gte('date_from', thisYearStart)
-      .lte('date_from', thisYearEnd)
-
-    // Count vacation days used (each request = date_from to date_to inclusive, or 1 day if no date_to)
+    // Count vacation days used
     let vacationUsed = 0
-    for (const req of vacationReqs ?? []) {
+    for (const req of vacationReqs) {
       if (req.date_to && req.date_to > req.date_from) {
         const from = new Date(req.date_from)
         const to = new Date(req.date_to)
@@ -172,14 +197,6 @@ export async function GET(req: NextRequest) {
     }
     const vacationTotal = (employee as { vacation_days_per_year?: number }).vacation_days_per_year ?? 20
     const vacationRemaining = Math.max(0, vacationTotal - vacationUsed)
-
-    // Fetch benefit config from company_settings
-    const { data: settingsRow } = await supabase
-      .from('company_settings')
-      .select('extra_settings')
-      .eq('organization_id', orgId)
-      .maybeSingle()
-    const extra = (settingsRow as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {}
 
     const BENEFIT_DEFS = [
       { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',   hoursKey: 'benefit_blood_hours',   maxKey: 'benefit_blood_max' },
@@ -211,6 +228,7 @@ export async function GET(req: NextRequest) {
         days: thisStats.days,
         monthName: czechMonthName(thisYear, thisMonthNum),
         monthKey: `${thisYear}-${String(thisMonthNum).padStart(2, '0')}`,
+        saturdayBonusHours: thisMonthSatBonusHours,
       },
       lastMonth: {
         hours: lastStats.hours,
