@@ -125,77 +125,70 @@ function NotifyModal({ target, onClose }: NotifyModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">{t('📨 Oslovit zaměstnance', '📨 Notify employee')}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+          <h3 className="font-semibold text-slate-800">{t('Oslovit zaměstnance', 'Notify employee')}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          </button>
         </div>
 
-        <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm">
-          <span className="font-semibold text-slate-800">{target.employeeName}</span>
-          <span className="text-slate-500 ml-2">→ {t('směna', 'shift')} {target.shift.date} ({target.shift.dayName})</span>
+        <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+            {target.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-800">{target.employeeName}</div>
+            <div className="text-xs text-slate-400">{target.shift.date} · {target.shift.dayName}</div>
+          </div>
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t('Kanál', 'Channel')}</label>
+          <label className="text-xs font-medium text-slate-500 mb-2 block">{t('Kanál', 'Channel')}</label>
           <div className="grid grid-cols-3 gap-2">
             {([
               { id: 'email', icon: '📧', label: 'Email' },
               { id: 'slack', icon: '💬', label: 'Slack' },
               { id: 'both',  icon: '📡', label: t('Oboje', 'Both') },
             ] as { id: 'slack' | 'email' | 'both'; icon: string; label: string }[]).map(opt => (
-              <button
-                key={opt.id}
-                onClick={() => setChannel(opt.id)}
-                className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-sm transition
-                  ${channel === opt.id
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 hover:border-slate-300 text-slate-600'}
-                `}
+              <button key={opt.id} onClick={() => setChannel(opt.id)}
+                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-sm transition-all ${channel === opt.id ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:border-slate-300 text-slate-500'}`}
               >
-                <span className="text-xl">{opt.icon}</span>
-                {opt.label}
+                <span className="text-lg">{opt.icon}</span>
+                <span className="text-xs font-medium">{opt.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-            {t('Vlastní zpráva', 'Custom message')} <span className="text-slate-400 font-normal">{t('(volitelné – jinak se použije automatická)', '(optional – automatic message will be used otherwise)')}</span>
+          <label className="text-xs font-medium text-slate-500 mb-2 block">
+            {t('Vlastní zpráva', 'Custom message')} <span className="text-slate-400 font-normal">{t('(volitelné)', '(optional)')}</span>
           </label>
           <textarea
             value={customMessage}
             onChange={e => setCustomMessage(e.target.value)}
             rows={3}
             placeholder={`Ahoj ${target.employeeName.split(' ')[0]}, můžeš nastoupit na směnu ${target.shift.date}?`}
-            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none text-slate-700 placeholder:text-slate-300"
           />
         </div>
 
         {result && (
-          <div className={`text-sm px-3 py-2 rounded-lg ${result.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+          <div className={`text-sm px-3 py-2.5 rounded-xl ${result.ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
             {result.text}
           </div>
         )}
 
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition"
-          >
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition font-medium">
             {t('Zrušit', 'Cancel')}
           </button>
-          <button
-            onClick={send}
-            disabled={sending}
+          <button onClick={send} disabled={sending}
             className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition"
           >
-            {sending ? t('Odesílám…', 'Sending…') : t('📨 Odeslat zprávu', '📨 Send message')}
+            {sending ? t('Odesílám…', 'Sending…') : t('Odeslat', 'Send')}
           </button>
         </div>
       </div>
@@ -203,7 +196,7 @@ function NotifyModal({ target, onClose }: NotifyModalProps) {
   );
 }
 
-// ─── License check ────────────────────────────────────────────────────────────
+// ─── License state ─────────────────────────────────────────────────────────────
 
 interface LicenseState {
   checked: boolean;
@@ -221,25 +214,29 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function badgeColor(badge: string): string {
-  if (badge.includes('Tier 1'))  return 'bg-emerald-100 text-emerald-800';
-  if (badge.includes('Tier 2'))  return 'bg-blue-100 text-blue-800';
-  if (badge.includes('Tier 3'))  return 'bg-amber-100 text-amber-800';
-  if (badge.includes('Mimo'))    return 'bg-red-100 text-red-700';
-  if (badge.includes('Prodejna')) return 'bg-indigo-100 text-indigo-700';
-  if (badge.includes('Soboty') || badge.includes('Priorita')) return 'bg-purple-100 text-purple-700';
-  if (badge.includes('IČO'))     return 'bg-orange-100 text-orange-700';
-  if (badge.includes('Večerní')) return 'bg-sky-100 text-sky-700';
-  return 'bg-slate-100 text-slate-600';
+function getInitials(name: string): string {
+  return name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
-function confidenceColor(c: number): string {
-  if (c >= 80) return 'text-emerald-600';
-  if (c >= 50) return 'text-amber-600';
-  return 'text-red-500';
+function matchColor(c: number): string {
+  if (c >= 80) return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+  if (c >= 50) return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+  return 'bg-red-50 text-red-600 ring-1 ring-red-200';
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function badgeStyle(badge: string): string {
+  if (badge.includes('Tier 1'))   return 'bg-emerald-50 text-emerald-700';
+  if (badge.includes('Tier 2'))   return 'bg-blue-50 text-blue-700';
+  if (badge.includes('Tier 3'))   return 'bg-amber-50 text-amber-700';
+  if (badge.includes('Mimo'))     return 'bg-red-50 text-red-600';
+  if (badge.includes('Prodejna')) return 'bg-indigo-50 text-indigo-700';
+  if (badge.includes('Soboty') || badge.includes('Priorita')) return 'bg-purple-50 text-purple-700';
+  if (badge.includes('IČO'))      return 'bg-orange-50 text-orange-700';
+  if (badge.includes('Večerní'))  return 'bg-sky-50 text-sky-700';
+  return 'bg-slate-100 text-slate-500';
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 
 export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNotifications }: Props & { onOpenNotifications?: () => void }) {
   const t = useT();
@@ -266,7 +263,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
 
   const storageKey = `tf_assistant_${orgId}_${month}_${draft}`;
 
-  // Restore persisted result + selection on mount / when key changes
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -279,7 +275,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  // Persist result + selection whenever they change
   useEffect(() => {
     if (!result) return;
     try {
@@ -287,7 +282,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     } catch { /* ignore */ }
   }, [result, selected, storageKey]);
 
-  // Check license on mount
   useEffect(() => {
     managerFetch('/api/shift-assistant/license')
       .then(r => r.json())
@@ -302,19 +296,14 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     setSelected(new Set());
     setApplyResult(null);
     try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
-
     try {
       const res = await managerFetch(`/api/shift-assistant/analyze?month=${month}&draft=${draft}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Chyba analýzy');
       setResult(data);
-
-      // Auto-select all recommended
       const autoIds = new Set<string>();
       for (const day of (data.problemDays ?? [])) {
-        for (const id of (day.recommendedSuggestionIds ?? [])) {
-          autoIds.add(id);
-        }
+        for (const id of (day.recommendedSuggestionIds ?? [])) autoIds.add(id);
       }
       setSelected(autoIds);
     } catch (e) {
@@ -337,7 +326,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     setApplying(true);
     setError(null);
     try {
-      // Build a map of suggestionId → {startTime, endTime} so apply route can store times
       const suggestionTimes: Record<string, { startTime: string; endTime: string }> = {};
       for (const day of result.problemDays) {
         for (const s of day.suggestions) {
@@ -345,7 +333,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
           if (s.partialAvailability) {
             suggestionTimes[s.id] = { startTime: s.partialAvailability.from, endTime: s.partialAvailability.to };
           } else {
-            // Parse timeLabel "09:00–19:00" (em dash or regular dash)
             const parts = s.timeLabel.split(/[–-]/).map((p: string) => p.trim());
             if (parts.length === 2) suggestionTimes[s.id] = { startTime: parts[0], endTime: parts[1] };
           }
@@ -358,7 +345,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Chyba při aplikaci');
       setApplyResult(data);
-      // Refresh analysis
       await analyze();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
@@ -367,17 +353,17 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     }
   };
 
-  // ── License check loading ────────────────────────────────────────────────
+  // ── License loading ──────────────────────────────────────────────────────────
   if (!license.checked) {
     return (
-      <div className="flex items-center justify-center py-32 text-slate-400">
-        <div className="animate-spin w-6 h-6 border-2 border-slate-300 border-t-indigo-500 rounded-full mr-3" />
-        {t('Ověřuji licenci…', 'Verifying license…')}
+      <div className="flex items-center justify-center py-32 text-slate-400 gap-3">
+        <div className="animate-spin w-5 h-5 border-2 border-slate-200 border-t-indigo-500 rounded-full" />
+        <span className="text-sm">{t('Ověřuji licenci…', 'Verifying license…')}</span>
       </div>
     );
   }
 
-  // ── Upsell wall ──────────────────────────────────────────────────────────
+  // ── Upsell ──────────────────────────────────────────────────────────────────
   if (!license.licensed) {
     const reasonMsg: Record<string, string> = {
       no_license: t('Vaše organizace nemá aktivovaný Asistent směn.', 'Your organization does not have Shift Assistant activated.'),
@@ -393,9 +379,6 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
           <p className="text-slate-500 text-sm leading-relaxed">
             {reasonMsg[license.reason ?? ''] ?? t('Asistent směn není aktivován.', 'Shift Assistant is not activated.')}
           </p>
-          <p className="text-slate-400 text-sm mt-2">
-            {t('Automaticky doplní chybějící směny…', 'Automatically fills missing shifts based on availability, tiers and employee preferences.')}
-          </p>
         </div>
         <div className="bg-slate-50 rounded-2xl p-5 w-full space-y-2 text-left">
           {[
@@ -403,338 +386,342 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
             t('✅ Scoring kandidátů podle tieru, sobot a hodin', '✅ Candidate scoring by tier, Saturdays and hours'),
             t('✅ Automatické i manuální schvalování návrhů', '✅ Automatic and manual proposal approval'),
             t('✅ Večerní záskok – closing coverage logika', '✅ Evening cover – closing coverage logic'),
-          ].map(f => (
-            <div key={f} className="text-sm text-slate-600">{f}</div>
-          ))}
+          ].map(f => <div key={f} className="text-sm text-slate-600">{f}</div>)}
         </div>
-        <a
-          href="https://selbicky.dev/assistant"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition text-sm"
-        >
+        <a href="https://selbicky.dev/assistant" target="_blank" rel="noopener noreferrer"
+          className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition text-sm">
           {t('Aktivovat Asistenta směn →', 'Activate Shift Assistant →')}
         </a>
-        <p className="text-xs text-slate-400">{t('Po zakoupení bude licence aktivována automaticky.', 'After purchase, the license will be activated automatically.')}</p>
       </div>
     );
   }
 
+  // ── Month helpers ────────────────────────────────────────────────────────────
+  const [y, m] = month.split('-').map(Number);
+  const monthLabel = new Date(y, m - 1, 1).toLocaleDateString(t('cs-CZ', 'en-US'), { month: 'long', year: 'numeric' });
+  const prevMonth = () => { if (!onMonthChange) return; const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); setResult(null); };
+  const nextMonth = () => { if (!onMonthChange) return; const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); setResult(null); };
+
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="min-h-full bg-slate-50/60">
+      <div className="max-w-4xl mx-auto px-5 py-6 space-y-5">
 
-      {/* Notify modal */}
-      {notifyTarget && (
-        <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />
-      )}
+        {/* Notify modal */}
+        {notifyTarget && <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            {t('🤖 Asistent směn', '🤖 Shift Assistant')}
-            <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">DLC</span>
-          </h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {t('Automatické doplnění chybějících směn na základě dostupnosti a preferencí', 'Automatic filling of missing shifts based on availability and preferences')}
-          </p>
-          {/* Month switcher */}
-          {onMonthChange && (() => {
-            const [y, m] = month.split('-').map(Number);
-            const label = new Date(y, m - 1, 1).toLocaleDateString(t('cs-CZ', 'en-US'), { month: 'long', year: 'numeric' });
-            const prev = () => { const d = new Date(y, m - 2, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); setResult(null); };
-            const next = () => { const d = new Date(y, m, 1); onMonthChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); setResult(null); };
-            return (
-              <div className="flex items-center gap-2 mt-2">
-                <button onClick={prev} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors">‹</button>
-                <span className="text-sm font-semibold text-slate-700 capitalize min-w-[130px] text-center">{label}</span>
-                <button onClick={next} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors">›</button>
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-slate-800">{t('Asistent směn', 'Shift Assistant')}</h1>
+                <span className="text-[11px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">DLC</span>
               </div>
-            );
-          })()}
+              <p className="text-xs text-slate-400 mt-0.5">{t('Automatické doplnění chybějících směn', 'Automatic missing shift filler')}</p>
+            </div>
+            {/* Month nav */}
+            {onMonthChange && (
+              <div className="flex items-center gap-1 ml-3 border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+                <button onClick={prevMonth} className="px-2.5 py-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors text-sm">‹</button>
+                <span className="text-xs font-semibold text-slate-700 capitalize px-2 min-w-[110px] text-center">{monthLabel}</span>
+                <button onClick={nextMonth} className="px-2.5 py-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors text-sm">›</button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Bell */}
+            <button onClick={() => setShowNotifications(true)}
+              className={`relative w-9 h-9 flex items-center justify-center rounded-lg border transition-all text-base
+                ${unconfirmedCount > 0 ? 'border-amber-300 bg-amber-50 text-amber-600' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              🔔
+              {(unreadCount > 0 || unconfirmedCount > 0) && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  {unreadCount || unconfirmedCount}
+                </span>
+              )}
+            </button>
+            {/* Draft */}
+            <select value={draft} onChange={e => setDraft(e.target.value as 'A' | 'B')} disabled={loading}
+              className="text-xs font-medium border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+              <option value="A">Draft A</option>
+              <option value="B">Draft B</option>
+            </select>
+            {/* Analyze button */}
+            <button onClick={analyze} disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors shadow-sm">
+              {loading ? (
+                <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{t('Analyzuji…', 'Analyzing…')}</>
+              ) : (
+                <><svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/><path d="m21 21-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>{t('Analyzovat měsíc', 'Analyze month')}</>
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowNotifications(true)}
-            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all
-              ${unconfirmedCount > 0
-                ? 'border-amber-300 bg-amber-50 text-amber-700 shadow-[0_0_0_3px_rgba(251,191,36,0.25)] animate-pulse'
-                : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-            title={t('Notifikace', 'Notifications')}
-          >
-            🔔
-            {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold">
-                {unreadCount}
-              </span>
-            )}
-            {unconfirmedCount > 0 && unreadCount === 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-xs font-bold">
-                {unconfirmedCount}
-              </span>
-            )}
-          </button>
-          <label className="text-sm text-slate-600 font-medium">Draft:</label>
-          <select
-            value={draft}
-            onChange={e => setDraft(e.target.value as 'A' | 'B')}
-            className="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-white"
-            disabled={loading}
-          >
-            <option value="A">Draft A</option>
-            <option value="B">Draft B</option>
-          </select>
-          <button
-            onClick={analyze}
-            disabled={loading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition"
-          >
-            {loading ? t('Analyzuji…', 'Analyzing…') : t('🔍 Analyzovat měsíc', '🔍 Analyze month')}
-          </button>
-        </div>
+        {/* ── Error ── */}
+        {error && (
+          <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" className="mt-0.5 flex-shrink-0"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            {error}
+          </div>
+        )}
+
+        {/* ── Apply result ── */}
+        {applyResult && (
+          <div className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${applyResult.applied > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+            <span>{applyResult.applied > 0 ? '✅' : '⚠️'}</span>
+            <div>
+              {applyResult.applied > 0
+                ? <span>{t('Zapsáno', 'Written')} <strong>{applyResult.applied}</strong> {t('směn do kalendáře.', 'shifts to calendar.')}</span>
+                : <span>{t('Žádná směna nebyla zapsána.', 'No shifts were written.')}</span>}
+              {applyResult.skipped.length > 0 && (
+                <div className="mt-1 text-xs opacity-75">{t('Přeskočeno', 'Skipped')} {applyResult.skipped.length}: {applyResult.skipped.map(s => s.reason).join(' · ')}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── KPI cards ── */}
+        {result && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: t('Dnů v měsíci', 'Days in month'), value: result.summary.totalDays,       accent: 'bg-slate-300',   num: 'text-slate-700' },
+              { label: t('Problémových', 'Problematic'),    value: result.summary.problemDays,      accent: 'bg-red-400',     num: 'text-red-600' },
+              { label: t('Doporučených', 'Recommended'),    value: result.summary.recommendedCount, accent: 'bg-indigo-400',  num: 'text-indigo-700' },
+              { label: t('Vybráno', 'Selected'),            value: selected.size,                   accent: 'bg-emerald-400', num: 'text-emerald-700' },
+            ].map(card => (
+              <div key={card.label} className="bg-white border border-slate-200 rounded-xl px-4 py-3.5 flex items-center gap-3 shadow-sm">
+                <div className={`w-1 h-9 rounded-full flex-shrink-0 ${card.accent}`} />
+                <div>
+                  <div className={`text-2xl font-bold leading-none ${card.num}`}>{card.value}</div>
+                  <div className="text-xs text-slate-400 mt-1">{card.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Action bar ── */}
+        {result && result.summary.problemDays > 0 && (
+          <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+            <div className="text-sm text-slate-500">
+              <span className="font-bold text-slate-800">{selected.size}</span> {t('návrhů vybráno', 'proposals selected')}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { const all = new Set<string>(); result.problemDays.forEach(d => d.recommendedSuggestionIds.forEach(id => all.add(id))); setSelected(all); }}
+                className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600 font-medium"
+              >
+                {t('Doporučené', 'Recommended')}
+              </button>
+              <button onClick={() => setSelected(new Set())}
+                className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600 font-medium">
+                {t('Zrušit výběr', 'Clear')}
+              </button>
+              <button onClick={apply} disabled={applying || selected.size === 0}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                {applying
+                  ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />{t('Zapisuji…', 'Writing…')}</>
+                  : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{t('Zapsat', 'Write')} {selected.size} {t('směn', 'shifts')}</>
+                }
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── All clear ── */}
+        {result && result.problemDays.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-3xl mb-4">🎉</div>
+            <div className="font-semibold text-slate-700">{t('Všechny směny jsou obsazené!', 'All shifts are filled!')}</div>
+            <div className="text-sm text-slate-400 mt-1">Draft {result.draft} · {result.month}</div>
+          </div>
+        )}
+
+        {/* ── Problem day cards ── */}
+        {result && result.problemDays.map((day, idx) => {
+          const isOpen = expandedDay === day.date;
+          const hasMissing = day.missingCount > 0;
+          const hasEveningMissing = day.closingCoverage.enabled && day.closingCoverage.missingStaff > 0;
+
+          return (
+            <div key={day.date} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+              {/* Day header */}
+              <button
+                onClick={() => setExpandedDay(isOpen ? null : day.date)}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors text-left"
+              >
+                {/* Index */}
+                <span className="text-xs text-slate-300 font-semibold w-5 text-right flex-shrink-0">{idx + 1}</span>
+
+                {/* Date */}
+                <div className="flex-shrink-0 min-w-[90px]">
+                  <div className="text-sm font-bold text-slate-800">{day.dateLabel}</div>
+                  <div className="text-xs text-slate-400">{day.dayName}</div>
+                </div>
+
+                {/* Badges */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {hasMissing && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full">
+                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="2"/></svg>
+                      {t('Chybí', 'Missing')} {day.missingCount}
+                    </span>
+                  )}
+                  {hasEveningMissing && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-full">
+                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2"/></svg>
+                      {t('Večer', 'Eve')} -{day.closingCoverage.missingStaff}
+                    </span>
+                  )}
+                </div>
+
+                {/* Filled count */}
+                <div className="flex-1 text-xs text-slate-400">
+                  {day.assignedCount} / {day.requiredTotal} {t('obsazeno', 'filled')}
+                  {day.storeHoursLabel && <span className="ml-2 text-slate-300">· {day.storeHoursLabel}</span>}
+                </div>
+
+                {/* Suggestion count pill */}
+                {day.suggestions.length > 0 && (
+                  <span className="text-xs text-slate-400 flex-shrink-0">
+                    {day.suggestions.length} {t('kandidátů', 'candidates')}
+                  </span>
+                )}
+
+                {/* Chevron */}
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24"
+                  className={`text-slate-300 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                  <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+
+              {/* Suggestions panel */}
+              {isOpen && (
+                <div className="border-t border-slate-100">
+                  {day.suggestions.length === 0 ? (
+                    <div className="px-5 py-8 text-center">
+                      <div className="text-slate-300 text-2xl mb-2">🤷</div>
+                      <div className="text-sm text-slate-400">{t('Žádní dostupní kandidáti pro tento den.', 'No available candidates for this day.')}</div>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-50">
+                      {day.suggestions.map(s => {
+                        const isSelected    = selected.has(s.id);
+                        const isRecommended = day.recommendedSuggestionIds.includes(s.id);
+                        const isClosing     = s.suggestionType === 'CLOSING_ASSIST';
+
+                        return (
+                          <div
+                            key={s.id}
+                            onClick={() => toggleSuggestion(s.id)}
+                            className={`flex items-center gap-3 px-5 py-3.5 cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50/60' : 'hover:bg-slate-50/60'}`}
+                          >
+                            {/* Checkbox */}
+                            <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                              {isSelected && (
+                                <svg width="8" height="8" fill="none" viewBox="0 0 24 24">
+                                  <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </div>
+
+                            {/* Avatar */}
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isSelected ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-100 text-slate-600'}`}>
+                              {getInitials(s.employeeName)}
+                            </div>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold text-slate-800">{s.employeeName}</span>
+                                {s.timeLabel && (
+                                  <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{s.timeLabel}</span>
+                                )}
+                                {isClosing && (
+                                  <span className="text-[11px] font-medium bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full">{t('Večerní záskok', 'Evening cover')}</span>
+                                )}
+                                {isRecommended && !isClosing && (
+                                  <span className="text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded-full">★ {t('Doporučeno', 'Recommended')}</span>
+                                )}
+                              </div>
+
+                              {/* Tags row */}
+                              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                                {s.badges.map(b => (
+                                  <span key={b} className={`text-[11px] px-1.5 py-0.5 rounded ${badgeStyle(b)}`}>{b}</span>
+                                ))}
+                                {s.warnings.map(w => (
+                                  <span key={w} className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">⚠ {w}</span>
+                                ))}
+                              </div>
+
+                              {/* Reasons — subtle */}
+                              {s.reasons.length > 0 && (
+                                <div className="text-[11px] text-slate-400 mt-1">{s.reasons.join(' · ')}</div>
+                              )}
+                            </div>
+
+                            {/* Match % */}
+                            <div className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${matchColor(s.confidence)}`}>
+                              {s.confidence}%
+                            </div>
+
+                            {/* Notify icon button */}
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                setNotifyTarget({
+                                  employeeId: s.id.split('__')[1] ?? s.id,
+                                  employeeName: s.employeeName,
+                                  shift: { date: day.date, dayName: day.dayName },
+                                });
+                              }}
+                              title={t('Oslovit zaměstnance', 'Notify employee')}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors flex-shrink-0"
+                            >
+                              <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="1.8"/>
+                                <polyline points="22,6 12,13 2,6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* ── Empty state ── */}
+        {!result && !loading && (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-3xl mb-4">🤖</div>
+            <div className="font-semibold text-slate-700">{t('Asistent směn připraven', 'Shift Assistant ready')}</div>
+            <div className="text-sm text-slate-400 mt-2 max-w-xs">
+              {t('Klikni na "Analyzovat měsíc" a bot najde chybějící směny a navrhne optimální obsazení.', 'Click "Analyze month" to find missing shifts and get optimal staffing suggestions.')}
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Apply result */}
-      {applyResult && (
-        <div className={`border rounded-lg px-4 py-3 text-sm ${applyResult.applied > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-          {applyResult.applied > 0
-            ? <div>✅ {t('Zapsáno', 'Written')} {applyResult.applied} {t('směn do kalendáře.', 'shifts to calendar.')}</div>
-            : <div>⚠️ {t('Žádná směna nebyla zapsána.', 'No shifts were written.')}</div>
-          }
-          {applyResult.skipped.length > 0 && (
-            <div className="mt-1 text-xs text-amber-700">
-              {t('Přeskočeno', 'Skipped')} {applyResult.skipped.length}: {applyResult.skipped.map(s => s.reason).join(' · ')}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Summary */}
-      {result && (
-        <div className="grid grid-cols-4 gap-4">
-          {[
-            { label: t('Dnů v měsíci', 'Days in month'),    value: result.summary.totalDays,        color: 'bg-slate-100 text-slate-700' },
-            { label: t('Problémových', 'Problematic'),     value: result.summary.problemDays,       color: 'bg-red-50 text-red-700' },
-            { label: t('Doporučených', 'Recommended'),     value: result.summary.recommendedCount,  color: 'bg-indigo-50 text-indigo-700' },
-            { label: t('Vybráno', 'Selected'),             value: selected.size,                    color: 'bg-amber-50 text-amber-700' },
-          ].map(card => (
-            <div key={card.label} className={`${card.color} rounded-xl p-4 text-center`}>
-              <div className="text-2xl font-bold">{card.value}</div>
-              <div className="text-xs font-medium mt-0.5">{card.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Action bar */}
-      {result && result.summary.problemDays > 0 && (
-        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3">
-          <div className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{selected.size}</span> {t('návrhů vybráno k zapsání', 'proposals selected for writing')}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                const allIds = new Set<string>();
-                result.problemDays.forEach(d => d.recommendedSuggestionIds.forEach(id => allIds.add(id)));
-                setSelected(allIds);
-              }}
-              className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
-            >
-              {t('Vybrat doporučené', 'Select recommended')}
-            </button>
-            <button
-              onClick={() => setSelected(new Set())}
-              className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
-            >
-              {t('Zrušit výběr', 'Clear selection')}
-            </button>
-            <button
-              onClick={apply}
-              disabled={applying || selected.size === 0}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition"
-            >
-              {applying ? t('Zapisuji…', 'Writing…') : `${t('✅ Zapsat', '✅ Write')} ${selected.size} ${t('směn', 'shifts')}`}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Problem days */}
-      {result && result.problemDays.length === 0 && (
-        <div className="text-center py-16 text-slate-400">
-          <div className="text-4xl mb-3">🎉</div>
-          <div className="font-semibold text-slate-600">{t('Všechny směny jsou obsazené!', 'All shifts are filled!')}</div>
-          <div className="text-sm mt-1">Draft {result.draft} {t('pro', 'for')} {result.month} {t('nemá žádná chybějící místa.', 'has no missing slots.')}</div>
-        </div>
-      )}
-
-      {result && result.problemDays.map((day, dayIdx) => (
-        <div key={day.date} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          {/* Day header */}
-          <button
-            onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}
-            className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition text-left"
-          >
-            {/* Index + date */}
-            <div className="flex-shrink-0 flex items-center gap-3 min-w-[160px]">
-              <span className="text-xs font-bold text-slate-400 w-5 text-right">{dayIdx + 1}.</span>
-              <div>
-                <div className="text-sm font-bold text-slate-800">{day.dateLabel}</div>
-                <div className="text-xs text-slate-400">{day.dayName}{day.storeHoursLabel ? ` · ${day.storeHoursLabel}` : ''}</div>
-              </div>
-            </div>
-
-            {/* Status badges */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {day.missingCount > 0 && (
-                <span className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
-                  {t('Chybí', 'Missing')} {day.missingCount} {day.missingCount === 1 ? t('člověk', 'person') : t('lidé', 'people')}
-                </span>
-              )}
-              {day.closingCoverage.enabled && day.closingCoverage.missingStaff > 0 && (
-                <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
-                  {t('Večer', 'Evening')} -{day.closingCoverage.missingStaff}
-                </span>
-              )}
-            </div>
-
-            {/* Assigned count */}
-            <div className="flex-1 text-xs text-slate-400">
-              {day.assignedCount > 0
-                ? `${day.assignedCount} / ${day.requiredTotal} obsazeno`
-                : <span className="italic">{t('Nikdo obsazen', 'Nobody assigned')}</span>}
-            </div>
-
-            <span className="text-slate-300 text-xs flex-shrink-0">{expandedDay === day.date ? '▲' : '▼'}</span>
-          </button>
-
-          {/* Suggestions */}
-          {expandedDay === day.date && (
-            <div className="border-t border-slate-100 divide-y divide-slate-50">
-              {day.suggestions.length === 0 ? (
-                <div className="px-5 py-6 text-sm text-slate-400 text-center">
-                  {t('Žádní dostupní kandidáti pro tento den.', 'No available candidates for this day.')}
-                </div>
-              ) : day.suggestions.map(s => {
-                const isSelected  = selected.has(s.id);
-                const isRecommended = day.recommendedSuggestionIds.includes(s.id);
-                const isClosing   = s.suggestionType === 'CLOSING_ASSIST';
-
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => toggleSuggestion(s.id)}
-                    className={`px-5 py-4 flex items-start gap-4 cursor-pointer transition
-                      ${isSelected ? 'bg-indigo-50 border-l-2 border-indigo-500' : 'hover:bg-slate-50'}
-                    `}
-                  >
-                    {/* Checkbox */}
-                    <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition
-                      ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}
-                    `}>
-                      {isSelected && <span className="text-white text-xs">✓</span>}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-slate-800">{s.employeeName}</span>
-                        {s.timeLabel && (
-                          <span className="text-xs text-slate-500">{s.timeLabel}</span>
-                        )}
-                        {isClosing && (
-                          <span className="text-xs bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded">{t('Večerní záskok', 'Evening cover')}</span>
-                        )}
-                        {isRecommended && !isClosing && (
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">{t('★ Doporučeno', '★ Recommended')}</span>
-                        )}
-                        <span className={`text-xs font-medium ml-auto ${confidenceColor(s.confidence)}`}>
-                          {s.confidence}{t('% shoda', '% match')}
-                        </span>
-                      </div>
-
-                      {/* Badges */}
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {s.badges.map(b => (
-                          <span key={b} className={`text-xs px-1.5 py-0.5 rounded ${badgeColor(b)}`}>{b}</span>
-                        ))}
-                      </div>
-
-                      {/* Warnings */}
-                      {s.warnings.length > 0 && (
-                        <div className="mt-1.5 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
-                          ⚠ {s.warnings.join(' · ')}
-                        </div>
-                      )}
-
-                      {/* Reasons */}
-                      <div className="mt-1 text-xs text-slate-400">
-                        {s.reasons.join(' · ')}
-                      </div>
-                    </div>
-
-                    {/* Action label + Oslovit */}
-                    <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full
-                        ${s.canAutoApply
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-amber-100 text-amber-700'}
-                      `}>
-                        {s.actionLabel}
-                      </span>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            setNotifyTarget({
-                              employeeId: s.id.split('__')[1] ?? s.id,
-                              employeeName: s.employeeName,
-                              shift: { date: day.date, dayName: day.dayName },
-                            });
-                          }}
-                          className="text-xs px-2 py-1 bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 rounded-lg transition"
-                        >
-                          {t('📨 Oslovit zaměstnance', '📨 Notify employee')}
-                        </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ))}
-
-      {/* Empty state before analysis */}
-      {!result && !loading && (
-        <div className="text-center py-20 text-slate-400">
-          <div className="text-5xl mb-4">🤖</div>
-          <div className="font-semibold text-slate-600 text-lg">{t('Asistent směn připraven', 'Shift Assistant ready')}</div>
-          <div className="text-sm mt-2 max-w-sm mx-auto">
-            {t('Klikni na "Analyzovat měsíc" a bot najde chybějící směny...', 'Click "Analyze month" and the bot will find missing shifts and suggest optimal staffing.')}
-          </div>
-        </div>
-      )}
-
-      {/* Notifications drawer */}
+      {/* ── Notifications drawer ── */}
       {showNotifications && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowNotifications(false)} />
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setShowNotifications(false)} />
           <div className="relative bg-white w-full max-w-md shadow-2xl flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-semibold text-slate-800">🔔 {t('Notifikace', 'Notifications')}</h2>
-              <button
-                onClick={() => setShowNotifications(false)}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-              >✕</button>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-slate-800">🔔 {t('Notifikace', 'Notifications')}</h2>
+              <button onClick={() => setShowNotifications(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto">
               <ShiftConfirmationsDashboard month={month} onUnconfirmedCount={setUnconfirmedCount} />
