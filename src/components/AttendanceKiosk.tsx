@@ -411,17 +411,53 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     if (!hoSw) return;
     setHoLoading(true);
     try {
-      // Close the open attendance record that was created when stopwatch started
+      const startAt = new Date(hoSw.startAt);
+      const endAt = new Date();
+
+      // Try checkout first (works for sessions started after the checkin-on-start fix)
       const res = await fetch('/api/public/kiosk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'checkout', orgId, pin }),
       });
-      const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; logId?: string; workTypeName?: string; duration?: string };
+      const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; logId?: string; workTypeName?: string; duration?: string; durationLabel?: string };
+
+      // Fallback: no open session in DB (session started before the fix) → create full record
+      if (!res.ok && res.status === 404) {
+        const date = startAt.toISOString().slice(0, 10);
+        const fbRes = await fetch('/api/public/kiosk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'ho-record',
+            orgId,
+            pin,
+            workTypeId: hoSw.workTypeId || undefined,
+            workTypeName: hoSw.workTypeName,
+            date,
+            startTime: startAt.toISOString(),
+            endTime: endAt.toISOString(),
+            note: null,
+          }),
+        });
+        const fbJson = await fbRes.json().catch(() => ({})) as { ok?: boolean; error?: string; durationLabel?: string };
+        if (!fbRes.ok) {
+          setHoFormError(fbJson.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
+          return;
+        }
+        localStorage.removeItem(HO_SW_KEY);
+        setHoSw(null);
+        setSuccessMessage(`HomeOffice zaznamenán ✓ ${fbJson.durationLabel ?? hoSwDisplay}`);
+        setScreen('success-checkin');
+        resetKiosk();
+        return;
+      }
+
       if (!res.ok) {
         setHoFormError(json.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
         return;
       }
+
       localStorage.removeItem(HO_SW_KEY);
       setHoSw(null);
       const checkoutWt = json.workTypeName ?? hoSw.workTypeName;
