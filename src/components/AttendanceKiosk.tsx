@@ -369,51 +369,72 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     resetKiosk();
   };
 
-  const handleHoStopwatchStart = () => {
-    const sw: HoStopwatchData = {
-      orgId,
-      employeeId,
-      workTypeId: hoFormWorkTypeId,
-      workTypeName: hoFormWorkTypeName || 'HomeOffice',
-      startAt: new Date().toISOString(),
-    };
-    localStorage.setItem(HO_SW_KEY, JSON.stringify(sw));
-    setHoSw(sw);
-    setScreen('ho-stopwatch');
+  const handleHoStopwatchStart = async () => {
+    setHoLoading(true);
+    setHoFormError('');
+    try {
+      // Create an open attendance record immediately so the employee appears in Přehledy
+      const res = await fetch('/api/public/kiosk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'checkin',
+          orgId,
+          pin,
+          workTypeId: hoFormWorkTypeId || undefined,
+          workTypeName: hoFormWorkTypeName || 'HomeOffice',
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setHoFormError(json.error ?? t('Chyba při záznamu příchodu.', 'Error recording clock-in.'));
+        return;
+      }
+      const sw: HoStopwatchData = {
+        orgId,
+        employeeId,
+        workTypeId: hoFormWorkTypeId,
+        workTypeName: hoFormWorkTypeName || 'HomeOffice',
+        startAt: new Date().toISOString(),
+      };
+      localStorage.setItem(HO_SW_KEY, JSON.stringify(sw));
+      setHoSw(sw);
+      setScreen('ho-stopwatch');
+    } catch {
+      setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
+    } finally {
+      setHoLoading(false);
+    }
   };
 
   const handleHoStopwatchStop = async () => {
     if (!hoSw) return;
     setHoLoading(true);
     try {
-      const startAt = new Date(hoSw.startAt);
-      const endAt = new Date();
-      const date = `${startAt.getFullYear()}-${String(startAt.getMonth() + 1).padStart(2, '0')}-${String(startAt.getDate()).padStart(2, '0')}`;
+      // Close the open attendance record that was created when stopwatch started
       const res = await fetch('/api/public/kiosk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'ho-record',
-          orgId,
-          pin,
-          workTypeId: hoSw.workTypeId || undefined,
-          workTypeName: hoSw.workTypeName,
-          date,
-          startTime: startAt.toISOString(),
-          endTime: endAt.toISOString(),
-          note: null,
-        }),
+        body: JSON.stringify({ action: 'checkout', orgId, pin }),
       });
-      const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; durationLabel?: string };
+      const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; logId?: string; workTypeName?: string; duration?: string };
       if (!res.ok) {
         setHoFormError(json.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
         return;
       }
       localStorage.removeItem(HO_SW_KEY);
       setHoSw(null);
-      setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.durationLabel ?? hoSwDisplay}`);
-      setScreen('success-checkin');
-      resetKiosk();
+      const checkoutWt = json.workTypeName ?? hoSw.workTypeName;
+      if (requireHoReport && isHomeOffice(checkoutWt) && json.logId) {
+        setHoLogId(json.logId);
+        setHoNote('');
+        setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.duration ?? hoSwDisplay}`);
+        setScreen('ho-activity');
+      } else {
+        setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.duration ?? hoSwDisplay}`);
+        setScreen('success-checkin');
+        resetKiosk();
+      }
     } catch {
       setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
     } finally {
