@@ -1640,7 +1640,10 @@ export default function WorkPlanGrid({
   const metaByDate = new Map<string, ScheduleDayMeta>();
 
   if (data || weekExtraPlans.length > 0) {
+    const seenIds = new Set<string>();
     for (const entry of [...(data?.workPlans ?? []), ...weekExtraPlans]) {
+      if (seenIds.has(entry.id)) continue;
+      seenIds.add(entry.id);
       const list = entriesByDate.get(entry.date) ?? [];
       list.push(entry);
       entriesByDate.set(entry.date, list);
