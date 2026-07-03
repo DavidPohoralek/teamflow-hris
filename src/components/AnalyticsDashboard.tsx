@@ -17,6 +17,8 @@ interface EmployeeStat {
   vacationDaysTotal: number;
   vacationDaysUsed: number;
   vacationDaysRemaining: number;
+  saturdayHours?: number;
+  saturdayBonusHours?: number;
 }
 
 interface WorkTypeBreakdown {
@@ -260,6 +262,7 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
                     <th className="text-right px-4 py-3 font-medium text-slate-500">Odpracováno</th>
                     <th className="text-right px-4 py-3 font-medium text-slate-500">Fond</th>
                     <th className="text-right px-4 py-3 font-medium text-slate-500">Rozdíl</th>
+                    <th className="text-right px-4 py-3 font-medium text-slate-500">Bonus So</th>
                     <th className="text-center px-4 py-3 font-medium text-slate-500">Vytížení</th>
                     <th className="text-center px-4 py-3 font-medium text-slate-500">Dochvilnost</th>
                     <th className="text-right px-4 py-3 font-medium text-slate-500">Dovolená</th>
@@ -284,6 +287,11 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
                           <span className={delta >= 0 ? 'text-emerald-600' : 'text-red-500'}>
                             {delta >= 0 ? '+' : ''}{Math.round(delta * 10) / 10}h
                           </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-mono">
+                          {(emp.saturdayBonusHours ?? 0) > 0
+                            ? <span className="text-amber-600">+{emp.saturdayBonusHours}h</span>
+                            : <span className="text-slate-300">—</span>}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2 justify-center">

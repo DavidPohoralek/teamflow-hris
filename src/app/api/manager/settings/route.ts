@@ -37,6 +37,7 @@ const EXTRA_KEYS = [
   'vacation_counting_mode',
   'default_vacation_days',
   'require_ho_activity_report',
+  'bonus_saturday_departments',
 ];
 
 // GET /api/manager/settings

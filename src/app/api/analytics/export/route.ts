@@ -18,20 +18,20 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  // Load bonus settings
-  const { data: settingsRows } = await sb
+  // Load bonus settings from extra_settings JSONB
+  const { data: settingsRow } = await sb
     .from('company_settings')
-    .select('key, value')
+    .select('extra_settings')
     .eq('organization_id', orgId)
-    .in('key', ['bonus_saturday_pct', 'bonus_overtime_threshold', 'bonus_overtime_pct']);
+    .maybeSingle();
 
-  const settings: Record<string, number> = {};
-  for (const row of settingsRows ?? []) settings[row.key] = parseFloat(row.value) || 0;
-  const saturdayBonusPct = settings['bonus_saturday_pct'] ?? 10;
-  const overtimeThreshold = settings['bonus_overtime_threshold'] ?? 0;
-  const overtimeBonusPct = settings['bonus_overtime_pct'] ?? 25;
+  const extra: Record<string, unknown> = (settingsRow?.extra_settings ?? {}) as Record<string, unknown>;
+  const saturdayBonusPct: number = typeof extra['bonus_saturday_pct'] === 'number' ? extra['bonus_saturday_pct'] : Number(extra['bonus_saturday_pct'] ?? 0);
+  const overtimeThreshold: number = typeof extra['bonus_overtime_threshold'] === 'number' ? extra['bonus_overtime_threshold'] : Number(extra['bonus_overtime_threshold'] ?? 0);
+  const overtimeBonusPct: number = typeof extra['bonus_overtime_pct'] === 'number' ? extra['bonus_overtime_pct'] : Number(extra['bonus_overtime_pct'] ?? 0);
+  const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : [];
 
-  let empQuery = sb.from('employees').select('id, name, target_hours, employment_type, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
+  let empQuery = sb.from('employees').select('id, name, department, target_hours, employment_type, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
   if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
 
   const [empRes, logsRes, plansRes, vacRes] = await Promise.all([
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
   ]);
 
-  const employees: { id: string; name: string; target_hours: number; employment_type?: string; vacation_days_per_year?: number }[] = empRes.data ?? [];
+  const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number }[] = empRes.data ?? [];
   const logs: { employee_id: string; check_in: string; check_out: string; date: string }[] = logsRes.data ?? [];
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
@@ -75,8 +75,10 @@ export async function GET(req: NextRequest) {
     const workedHours = workedMinutes / 60;
     const saturdayHours = saturdayMinutes / 60;
 
-    // Bonus calculation
-    const satBonusHours = saturdayHours * (saturdayBonusPct / 100);
+    // Bonus calculation (saturday only for eligible departments)
+    const empDept = emp.department ?? '';
+    const satEligible = saturdayBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept));
+    const satBonusHours = satEligible ? saturdayHours * (saturdayBonusPct / 100) : 0;
     let otBonusHours = 0;
     if (overtimeThreshold > 0 && workedHours > overtimeThreshold) {
       otBonusHours = (workedHours - overtimeThreshold) * (overtimeBonusPct / 100);

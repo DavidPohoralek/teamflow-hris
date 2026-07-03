@@ -17,17 +17,24 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  let empQuery = sb.from('employees').select('id, name, target_hours, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
+  let empQuery = sb.from('employees').select('id, name, department, target_hours, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
   if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
 
-  const [empRes, logsRes, plansRes, requestsRes] = await Promise.all([
+  const [empRes, logsRes, plansRes, requestsRes, settingsRes] = await Promise.all([
     empQuery,
     sb.from('attendance_logs').select('employee_id, check_in, check_out, work_type_name, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
     sb.from('work_plans').select('employee_id, date, start_time, end_time, work_type').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
     sb.from('requests').select('employee_id, type, status, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
+    sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
 
-  const employees: { id: string; name: string; target_hours: number; vacation_days_per_year: number }[] = empRes.data ?? [];
+  const extra: Record<string, unknown> = (settingsRes.data?.extra_settings ?? {}) as Record<string, unknown>;
+  const satBonusPct: number = typeof extra['bonus_saturday_pct'] === 'number' ? extra['bonus_saturday_pct'] : Number(extra['bonus_saturday_pct'] ?? 0);
+  const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : [];
+
+  function isSat(dateStr: string): boolean { return new Date(dateStr + 'T12:00:00').getDay() === 6; }
+
+  const employees: { id: string; name: string; department: string | null; target_hours: number; vacation_days_per_year: number }[] = empRes.data ?? [];
   const logs: { employee_id: string; check_in: string | null; check_out: string | null; work_type_name: string | null; date: string }[] = logsRes.data ?? [];
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null; work_type: string }[] = plansRes.data ?? [];
   const vacRequests: { employee_id: string; date_from: string; date_to: string | null }[] = requestsRes.data ?? [];
@@ -43,11 +50,19 @@ export async function GET(req: NextRequest) {
     const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
     const empPlans = plans.filter((p) => p.employee_id === emp.id);
 
-    // Worked hours
-    const workedMinutes = empLogs.reduce((sum, l) => {
+    // Saturday bonus eligibility
+    const empDept = emp.department ?? '';
+    const satEligible = satBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept));
+
+    // Worked hours (total + saturday split)
+    let workedMinutes = 0;
+    let satWorkedMinutes = 0;
+    for (const l of empLogs) {
       const diff = new Date(l.check_out!).getTime() - new Date(l.check_in!).getTime();
-      return sum + Math.round(diff / 60000);
-    }, 0);
+      const mins = Math.round(diff / 60000);
+      workedMinutes += mins;
+      if (isSat(l.date)) satWorkedMinutes += mins;
+    }
     const workedHours = workedMinutes / 60;
 
     // Planned hours (from work_plans)
@@ -83,6 +98,8 @@ export async function GET(req: NextRequest) {
       .reduce((sum, r) => sum + countDays(r.date_from, r.date_to), 0);
 
     const targetHours = emp.target_hours ?? 160;
+    const satHours = Math.round((satWorkedMinutes / 60) * 10) / 10;
+    const satBonusHours = satEligible ? Math.round(satHours * (satBonusPct / 100) * 10) / 10 : 0;
 
     return {
       id: emp.id,
@@ -97,6 +114,8 @@ export async function GET(req: NextRequest) {
       vacationDaysTotal: emp.vacation_days_per_year ?? 20,
       vacationDaysUsed: vacUsedDays,
       vacationDaysRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) - vacUsedDays),
+      saturdayHours: satHours,
+      saturdayBonusHours: satBonusHours,
     };
   });
 
