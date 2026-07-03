@@ -577,36 +577,56 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
         </div>
       )}
 
-      {result && result.problemDays.map(day => (
+      {result && result.problemDays.map((day, dayIdx) => (
         <div key={day.date} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           {/* Day header */}
           <button
             onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition text-left"
+            className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-bold text-slate-800">{day.dateLabel}</div>
-              <div className="text-sm text-slate-500">{day.dayName}</div>
-              {day.storeHoursLabel && (
-                <div className="text-xs text-slate-400">{day.storeHoursLabel}</div>
-              )}
+            {/* Index + date */}
+            <div className="flex-shrink-0 flex items-center gap-3 min-w-[160px]">
+              <span className="text-xs font-bold text-slate-400 w-5 text-right">{dayIdx + 1}.</span>
+              <div>
+                <div className="text-sm font-bold text-slate-800">{day.dateLabel}</div>
+                <div className="text-xs text-slate-400">{day.dayName}{day.storeHoursLabel ? ` · ${day.storeHoursLabel}` : ''}</div>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Status badges */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               {day.missingCount > 0 && (
-                <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
+                <span className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
                   {t('Chybí', 'Missing')} {day.missingCount} {day.missingCount === 1 ? t('člověk', 'person') : t('lidé', 'people')}
                 </span>
               )}
               {day.closingCoverage.enabled && day.closingCoverage.missingStaff > 0 && (
-                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
-                  {t('Večer -', 'Evening -')}{day.closingCoverage.missingStaff}
+                <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
+                  {t('Večer', 'Evening')} -{day.closingCoverage.missingStaff}
                 </span>
               )}
-              <div className="text-xs text-slate-400">
-                {t('Obsazeno:', 'Filled:')} {day.assignedEmployees.join(', ') || '—'}
-              </div>
-              <span className="text-slate-400 text-sm">{expandedDay === day.date ? '▲' : '▼'}</span>
             </div>
+
+            {/* Assigned employee avatar chips */}
+            <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
+              {day.assignedEmployees.length === 0 ? (
+                <span className="text-xs text-slate-300 italic">{t('Nikdo obsazen', 'Nobody assigned')}</span>
+              ) : day.assignedEmployees.slice(0, 8).map((name, i) => {
+                const initials = name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase();
+                const colors = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700', 'bg-teal-100 text-teal-700'];
+                return (
+                  <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${colors[i % colors.length]}`}>
+                    <span className="font-bold">{initials}</span>
+                    <span className="hidden sm:inline">{name.split(' ')[0]}</span>
+                  </span>
+                );
+              })}
+              {day.assignedEmployees.length > 8 && (
+                <span className="text-xs text-slate-400 font-medium">+{day.assignedEmployees.length - 8}</span>
+              )}
+            </div>
+
+            <span className="text-slate-300 text-xs flex-shrink-0">{expandedDay === day.date ? '▲' : '▼'}</span>
           </button>
 
           {/* Suggestions */}

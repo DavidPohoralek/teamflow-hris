@@ -384,7 +384,7 @@ function analyzeLocally(
       dateLabel,
       dayName: day.dayName,
       requiredTotal: day.requiredTotal,
-      assignedEmployees: day.assignedEmployees,
+      assignedEmployees: day.assignedEmployees.map(id => empById.get(id)?.name ?? id),
       assignedCount: day.assignedCount,
       missingCount: missingProdejna,
       status: 'MISSING',
