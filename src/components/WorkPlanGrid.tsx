@@ -1258,7 +1258,7 @@ export default function WorkPlanGrid({
   const [eveningConfig, setEveningConfig] = useState<{ enabled: boolean; start: string; end: string; minStaff: number; label: string } | null>(null);
   // Employee PIN session — set once in header, unlocks actions
   const [sessionPin, setSessionPin] = useState('');
-  const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string; targetHours?: number } | null>(null);
   const [pinInputValue, setPinInputValue] = useState('');
   // Shift confirmation for current month
   const [shiftConfirmed, setShiftConfirmed] = useState<boolean | null>(null);
@@ -1292,10 +1292,10 @@ export default function WorkPlanGrid({
     try {
       const stored = localStorage.getItem('hris_employee_session');
       if (stored) {
-        const parsed = JSON.parse(stored) as { id: string; name: string; pin: string; orgId: string };
+        const parsed = JSON.parse(stored) as { id: string; name: string; targetHours?: number; pin: string; orgId: string };
         if (parsed.orgId === orgId && parsed.id && parsed.name && parsed.pin) {
           setSessionPin(parsed.pin);
-          setSessionEmployee({ id: parsed.id, name: parsed.name });
+          setSessionEmployee({ id: parsed.id, name: parsed.name, targetHours: parsed.targetHours });
         }
       }
     } catch { /* ignore */ }
@@ -1523,8 +1523,8 @@ export default function WorkPlanGrid({
       if (!res.ok) { setPinInputError(true); setPinInputValue(''); return; }
       const json = await res.json();
       setSessionPin(pinInputValue);
-      setSessionEmployee({ id: json.employeeId, name: json.employeeName });
-      try { localStorage.setItem('hris_employee_session', JSON.stringify({ id: json.employeeId, name: json.employeeName, pin: pinInputValue, orgId })); } catch { /* ignore */ }
+      setSessionEmployee({ id: json.employeeId, name: json.employeeName, targetHours: json.targetHours ?? 160 });
+      try { localStorage.setItem('hris_employee_session', JSON.stringify({ id: json.employeeId, name: json.employeeName, targetHours: json.targetHours ?? 160, pin: pinInputValue, orgId })); } catch { /* ignore */ }
       setPinInputValue('');
     } catch {
       setPinInputError(true);
@@ -1744,11 +1744,27 @@ export default function WorkPlanGrid({
                     ✓ Potvrzeno
                   </span>
                 )}
-                <div className="ml-auto flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
-                  <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); setShiftConfirmed(null); localStorage.removeItem('hris_employee_session'); }} className="text-emerald-400 hover:text-emerald-700 text-xs">✕</button>
-                </div>
+                {(() => {
+                  const myPlanned = plannedHoursPerEmp.get(sessionEmployee.id) ?? 0;
+                  const myTarget = sessionEmployee.targetHours ?? 160;
+                  const pct = Math.min(100, Math.round((myPlanned / myTarget) * 100));
+                  const barColor = pct >= 100 ? 'bg-emerald-400' : pct >= 75 ? 'bg-blue-400' : pct >= 50 ? 'bg-amber-400' : 'bg-slate-300';
+                  return (
+                    <div className="ml-auto flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-emerald-700 text-xs font-semibold leading-tight">{sessionEmployee.name}</span>
+                        <div className="flex items-center gap-1">
+                          <div className="w-14 h-1 bg-emerald-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[10px] text-emerald-600 tabular-nums">{Math.round(myPlanned * 10) / 10}h/{myTarget}h</span>
+                        </div>
+                      </div>
+                      <button onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); setShiftConfirmed(null); localStorage.removeItem('hris_employee_session'); }} className="text-emerald-400 hover:text-emerald-700 text-xs shrink-0">✕</button>
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2">
@@ -2080,16 +2096,34 @@ export default function WorkPlanGrid({
                     ✓ {t('Potvrzeno', 'Confirmed')}
                   </span>
                 )}
-                {/* Session badge */}
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
-                  <button
-                    onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); setShiftConfirmed(null); localStorage.removeItem('hris_employee_session'); }}
-                    className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs"
-                    title={t('Odhlásit', 'Log out')}
-                  >✕</button>
-                </div>
+                {/* Session badge with planned hours */}
+                {(() => {
+                  const myPlanned = plannedHoursPerEmp.get(sessionEmployee.id) ?? 0;
+                  const myTarget = sessionEmployee.targetHours ?? 160;
+                  const pct = Math.min(100, Math.round((myPlanned / myTarget) * 100));
+                  const barColor = pct >= 100 ? 'bg-emerald-400' : pct >= 75 ? 'bg-blue-400' : pct >= 50 ? 'bg-amber-400' : 'bg-slate-300';
+                  return (
+                    <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-20 h-1.5 bg-emerald-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-emerald-600 tabular-nums whitespace-nowrap">
+                            {Math.round(myPlanned * 10) / 10}h / {myTarget}h
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setSessionEmployee(null); setSessionPin(''); setClipboard(null); setMyShiftsOnly(false); setShiftConfirmed(null); localStorage.removeItem('hris_employee_session'); }}
+                        className="text-emerald-400 hover:text-emerald-700 transition-colors text-xs shrink-0"
+                        title={t('Odhlásit', 'Log out')}
+                      >✕</button>
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <form
