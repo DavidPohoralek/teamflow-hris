@@ -607,23 +607,11 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
               )}
             </div>
 
-            {/* Assigned employee avatar chips */}
-            <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
-              {day.assignedEmployees.length === 0 ? (
-                <span className="text-xs text-slate-300 italic">{t('Nikdo obsazen', 'Nobody assigned')}</span>
-              ) : day.assignedEmployees.slice(0, 8).map((name, i) => {
-                const initials = name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase();
-                const colors = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-pink-100 text-pink-700', 'bg-sky-100 text-sky-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700', 'bg-teal-100 text-teal-700'];
-                return (
-                  <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${colors[i % colors.length]}`}>
-                    <span className="font-bold">{initials}</span>
-                    <span className="hidden sm:inline">{name.split(' ')[0]}</span>
-                  </span>
-                );
-              })}
-              {day.assignedEmployees.length > 8 && (
-                <span className="text-xs text-slate-400 font-medium">+{day.assignedEmployees.length - 8}</span>
-              )}
+            {/* Assigned count */}
+            <div className="flex-1 text-xs text-slate-400">
+              {day.assignedCount > 0
+                ? `${day.assignedCount} / ${day.requiredTotal} obsazeno`
+                : <span className="italic">{t('Nikdo obsazen', 'Nobody assigned')}</span>}
             </div>
 
             <span className="text-slate-300 text-xs flex-shrink-0">{expandedDay === day.date ? '▲' : '▼'}</span>
