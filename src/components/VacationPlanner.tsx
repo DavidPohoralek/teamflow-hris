@@ -765,11 +765,27 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   📅 {myShiftsLoading ? t('Načítám…', 'Loading…') : t('Mé směny', 'My shifts')}
                 </button>
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-emerald-700 text-sm font-semibold">{sessionEmployee.name}</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
+                    {vacBalance && vacBalance.totalDays > 0 && (() => {
+                      const pct = Math.min(100, (vacBalance.consumedDays / vacBalance.totalDays) * 100);
+                      const barColor = pct >= 90 ? 'bg-red-400' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500';
+                      return (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="w-20 h-1.5 bg-emerald-200 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
+                            {vacBalance.consumedDays} / {vacBalance.totalDays} dní
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
                   <button
                     onClick={() => { setSessionEmployee(null); setSessionPin(''); setShowMyShifts(false); setMyShiftDays(new Set()); setMyVacationOnly(false); setVacBalance(null); localStorage.removeItem('hris_employee_session'); }}
-                    className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1"
+                    className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1 shrink-0"
                     title="Odhlásit"
                   >✕</button>
                 </div>
