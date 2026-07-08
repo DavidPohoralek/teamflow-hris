@@ -218,6 +218,23 @@ export default function TicketPage() {
     } catch { /* ignore */ }
   }
 
+  // ── Delete ticket (admin) ─────────────────────────────────────────────────
+
+  const deleteTicket = async () => {
+    if (!selectedTicket) return
+    if (!window.confirm(`Opravdu smazat ticket „${selectedTicket.title}"?`)) return
+    try {
+      const res = await fetch(`/api/ticket/tickets/${selectedTicket.id}`, {
+        method: 'DELETE',
+        headers: adminHeaders(),
+      })
+      if (res.ok) {
+        setTickets(prev => prev.filter(t => t.id !== selectedTicket.id))
+        setView('list')
+      }
+    } catch { /* ignore */ }
+  }
+
   // ── Status change (admin) ─────────────────────────────────────────────────
 
   const changeStatus = async (status: string) => {
@@ -563,17 +580,27 @@ export default function TicketPage() {
             {/* Admin: status controls */}
             {isAdmin && (
               <div className="mt-5 pt-4 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 mb-2">Změnit stav</p>
-                <div className="flex gap-2">
-                  {(['open', 'in_progress', 'resolved'] as const).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => changeStatus(s)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${selectedTicket.status === s ? `${STATUS_STYLE[s]} ring-2 ring-offset-1 ring-current` : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                    >
-                      {STATUS_LABEL[s]}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-2">Změnit stav</p>
+                    <div className="flex gap-2">
+                      {(['open', 'in_progress', 'resolved'] as const).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => changeStatus(s)}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${selectedTicket.status === s ? `${STATUS_STYLE[s]} ring-2 ring-offset-1 ring-current` : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {STATUS_LABEL[s]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={deleteTicket}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors"
+                  >
+                    Smazat ticket
+                  </button>
                 </div>
               </div>
             )}

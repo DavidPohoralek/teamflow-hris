@@ -53,3 +53,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ticket: data })
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  if (!isAdmin(req)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  await sb().from('ticket_replies').delete().eq('ticket_id', params.id)
+  const { error } = await sb().from('tickets').delete().eq('id', params.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
