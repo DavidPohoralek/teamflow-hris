@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const host = req.headers.get('host') ?? ''
   const url = req.nextUrl.clone()
   const { pathname } = url
@@ -19,7 +20,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.rewrite(url)
   }
 
-  return NextResponse.next()
+  // Always run Supabase session refresh so auth cookies stay valid
+  return updateSession(req)
 }
 
 export const config = {
