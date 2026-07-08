@@ -74,16 +74,22 @@ export async function GET(req: NextRequest) {
     }, 0);
     const plannedHours = plannedMinutes / 60;
 
-    // Punctuality: avg deviation (check_in vs planned start_time) in minutes
+    // Punctuality: avg deviation (check_in vs planned start_time) in minutes.
+    // check_in is stored as UTC; start_time is Prague local time — compare in Prague tz.
     let punctualitySum = 0;
     let punctualityCount = 0;
     for (const log of empLogs) {
       const plan = empPlans.find((p) => p.date === log.date && p.start_time);
       if (!plan?.start_time || !log.check_in) continue;
       const [ph, pm] = plan.start_time.split(':').map(Number);
-      const planned = new Date(log.date + 'T' + plan.start_time + ':00');
-      const actual = new Date(log.check_in);
-      punctualitySum += Math.round((actual.getTime() - planned.getTime()) / 60000);
+      const plannedMinutes = ph * 60 + pm;
+      // Convert check_in (UTC) to Prague local time, extract HH:MM
+      const checkInDate = new Date(log.check_in);
+      const pragueParts = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(checkInDate);
+      const ah = parseInt(pragueParts.find((p) => p.type === 'hour')!.value, 10);
+      const am = parseInt(pragueParts.find((p) => p.type === 'minute')!.value, 10);
+      const actualMinutes = ah * 60 + am;
+      punctualitySum += actualMinutes - plannedMinutes;
       punctualityCount++;
     }
     const avgPunctuality = punctualityCount > 0 ? Math.round(punctualitySum / punctualityCount) : null;
