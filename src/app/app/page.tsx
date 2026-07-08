@@ -21,10 +21,10 @@ type Tab = 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'vacation' | 'a
 
 const BASE_TABS: { id: Tab; labelCs: string; labelEn: string; icon: string }[] = [
   { id: 'attendance', labelCs: 'Příchod/Odchod', labelEn: 'Clock In/Out', icon: '⏰' },
-  { id: 'schedule', labelCs: 'Směny', labelEn: 'Shifts', icon: '📅' },
   { id: 'overview', labelCs: 'Přehled', labelEn: 'Overview', icon: '📊' },
-  { id: 'my-hours', labelCs: 'Zaměstnanec', labelEn: 'Employee', icon: '👤' },
+  { id: 'schedule', labelCs: 'Směny', labelEn: 'Shifts', icon: '📅' },
   { id: 'vacation', labelCs: 'Dovolená', labelEn: 'Vacation', icon: '🏖️' },
+  { id: 'my-hours', labelCs: 'Zaměstnanec', labelEn: 'Employee', icon: '👤' },
 ]
 
 const MANAGER_TABS: { id: Tab; labelCs: string; labelEn: string; icon: string }[] = [
