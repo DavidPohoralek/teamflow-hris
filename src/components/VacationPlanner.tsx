@@ -929,32 +929,40 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
       </div>
 
-      {/* Vacation balance widget — only when PIN logged in and has paid vacation */}
-      {!isManagerMode && sessionEmployee && vacBalance?.hasPaidVacation && (
+      {/* Vacation balance widget — only when PIN logged in */}
+      {!isManagerMode && sessionEmployee && vacBalance && vacBalance.totalDays > 0 && (
         <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2.5">
             <span className="text-sm font-semibold text-slate-700">🏖️ {t('Fond dovolené', 'Vacation balance')}</span>
             <span className="text-xs text-slate-400">{new Date().getFullYear()}</span>
           </div>
-          <div className="grid grid-cols-4 gap-3 text-center">
-            <div className="bg-slate-50 rounded-xl p-3">
-              <div className="text-xl font-bold text-slate-800">{vacBalance.totalDays}</div>
-              <div className="text-xs text-slate-400 mt-0.5">{vacBalance.totalHours} h</div>
-              <div className="text-xs text-slate-500 mt-0.5">{t('Celkem dní', 'Total days')}</div>
-            </div>
-            <div className="bg-emerald-50 rounded-xl p-3">
-              <div className="text-xl font-bold text-emerald-700">{vacBalance.remainingDays}</div>
-              <div className="text-xs text-emerald-400 mt-0.5">{vacBalance.remainingHours} h</div>
+          {(() => {
+            const pct = Math.min(100, (vacBalance.consumedDays / vacBalance.totalDays) * 100);
+            const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : pct >= 40 ? 'bg-blue-500' : 'bg-emerald-500';
+            const remainColor = pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-amber-600' : pct >= 40 ? 'text-blue-600' : 'text-emerald-700';
+            return (
+              <>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-slate-400">{t('Vyčerpáno', 'Used')} {vacBalance.consumedDays} / {vacBalance.totalDays} {t('dní', 'days')}</span>
+                  <span className={`text-xs font-bold ${remainColor}`}>{vacBalance.remainingDays} {t('dní zbývá', 'days remaining')}</span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
+                  <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                </div>
+              </>
+            );
+          })()}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-emerald-50 rounded-xl p-2.5">
+              <div className="text-lg font-bold text-emerald-700">{vacBalance.remainingDays}</div>
               <div className="text-xs text-emerald-600 mt-0.5">{t('Zbývá', 'Remaining')}</div>
             </div>
-            <div className="bg-blue-50 rounded-xl p-3">
-              <div className="text-xl font-bold text-blue-600">{vacBalance.futurePlannedDays}</div>
-              <div className="text-xs text-blue-300 mt-0.5">{vacBalance.futurePlannedHours} h</div>
+            <div className="bg-blue-50 rounded-xl p-2.5">
+              <div className="text-lg font-bold text-blue-600">{vacBalance.futurePlannedDays}</div>
               <div className="text-xs text-blue-500 mt-0.5">{t('Naplánováno', 'Planned')}</div>
             </div>
-            <div className="bg-red-50 rounded-xl p-3">
-              <div className="text-xl font-bold text-red-600">{vacBalance.consumedDays}</div>
-              <div className="text-xs text-red-300 mt-0.5">{vacBalance.consumedHours} h</div>
+            <div className="bg-red-50 rounded-xl p-2.5">
+              <div className="text-lg font-bold text-red-600">{vacBalance.consumedDays}</div>
               <div className="text-xs text-red-500 mt-0.5">{t('Vyčerpáno', 'Used')}</div>
             </div>
           </div>
