@@ -310,6 +310,46 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             );
           })()}
 
+          {/* Vacation section */}
+          {data.vacation && (
+            <div className="px-4 sm:px-6 pb-3">
+              {(() => {
+                const { total, used, remaining } = data.vacation!;
+                const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+                const barColor =
+                  pct >= 90 ? 'bg-red-500' :
+                  pct >= 70 ? 'bg-amber-400' :
+                  pct >= 40 ? 'bg-blue-500' :
+                  'bg-emerald-500';
+                const textColor =
+                  pct >= 90 ? 'text-red-600' :
+                  pct >= 70 ? 'text-amber-600' :
+                  pct >= 40 ? 'text-blue-600' :
+                  'text-emerald-700';
+                return (
+                  <div className="bg-white border border-slate-200 rounded-xl px-4 py-3.5 shadow-sm">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-sm font-semibold text-slate-700">🏖️ Dovolená</span>
+                      <span className={`text-xs font-bold ${textColor}`}>
+                        {remaining} dní zbývá
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+                      <span>{used} dní vyčerpáno</span>
+                      <span>{total} dní celkem</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Benefits section */}
           {data.benefits && data.benefits.length > 0 && (
             <div className="px-4 sm:px-6 pb-3">
