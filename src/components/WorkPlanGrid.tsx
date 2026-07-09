@@ -1326,9 +1326,6 @@ export default function WorkPlanGrid({
   const [desktopWeekStart, setDesktopWeekStart] = useState<Date>(() => getWeekStart(new Date()));
   // Extra plans for the adjacent month when the visible week spans two months
   const [weekExtraPlans, setWeekExtraPlans] = useState<WorkPlanEntry[]>([]);
-  // Carousel refs for horizontal week scroll
-  const weekScrollRef = useRef<HTMLDivElement>(null);
-  const weekScrollResetting = useRef(false);
 
   // Mobile week view — start on Monday of current week
   const [mobileWeekStart, setMobileWeekStart] = useState<Date>(() => getWeekStart(new Date()));
@@ -1496,40 +1493,6 @@ export default function WorkPlanGrid({
       .catch(() => setWeekExtraPlans([]));
   }, [desktopViewMode, desktopWeekStart, month, orgId]);
 
-  // Re-centre the carousel scroll position on the current (middle) slot when the week changes
-  useEffect(() => {
-    if (desktopViewMode !== 'week') return;
-    const el = weekScrollRef.current;
-    if (!el) return;
-    weekScrollResetting.current = true;
-    el.scrollLeft = el.clientWidth;
-    const t = setTimeout(() => { weekScrollResetting.current = false; }, 200);
-    return () => clearTimeout(t);
-  }, [desktopWeekStart, desktopViewMode]);
-
-  // Detect when user scrolls the week carousel to prev/next slot and navigate
-  useEffect(() => {
-    if (desktopViewMode !== 'week') return;
-    const el = weekScrollRef.current;
-    if (!el) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const onScroll = () => {
-      if (weekScrollResetting.current) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const slot = Math.round(el.scrollLeft / el.clientWidth);
-        if (slot === 0) {
-          weekScrollResetting.current = true;
-          handleDesktopPrevWeek();
-        } else if (slot === 2) {
-          weekScrollResetting.current = true;
-          handleDesktopNextWeek();
-        }
-      }, 120);
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => { el.removeEventListener('scroll', onScroll); clearTimeout(timer); };
-  }, [desktopViewMode, handleDesktopPrevWeek, handleDesktopNextWeek]);
 
   const handleShiftSuccess = useCallback(() => {
     fetchSchedule();
@@ -1705,10 +1668,6 @@ export default function WorkPlanGrid({
 
   // Desktop week view computed values
   const desktopWeekDays = getWeekDays(desktopWeekStart);
-  const _prevWeekStartDate = new Date(desktopWeekStart); _prevWeekStartDate.setDate(_prevWeekStartDate.getDate() - 7);
-  const _nextWeekStartDate = new Date(desktopWeekStart); _nextWeekStartDate.setDate(_nextWeekStartDate.getDate() + 7);
-  const prevWeekDays = getWeekDays(_prevWeekStartDate);
-  const nextWeekDays = getWeekDays(_nextWeekStartDate);
   const desktopWeekLabel = (() => {
     const last = new Date(desktopWeekStart);
     last.setDate(last.getDate() + 6);
@@ -2355,83 +2314,68 @@ export default function WorkPlanGrid({
         </>
       )}
 
-      {/* ── DESKTOP WEEK GRID (horizontal scroll carousel) ───────────── */}
+      {/* ── DESKTOP WEEK GRID ────────────────────────────────────────── */}
       {desktopViewMode === 'week' && !loading && !error && (
         <>
-          {/* 3 slots: prev / current / next week — scroll-snaps between them */}
-          <div
-            ref={weekScrollRef}
-            className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden"
-            style={{ scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {([prevWeekDays, desktopWeekDays, nextWeekDays] as string[][]).map((weekDays, slotIdx) => (
-              <div
-                key={slotIdx}
-                className="shrink-0"
-                style={{ minWidth: '100%', scrollSnapAlign: 'start' }}
-              >
-                {/* Day headers */}
-                <div className="grid grid-cols-7 gap-2 mb-2 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
-                  {DAY_NAMES_SHORT.map((d, idx) => (
-                    <div key={idx} className={`text-center text-xs font-semibold py-0.5 ${idx >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
-                      {d}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Week cells — expanded DayCards */}
-                <div className="grid grid-cols-7 gap-2 items-start">
-                  {weekDays.map((dateStr) => {
-                    const wd = mondayWeekday(dateStr);
-                    const isWeekend = wd === 5 || wd === 6;
-                    const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
-                    const allEntries = entriesByDate.get(dateStr) ?? [];
-                    const visibleEntries = (() => {
-                      let es = myShiftsOnly && sessionEmployee
-                        ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
-                        : allEntries;
-                      if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
-                      if (eveningFilter && eveningConfig?.enabled) {
-                        const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
-                        const eMin = toMin(eveningConfig.start ?? '17:00');
-                        es = es.filter((e) => {
-                          if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
-                          const startMin = e.startTime ? toMin(e.startTime) : null;
-                          const endMin = e.endTime ? toMin(e.endTime) : null;
-                          return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
-                        });
-                      }
-                      return es;
-                    })();
-                    return (
-                      <DayCard
-                        key={dateStr}
-                        dateStr={dateStr}
-                        entries={visibleEntries}
-                        scheduleMeta={metaByDate.get(dateStr)}
-                        isManagerMode={isManagerMode}
-                        isWeekend={isWeekend}
-                        isClosed={isClosed}
-                        clipboard={clipboard}
-                        sessionEmployeeId={sessionEmployee?.id}
-                        dayNamesShort={DAY_NAMES_SHORT}
-                        eveningConfig={eveningConfig}
-                        orgId={orgId}
-                        onClickDay={handleClickDay}
-                        onEditDay={isManagerMode ? setEditingDate : undefined}
-                        onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
-                        onEditEntry={(isManagerMode || sessionEmployee) ? setEditingEntry : undefined}
-                        onCopyEntry={handleCopyEntry}
-                        onPaste={handlePaste}
-                        isMyVacation={myVacation && vacationDates.has(dateStr)}
-                        isToday={dateStr === todayStr}
-                        expanded={true}
-                      />
-                    );
-                  })}
-                </div>
+          {/* Sticky day-name header row */}
+          <div className="grid grid-cols-7 gap-2 mb-2 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2 sticky top-0 z-10">
+            {DAY_NAMES_SHORT.map((d, idx) => (
+              <div key={idx} className={`text-center text-xs font-semibold py-0.5 ${idx >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
+                {d}
               </div>
             ))}
+          </div>
+
+          {/* 7 day cards — part of normal page flow, scrolls vertically */}
+          <div className="grid grid-cols-7 gap-2 items-start">
+            {desktopWeekDays.map((dateStr) => {
+              const wd = mondayWeekday(dateStr);
+              const isWeekend = wd === 5 || wd === 6;
+              const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
+              const allEntries = entriesByDate.get(dateStr) ?? [];
+              const visibleEntries = (() => {
+                let es = myShiftsOnly && sessionEmployee
+                  ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                  : allEntries;
+                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                if (eveningFilter && eveningConfig?.enabled) {
+                  const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
+                  const eMin = toMin(eveningConfig.start ?? '17:00');
+                  es = es.filter((e) => {
+                    if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
+                    const startMin = e.startTime ? toMin(e.startTime) : null;
+                    const endMin = e.endTime ? toMin(e.endTime) : null;
+                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
+                  });
+                }
+                return es;
+              })();
+              return (
+                <DayCard
+                  key={dateStr}
+                  dateStr={dateStr}
+                  entries={visibleEntries}
+                  scheduleMeta={metaByDate.get(dateStr)}
+                  isManagerMode={isManagerMode}
+                  isWeekend={isWeekend}
+                  isClosed={isClosed}
+                  clipboard={clipboard}
+                  sessionEmployeeId={sessionEmployee?.id}
+                  dayNamesShort={DAY_NAMES_SHORT}
+                  eveningConfig={eveningConfig}
+                  orgId={orgId}
+                  onClickDay={handleClickDay}
+                  onEditDay={isManagerMode ? setEditingDate : undefined}
+                  onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
+                  onEditEntry={(isManagerMode || sessionEmployee) ? setEditingEntry : undefined}
+                  onCopyEntry={handleCopyEntry}
+                  onPaste={handlePaste}
+                  isMyVacation={myVacation && vacationDates.has(dateStr)}
+                  isToday={dateStr === todayStr}
+                  expanded={true}
+                />
+              );
+            })}
           </div>
 
           <Legend workTypes={workTypes} isManagerMode={isManagerMode} onChanged={fetchWorkTypes} />
