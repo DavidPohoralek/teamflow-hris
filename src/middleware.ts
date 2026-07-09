@@ -20,8 +20,14 @@ export async function middleware(req: NextRequest) {
     return NextResponse.rewrite(url)
   }
 
-  // Always run Supabase session refresh so auth cookies stay valid
-  return updateSession(req)
+  // Always run Supabase session refresh so auth cookies stay valid.
+  // Wrap in try/catch: if Supabase is unreachable, pass the request through
+  // rather than serving a 500 (which would show a blank/broken page).
+  try {
+    return await updateSession(req)
+  } catch {
+    return NextResponse.next()
+  }
 }
 
 export const config = {
