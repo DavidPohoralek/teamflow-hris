@@ -20,6 +20,8 @@ interface EmployeeStat {
   daysWorked: number;
   daysPlanned: number;
   avgPunctualityMin: number | null;
+  overtimeHours: number;
+  debtHours: number;
   vacationDaysTotal: number;
   vacationDaysUsed: number;
   vacationDaysRemaining: number;
@@ -214,19 +216,20 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   // KPI values from filtered stats
   const totalWorked = filteredStats.reduce((s, e) => s + e.workedHours, 0);
   const totalTarget = filteredStats.reduce((s, e) => s + e.targetHours, 0);
-  const totalOvertime = filteredStats.reduce((s, e) => s + Math.max(0, e.workedHours - e.targetHours), 0);
-  const totalDebt = filteredStats.reduce((s, e) => s + Math.max(0, e.targetHours - e.workedHours), 0);
+  // Per-shift overtime/debt: time worked past (or before) planned end_time
+  const totalOvertime = filteredStats.reduce((s, e) => s + (e.overtimeHours ?? 0), 0);
+  const totalDebt = filteredStats.reduce((s, e) => s + (e.debtHours ?? 0), 0);
   const avgUtil = filteredStats.length > 0 ? Math.round(filteredStats.reduce((s, e) => s + e.utilizationPct, 0) / filteredStats.length) : 0;
   const punctVals = filteredStats.map((e) => e.avgPunctualityMin).filter((v) => v !== null) as number[];
   const avgPunct = punctVals.length > 0 ? Math.round(punctVals.reduce((s, v) => s + v, 0) / punctVals.length) : null;
 
-  // Balance data for horizontal bar chart (sorted largest → smallest)
+  // Balance data for horizontal bar chart — per-shift delta (overtime − debt per person)
   const balanceData = useMemo(() =>
     filteredStats
       .map((e) => ({
         name: e.name,
         firstName: e.name.split(' ')[0],
-        delta: Math.round((e.workedHours - e.targetHours) * 10) / 10,
+        delta: Math.round(((e.overtimeHours ?? 0) - (e.debtHours ?? 0)) * 10) / 10,
       }))
       .sort((a, b) => b.delta - a.delta),
     [filteredStats]
@@ -558,7 +561,9 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredStats.map((emp) => {
-                    const delta = emp.workedHours - emp.targetHours;
+                    const ot = emp.overtimeHours ?? 0;
+                    const debt = emp.debtHours ?? 0;
+                    const delta = Math.round((ot - debt) * 10) / 10;
                     return (
                       <tr key={emp.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3.5">
@@ -578,7 +583,7 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
                         <td className="px-4 py-3.5 text-right font-mono text-slate-500">{emp.targetHours}h</td>
                         <td className="px-4 py-3.5 text-right font-mono">
                           <span className={delta >= 0 ? 'text-emerald-600' : 'text-red-500'}>
-                            {delta >= 0 ? '+' : ''}{Math.round(delta * 10) / 10}h
+                            {delta >= 0 ? '+' : ''}{delta}h
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-right font-mono">

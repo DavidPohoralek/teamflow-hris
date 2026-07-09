@@ -79,23 +79,39 @@ export async function GET(req: NextRequest) {
     }, 0);
     const plannedHours = plannedMinutes / 60;
 
-    // Punctuality: avg deviation (check_in vs planned start_time) in minutes.
-    // check_in is stored as UTC; start_time is Prague local time — compare in Prague tz.
+    // Punctuality (check_in vs planned start_time) + Overtime (check_out vs planned end_time)
+    // Both stored as UTC; planned times are Prague local — compare in Prague tz.
+    const pragmaFmt = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false });
+    const pragueMins = (isoUtc: string) => {
+      const parts = pragmaFmt.formatToParts(new Date(isoUtc));
+      return parseInt(parts.find((p) => p.type === 'hour')!.value, 10) * 60
+           + parseInt(parts.find((p) => p.type === 'minute')!.value, 10);
+    };
+
     let punctualitySum = 0;
     let punctualityCount = 0;
+    let overtimeMinutes = 0;  // sum of (actual_end - planned_end) when positive
+    let debtMinutes = 0;      // sum of (planned_end - actual_end) when negative
+
     for (const log of empLogs) {
-      const plan = empPlans.find((p) => p.date === log.date && p.start_time);
-      if (!plan?.start_time || !log.check_in) continue;
-      const [ph, pm] = plan.start_time.split(':').map(Number);
-      const plannedMinutes = ph * 60 + pm;
-      // Convert check_in (UTC) to Prague local time, extract HH:MM
-      const checkInDate = new Date(log.check_in);
-      const pragueParts = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(checkInDate);
-      const ah = parseInt(pragueParts.find((p) => p.type === 'hour')!.value, 10);
-      const am = parseInt(pragueParts.find((p) => p.type === 'minute')!.value, 10);
-      const actualMinutes = ah * 60 + am;
-      punctualitySum += actualMinutes - plannedMinutes;
-      punctualityCount++;
+      const plan = empPlans.find((p) => p.date === log.date);
+      if (!plan) continue;
+
+      // Punctuality: check_in vs planned start_time
+      if (plan.start_time && log.check_in) {
+        const [ph, pm] = plan.start_time.split(':').map(Number);
+        const diff = pragueMins(log.check_in) - (ph * 60 + pm);
+        punctualitySum += diff;
+        punctualityCount++;
+      }
+
+      // Overtime/debt: check_out vs planned end_time
+      if (plan.end_time && log.check_out) {
+        const [eh, em] = plan.end_time.split(':').map(Number);
+        const diff = pragueMins(log.check_out) - (eh * 60 + em);
+        if (diff > 0) overtimeMinutes += diff;
+        else debtMinutes += -diff;
+      }
     }
     const avgPunctuality = punctualityCount > 0 ? Math.round(punctualitySum / punctualityCount) : null;
 
@@ -123,6 +139,9 @@ export async function GET(req: NextRequest) {
       daysWorked,
       daysPlanned,
       avgPunctualityMin: avgPunctuality,
+      // Per-shift overtime/debt: check_out vs planned end_time
+      overtimeHours: Math.round(overtimeMinutes / 6) / 10,
+      debtHours: Math.round(debtMinutes / 6) / 10,
       vacationDaysTotal: emp.vacation_days_per_year ?? 20,
       vacationDaysUsed: vacUsedDays,
       vacationDaysRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) - vacUsedDays),
