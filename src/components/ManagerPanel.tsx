@@ -2480,6 +2480,8 @@ function SettingsTab() {
         <div className="space-y-4">
           <NumberSetting label={t('Příplatek za sobotu (%)', 'Saturday bonus (%)')} description={t('% navíc za hodiny v sobotu. Např. 10 = za 8h soboty → 0,8h bonus.', '% extra for Saturday hours. E.g. 10 = for 8h Saturday → 0.8h bonus.')} settingKey="bonus_saturday_pct" defaultValue={10} />
           <BonusDepartmentSetting />
+          <NumberSetting label={t('Příplatek za neděli (%)', 'Sunday bonus (%)')} description={t('% navíc za hodiny v neděli. Např. 50 = za 8h neděle → 4h bonus.', '% extra for Sunday hours. E.g. 50 = for 8h Sunday → 4h bonus.')} settingKey="bonus_sunday_pct" defaultValue={0} />
+          <BonusSundayDepartmentSetting />
           <NumberSetting label={t('Přesčas — práh (h/měsíc)', 'Overtime threshold (h/month)')} description={t('Od kolika hodin měsíčně se počítá přesčas. 0 = přesčas se nepočítá.', 'Monthly hours threshold for overtime. 0 = overtime not counted.')} settingKey="bonus_overtime_threshold" defaultValue={0} />
           <NumberSetting label={t('Příplatek za přesčas (%)', 'Overtime bonus (%)')} description={t('% navíc za přesčasové hodiny.', '% extra for overtime hours.')} settingKey="bonus_overtime_pct" defaultValue={25} />
         </div>
@@ -2724,6 +2726,75 @@ function NumberSetting({ label, description, settingKey, defaultValue }: { label
           {saved ? '✓' : saving ? '…' : 'Uložit'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── BonusSundayDepartmentSetting ────────────────────────────────────────────
+
+function BonusSundayDepartmentSetting() {
+  const t = useT();
+  const [allDepts, setAllDepts] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      managerFetch('/api/employees').then((r) => r.json()),
+      managerFetch('/api/manager/settings').then((r) => r.json()),
+    ]).then(([empData, settings]) => {
+      const emps: { department?: string | null }[] = empData.employees ?? [];
+      const depts = Array.from(new Set(emps.map((e) => e.department ?? '').filter(Boolean))).sort();
+      setAllDepts(depts);
+      const saved = settings['bonus_sunday_departments'];
+      if (Array.isArray(saved)) setSelected(saved as string[]);
+    }).catch(() => {});
+  }, []);
+
+  const toggle = (dept: string) =>
+    setSelected((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bonus_sunday_departments: selected }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  if (allDepts.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray-700 mb-1">{t('Oddělení s bonusem za neděli', 'Departments with Sunday bonus')}</p>
+      <p className="text-xs text-gray-400 mb-3">{t('Prázdný výběr = bonus pro všechny. Zaškrtni jen konkrétní oddělení.', 'Empty = bonus for everyone. Check only specific departments.')}</p>
+      <div className="flex flex-wrap gap-2 mb-3">
+        {allDepts.map((dept) => (
+          <label key={dept} className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selected.includes(dept)}
+              onChange={() => toggle(dept)}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+            />
+            <span className="text-sm text-gray-700">{dept}</span>
+          </label>
+        ))}
+      </div>
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}
+      >
+        {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
+      </button>
     </div>
   );
 }
