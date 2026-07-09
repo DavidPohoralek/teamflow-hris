@@ -51,10 +51,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
-    url.pathname = '/';
-    return NextResponse.redirect(url);
-  }
+  // NOTE: We intentionally do NOT redirect authenticated users away from /login.
+  // Doing so creates a redirect loop when cookies appear valid but the session is
+  // actually broken — the user can never reach the login form to fix it.
+  // The login page handles the "already logged in" case client-side instead.
 
   return supabaseResponse;
 }
