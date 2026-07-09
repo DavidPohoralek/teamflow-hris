@@ -335,7 +335,7 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function ManagerPanel({ onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
+export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
@@ -453,7 +453,7 @@ export default function ManagerPanel({ onClose, initialTab, lang, scope }: Manag
               </p>
             </div>
           )}
-          {activeTab === 'employees' && <EmployeesTab isAdmin={isAdmin} />}
+          {activeTab === 'employees' && <EmployeesTab isAdmin={isAdmin} orgId={orgId} />}
           {activeTab === 'work-types' && isAdmin && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
@@ -510,7 +510,7 @@ interface AttLogRow {
   work_type_name: string | null;
 }
 
-function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: string; onClose: () => void }) {
+function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empName: string; orgId: string; onClose: () => void }) {
   const now = new Date();
   const [month, setMonth] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [logs, setLogs] = useState<AttLogRow[]>([]);
@@ -522,8 +522,19 @@ function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: str
   const [addCheckIn, setAddCheckIn] = useState('');
   const [addCheckOut, setAddCheckOut] = useState('');
   const [addNote, setAddNote] = useState('');
+  const [addWorkTypeId, setAddWorkTypeId] = useState('');
+  const [addWorkTypeName, setAddWorkTypeName] = useState('');
+  const [workTypes, setWorkTypes] = useState<{ id: string; name: string; color?: string }[]>([]);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`)
+      .then(r => r.json())
+      .then((data: { id: string; name: string; color?: string }[]) => setWorkTypes(Array.isArray(data) ? data.filter(w => w.id) : []))
+      .catch(() => {});
+  }, [orgId]);
 
   const fetchLogs = useCallback(async (m: string) => {
     setLoadingLogs(true);
@@ -559,11 +570,18 @@ function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: str
       const checkOut = addCheckOut ? new Date(`${addDate}T${addCheckOut}:00`).toISOString() : undefined;
       const res = await managerFetch('/api/attendance', {
         method: 'POST',
-        body: JSON.stringify({ employee_id: empId, date: addDate, check_in: checkIn, ...(checkOut ? { check_out: checkOut } : {}), ...(addNote ? { note: addNote } : {}) }),
+        body: JSON.stringify({
+          employee_id: empId,
+          date: addDate,
+          check_in: checkIn,
+          ...(checkOut ? { check_out: checkOut } : {}),
+          ...(addNote ? { note: addNote } : {}),
+          ...(addWorkTypeId ? { work_type_id: addWorkTypeId, work_type_name: addWorkTypeName } : {}),
+        }),
       });
       if (!res.ok) { const j = await res.json(); setAddError(j.error ?? 'Chyba při přidávání.'); return; }
       setShowAddForm(false);
-      setAddCheckIn(''); setAddCheckOut(''); setAddNote('');
+      setAddCheckIn(''); setAddCheckOut(''); setAddNote(''); setAddWorkTypeId(''); setAddWorkTypeName('');
       fetchLogs(month);
     } catch { setAddError('Chyba sítě.'); }
     finally { setAdding(false); }
@@ -652,6 +670,25 @@ function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: str
               <input type="time" value={addCheckOut} onChange={e => setAddCheckOut(e.target.value)}
                 className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
+            {workTypes.length > 0 && (
+              <div className="flex flex-col gap-1 min-w-[140px]">
+                <label className="text-xs font-medium text-slate-600">Oddělení</label>
+                <select
+                  value={addWorkTypeId}
+                  onChange={e => {
+                    const wt = workTypes.find(w => w.id === e.target.value);
+                    setAddWorkTypeId(e.target.value);
+                    setAddWorkTypeName(wt?.name ?? '');
+                  }}
+                  className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="">— bez oddělení —</option>
+                  {workTypes.map(wt => (
+                    <option key={wt.id} value={wt.id}>{wt.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
               <label className="text-xs font-medium text-slate-600">Poznámka</label>
               <input type="text" value={addNote} onChange={e => setAddNote(e.target.value)} placeholder="volitelná"
@@ -751,7 +788,7 @@ function EmpLogsModal({ empId, empName, onClose }: { empId: string; empName: str
   );
 }
 
-function EmployeesTab({ isAdmin = true }: { isAdmin?: boolean }) {
+function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId?: string }) {
   const t = useT();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -938,6 +975,7 @@ function EmployeesTab({ isAdmin = true }: { isAdmin?: boolean }) {
         <EmpLogsModal
           empId={logsEmp.id}
           empName={logsEmp.name}
+          orgId={orgId}
           onClose={() => setLogsEmp(null)}
         />
       )}
