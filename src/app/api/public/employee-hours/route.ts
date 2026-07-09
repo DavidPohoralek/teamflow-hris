@@ -149,14 +149,28 @@ export async function GET(req: NextRequest) {
     const thisStats = calcStats(thisMonthLogs)
     const lastStats = calcStats(lastMonthLogs)
 
-    // Saturday / Sunday bonus eligibility
+    // Saturday / Sunday / special-day bonus eligibility
     const satBonusPct: number = extra['bonus_saturday_pct'] != null ? Number(extra['bonus_saturday_pct']) : 0
     const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : []
     const sunBonusPct: number = extra['bonus_sunday_pct'] != null ? Number(extra['bonus_sunday_pct']) : 0
     const sunBonusDepts: string[] = Array.isArray(extra['bonus_sunday_departments']) ? (extra['bonus_sunday_departments'] as string[]) : []
+
+    interface SpecialBonusDay { id: string; dateFrom: string; dateTo: string; pct: number; departments: string[]; label: string }
+    const specialDays: SpecialBonusDay[] = Array.isArray(extra['bonus_special_days']) ? (extra['bonus_special_days'] as SpecialBonusDay[]) : []
+
     const empDept: string = (employee as { department?: string | null }).department ?? ''
     const isSat = (dateStr: string): boolean => new Date(dateStr + 'T12:00:00').getDay() === 6
     const isSun = (dateStr: string): boolean => new Date(dateStr + 'T12:00:00').getDay() === 0
+    const deptMatches = (allowed: string[], logDept: string): boolean =>
+      allowed.length === 0 || allowed.includes(empDept) || allowed.includes(logDept)
+
+    // Returns total special-day bonus pct for a given date (sums all matching rules)
+    const specialPctFor = (dateStr: string, logDept: string): number =>
+      specialDays.reduce((sum, rule) => {
+        if (dateStr < rule.dateFrom || dateStr > rule.dateTo) return sum
+        if (!deptMatches(rule.departments, logDept)) return sum
+        return sum + rule.pct
+      }, 0)
 
     // All logs for display (sorted by date desc, check_in desc)
     let thisMonthSatBonusHours = 0
@@ -168,26 +182,21 @@ export async function GET(req: NextRequest) {
 
       const logDept = l.work_type_name ?? ''
 
-      // Bonus applies if: pct is set AND (no dept restriction OR employee dept matches OR log's work_type matches)
+      // Bonus applies if: pct is set AND dept matches
       let satBonusHours: number | null = null
-      if (satBonusPct > 0 && durationHours !== null && isSat(l.date)) {
-        const deptMatch = satBonusDepts.length === 0 || satBonusDepts.includes(empDept) || satBonusDepts.includes(logDept)
-        if (deptMatch) {
-          satBonusHours = Math.round(durationHours * (satBonusPct / 100) * 100) / 100
+
+      if (durationHours !== null) {
+        let totalPct = 0
+
+        if (satBonusPct > 0 && isSat(l.date) && deptMatches(satBonusDepts, logDept)) totalPct += satBonusPct
+        if (sunBonusPct > 0 && isSun(l.date) && deptMatches(sunBonusDepts, logDept)) totalPct += sunBonusPct
+        totalPct += specialPctFor(l.date, logDept)
+
+        if (totalPct > 0) {
+          satBonusHours = Math.round(durationHours * (totalPct / 100) * 100) / 100
           if (l.date >= thisRange.firstDay && l.date <= thisRange.lastDay) {
             thisMonthSatBonusHours += satBonusHours
           }
-        }
-      }
-
-      if (sunBonusPct > 0 && durationHours !== null && isSun(l.date)) {
-        const deptMatch = sunBonusDepts.length === 0 || sunBonusDepts.includes(empDept) || sunBonusDepts.includes(logDept)
-        if (deptMatch) {
-          const sunBonus = Math.round(durationHours * (sunBonusPct / 100) * 100) / 100
-          if (l.date >= thisRange.firstDay && l.date <= thisRange.lastDay) {
-            thisMonthSatBonusHours += sunBonus
-          }
-          satBonusHours = (satBonusHours ?? 0) + sunBonus
         }
       }
 

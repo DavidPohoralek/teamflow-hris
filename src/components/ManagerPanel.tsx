@@ -2482,6 +2482,7 @@ function SettingsTab() {
           <BonusDepartmentSetting />
           <NumberSetting label={t('Příplatek za neděli (%)', 'Sunday bonus (%)')} description={t('% navíc za hodiny v neděli. Např. 50 = za 8h neděle → 4h bonus.', '% extra for Sunday hours. E.g. 50 = for 8h Sunday → 4h bonus.')} settingKey="bonus_sunday_pct" defaultValue={0} />
           <BonusSundayDepartmentSetting />
+          <SpecialDaysSetting />
           <NumberSetting label={t('Přesčas — práh (h/měsíc)', 'Overtime threshold (h/month)')} description={t('Od kolika hodin měsíčně se počítá přesčas. 0 = přesčas se nepočítá.', 'Monthly hours threshold for overtime. 0 = overtime not counted.')} settingKey="bonus_overtime_threshold" defaultValue={0} />
           <NumberSetting label={t('Příplatek za přesčas (%)', 'Overtime bonus (%)')} description={t('% navíc za přesčasové hodiny.', '% extra for overtime hours.')} settingKey="bonus_overtime_pct" defaultValue={25} />
         </div>
@@ -2864,6 +2865,197 @@ function BonusDepartmentSetting() {
       >
         {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
       </button>
+    </div>
+  );
+}
+
+// ─── SpecialDaysSetting ───────────────────────────────────────────────────────
+
+interface SpecialBonusDay {
+  id: string;
+  dateFrom: string;
+  dateTo: string;
+  pct: number;
+  departments: string[];
+  label: string;
+}
+
+function SpecialDaysSetting() {
+  const t = useT();
+  const [allDepts, setAllDepts] = useState<string[]>([]);
+  const [days, setDays] = useState<SpecialBonusDay[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [addFrom, setAddFrom] = useState('');
+  const [addTo, setAddTo] = useState('');
+  const [addPct, setAddPct] = useState('50');
+  const [addDepts, setAddDepts] = useState<string[]>([]);
+  const [addLabel, setAddLabel] = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      managerFetch('/api/employees').then((r) => r.json()),
+      managerFetch('/api/manager/settings').then((r) => r.json()),
+    ]).then(([empData, settings]) => {
+      const emps: { department?: string | null }[] = empData.employees ?? [];
+      const depts = Array.from(new Set(emps.map((e) => e.department ?? '').filter(Boolean))).sort();
+      setAllDepts(depts);
+      const saved = settings['bonus_special_days'];
+      if (Array.isArray(saved)) setDays(saved as SpecialBonusDay[]);
+    }).catch(() => {});
+  }, []);
+
+  const saveAll = async (newDays: SpecialBonusDay[]) => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bonus_special_days: newDays }),
+      });
+      setDays(newDays);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  const handleAdd = async () => {
+    if (!addFrom || !addPct) return;
+    const newDay: SpecialBonusDay = {
+      id: Math.random().toString(36).slice(2),
+      dateFrom: addFrom,
+      dateTo: addTo || addFrom,
+      pct: parseFloat(addPct) || 0,
+      departments: addDepts,
+      label: addLabel,
+    };
+    await saveAll([...days, newDay]);
+    setAddFrom('');
+    setAddTo('');
+    setAddPct('50');
+    setAddDepts([]);
+    setAddLabel('');
+  };
+
+  const handleDelete = (id: string) => saveAll(days.filter((d) => d.id !== id));
+
+  const toggleDept = (dept: string) =>
+    setAddDepts((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept]);
+
+  const formatDate = (s: string) => {
+    const [y, m, d] = s.split('-');
+    return `${d}.${m}.${y}`;
+  };
+
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray-700 mb-1">{t('Příplatek za svátek / mimořádný den', 'Holiday / special day bonus')}</p>
+      <p className="text-xs text-gray-400 mb-3">{t('Nastav příplatek (%) pro konkrétní den nebo rozsah dat. Prázdná oddělení = platí pro všechny.', 'Set a bonus (%) for a specific date or date range. Empty departments = applies to everyone.')}</p>
+
+      {days.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {days.map((day) => (
+            <div key={day.id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 text-sm">
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-gray-800">
+                  {formatDate(day.dateFrom)}{day.dateTo && day.dateTo !== day.dateFrom ? ` – ${formatDate(day.dateTo)}` : ''}
+                </span>
+                <span className="ml-2 text-blue-700 font-semibold">{day.pct} %</span>
+                {day.label && <span className="ml-2 text-gray-500">· {day.label}</span>}
+                <span className="ml-2 text-gray-400">
+                  · {day.departments.length > 0 ? day.departments.join(', ') : t('všechna oddělení', 'all departments')}
+                </span>
+              </div>
+              <button
+                onClick={() => handleDelete(day.id)}
+                disabled={saving}
+                className="text-gray-300 hover:text-red-400 transition-colors shrink-0 disabled:opacity-30"
+                title={t('Smazat', 'Delete')}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="border border-dashed border-gray-200 rounded-xl p-4 space-y-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('Přidat nový', 'Add new')}</p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">{t('Od', 'From')}</label>
+            <input
+              type="date"
+              value={addFrom}
+              onChange={(e) => { setAddFrom(e.target.value); if (!addTo) setAddTo(e.target.value); }}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">{t('Do (volitelné pro 1 den)', 'To (optional for 1 day)')}</label>
+            <input
+              type="date"
+              value={addTo}
+              onChange={(e) => setAddTo(e.target.value)}
+              min={addFrom}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">{t('Příplatek (%)', 'Bonus (%)')}</label>
+            <input
+              type="number"
+              value={addPct}
+              onChange={(e) => setAddPct(e.target.value)}
+              min={0}
+              max={500}
+              step={1}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">{t('Popisek (volitelný)', 'Label (optional)')}</label>
+            <input
+              type="text"
+              value={addLabel}
+              onChange={(e) => setAddLabel(e.target.value)}
+              placeholder={t('Vánoce 2025', 'Christmas 2025')}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        </div>
+
+        {allDepts.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-500 mb-1.5">{t('Oddělení (prázdné = všechna)', 'Departments (empty = all)')}</p>
+            <div className="flex flex-wrap gap-2">
+              {allDepts.map((dept) => (
+                <label key={dept} className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={addDepts.includes(dept)}
+                    onChange={() => toggleDept(dept)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                  />
+                  <span className="text-sm text-gray-700">{dept}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={handleAdd}
+          disabled={saving || !addFrom}
+          className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-40"
+        >
+          {saving ? '…' : t('+ Přidat', '+ Add')}
+        </button>
+      </div>
     </div>
   );
 }
