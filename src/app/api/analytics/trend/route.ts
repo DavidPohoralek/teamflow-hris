@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 // GET /api/analytics/trend?month=YYYY-MM&department=Prodejna
 // Returns 12 data points (last 12 months) for AreaChart
@@ -37,17 +38,21 @@ export async function GET(req: NextRequest) {
     empQuery = empQuery.in('department', departments);
   }
 
-  const [empRes, logsRes] = await Promise.all([
+  const [empRes, allLogs] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs')
-      .select('employee_id, date, check_in, check_out')
-      .eq('organization_id', orgId)
-      .gte('date', rangeFrom)
-      .lte('date', rangeTo),
+    // stránkovat přes 1000-řádkový limit (12 měsíců docházky může být >1000 řádků)
+    fetchAllRows<{ employee_id: string; date: string; check_in: string | null; check_out: string | null }>(
+      (from, to) => sb.from('attendance_logs')
+        .select('employee_id, date, check_in, check_out')
+        .eq('organization_id', orgId)
+        .gte('date', rangeFrom)
+        .lte('date', rangeTo)
+        .order('date', { ascending: true })
+        .range(from, to),
+    ),
   ]);
 
   const employees: { id: string; target_hours: number }[] = empRes.data ?? [];
-  const allLogs: { employee_id: string; date: string; check_in: string | null; check_out: string | null }[] = logsRes.data ?? [];
 
   const empIds = new Set(employees.map((e) => e.id));
   const relevantLogs = allLogs.filter((l) => empIds.has(l.employee_id) && l.check_in && l.check_out);

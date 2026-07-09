@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 // GET /api/analytics/weekday?month=YYYY-MM&department=Prodejna
 // Returns avg punctuality by day of week (Mon–Sun, ISO order), using last 3 months for sample size
@@ -34,16 +35,19 @@ export async function GET(req: NextRequest) {
     empQuery = empQuery.in('department', departments);
   }
 
-  const [empRes, logsRes, plansRes] = await Promise.all([
+  const [empRes, allLogs, plans] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs').select('employee_id, check_in, date').eq('organization_id', orgId).gte('date', rangeFrom).lte('date', rangeTo),
-    sb.from('work_plans').select('employee_id, date, start_time').eq('organization_id', orgId).eq('active', true).gte('date', rangeFrom).lte('date', rangeTo),
+    fetchAllRows<{ employee_id: string; check_in: string | null; date: string }>(
+      (from, to) => sb.from('attendance_logs').select('employee_id, check_in, date').eq('organization_id', orgId).gte('date', rangeFrom).lte('date', rangeTo).order('date', { ascending: true }).range(from, to),
+    ),
+    fetchAllRows<{ employee_id: string; date: string; start_time: string | null }>(
+      (from, to) => sb.from('work_plans').select('employee_id, date, start_time').eq('organization_id', orgId).eq('active', true).gte('date', rangeFrom).lte('date', rangeTo).order('date', { ascending: true }).range(from, to),
+    ),
   ]);
 
   const empIds = new Set<string>((empRes.data ?? []).map((e: { id: string }) => e.id));
   const logs: { employee_id: string; check_in: string; date: string }[] =
-    (logsRes.data ?? []).filter((l: { employee_id: string; check_in: string | null }) => empIds.has(l.employee_id) && l.check_in);
-  const plans: { employee_id: string; date: string; start_time: string | null }[] = plansRes.data ?? [];
+    allLogs.filter((l) => empIds.has(l.employee_id) && l.check_in) as { employee_id: string; check_in: string; date: string }[];
 
   // Index plans by empId+date for O(1) lookup
   const planMap = new Map<string, string>();
