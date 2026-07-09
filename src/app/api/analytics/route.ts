@@ -119,6 +119,14 @@ export async function GET(req: NextRequest) {
     const daysWorked = new Set(empLogs.map((l) => l.date)).size;
     const daysPlanned = new Set(empPlans.map((p) => p.date)).size;
 
+    // Work-type breakdown for THIS employee (so client může respektovat filtr zaměstnance)
+    const wtMins = new Map<string, number>();
+    for (const l of empLogs) {
+      const key = l.work_type_name ?? 'Neurčeno';
+      wtMins.set(key, (wtMins.get(key) ?? 0) + Math.round((new Date(l.check_out!).getTime() - new Date(l.check_in!).getTime()) / 60000));
+    }
+    const workTypes = Array.from(wtMins.entries()).map(([name, mins]) => ({ name, hours: Math.round(mins / 6) / 10 }));
+
     // Vacation used this year (in days)
     const vacUsedDays = vacRequests
       .filter((r) => r.employee_id === emp.id)
@@ -147,6 +155,7 @@ export async function GET(req: NextRequest) {
       vacationDaysRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) - vacUsedDays),
       saturdayHours: satHours,
       saturdayBonusHours: satBonusHours,
+      workTypes,
     };
   });
 

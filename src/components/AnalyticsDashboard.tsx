@@ -27,6 +27,7 @@ interface EmployeeStat {
   vacationDaysRemaining: number;
   saturdayHours?: number;
   saturdayBonusHours?: number;
+  workTypes?: WorkTypeBreakdown[];
 }
 
 interface WorkTypeBreakdown { name: string; hours: number; }
@@ -235,6 +236,19 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
     [filteredStats]
   );
 
+  // Rozložení hodin dle kategorie — respektuje filtr zaměstnance (sečteno přes filteredStats)
+  const workTypeBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of filteredStats) {
+      for (const wt of s.workTypes ?? []) {
+        map.set(wt.name, (map.get(wt.name) ?? 0) + wt.hours);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([name, hours]) => ({ name, hours: Math.round(hours * 10) / 10 }))
+      .sort((a, b) => b.hours - a.hours);
+  }, [filteredStats]);
+
   const [y, mo] = month.split('-').map(Number);
   const monthLabel = `${CZ_MONTHS[mo - 1]} ${y}`;
 
@@ -420,7 +434,7 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
             {/* Graf 2: Bilance hodin (přesčasy / dluhy) */}
             <ChartShell title="Bilance hodin" badge={
               <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1">
-                vs. fond
+                přesčas − dluh
               </span>
             } minH={Math.max(160, balanceData.length * 44)}>
               {balanceData.length === 0 ? (
@@ -630,12 +644,12 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
           </section>
 
           {/* ── Rozložení dle kategorie práce ── */}
-          {data.workTypeBreakdown.length > 0 && (
+          {workTypeBreakdown.length > 0 && (
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <h3 className="text-base font-semibold text-slate-800 mb-5">Rozložení hodin dle kategorie</h3>
               <div className="space-y-3">
-                {data.workTypeBreakdown.map((wt, i) => {
-                  const maxH = data.workTypeBreakdown[0].hours;
+                {workTypeBreakdown.map((wt, i) => {
+                  const maxH = workTypeBreakdown[0].hours;
                   const COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#f97316','#ef4444','#06b6d4'];
                   const color = COLORS[i % COLORS.length];
                   return (
