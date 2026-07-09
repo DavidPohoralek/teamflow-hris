@@ -140,16 +140,34 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   const [exportLoading, setExportLoading] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [nameSearch, setNameSearch] = useState('');
+  // allDepts: fetched once at mount from unfiltered response so dropdown always shows all options
+  const [allDepts, setAllDepts] = useState<string[]>([]);
 
-  // Fetch main stats (all employees — dept filter applied client-side for table/kpi)
+  useEffect(() => {
+    managerFetch(`/api/analytics?month=${currentMonth}`)
+      .then((r) => r.json())
+      .then((d: AnalyticsData) => {
+        const seen = new Set<string>();
+        const list: string[] = [];
+        for (const s of d.stats) {
+          if (s.department && !seen.has(s.department)) { seen.add(s.department); list.push(s.department); }
+        }
+        setAllDepts(list.sort());
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch main stats with dept filter so workTypeBreakdown is also scoped to dept
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await managerFetch(`/api/analytics?month=${month}`);
+      const dept = selectedDept !== '__all__' ? `&department=${encodeURIComponent(selectedDept)}` : '';
+      const res = await managerFetch(`/api/analytics?month=${month}${dept}`);
       if (res.ok) setData(await res.json());
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [month]);
+  }, [month, selectedDept]);
 
   // Fetch trend (server-side dept filter for 12-month aggregation)
   const fetchTrend = useCallback(async () => {
@@ -180,33 +198,18 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   // Reset employee chips when dept changes
   useEffect(() => { setSelectedEmployees(new Set()); }, [selectedDept]);
 
-  // Derive department list from loaded stats
-  const departments = useMemo(() => {
-    if (!data) return [];
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const s of data.stats) {
-      if (s.department && !seen.has(s.department)) { seen.add(s.department); result.push(s.department); }
-    }
-    return result.sort();
-  }, [data]);
-
-  // Client-side dept + employee + name filter
+  // API already filters by dept — client-side only handles employee chips + name search
   const filteredStats = useMemo(() => {
     if (!data) return [];
     return data.stats.filter((s) => {
-      if (selectedDept !== '__all__' && s.department !== selectedDept) return false;
       if (selectedEmployees.size > 0 && !selectedEmployees.has(s.id)) return false;
       if (nameSearch.trim()) return s.name.toLowerCase().includes(nameSearch.trim().toLowerCase());
       return true;
     });
-  }, [data, selectedDept, selectedEmployees, nameSearch]);
+  }, [data, selectedEmployees, nameSearch]);
 
-  // Employees visible in current dept (for chip row)
-  const deptEmployees = useMemo(() => {
-    if (!data) return [];
-    return data.stats.filter((s) => selectedDept === '__all__' || s.department === selectedDept);
-  }, [data, selectedDept]);
+  // Chip row shows all employees returned by API (already scoped to dept)
+  const deptEmployees = data?.stats ?? [];
 
   // KPI values from filtered stats
   const totalWorked = filteredStats.reduce((s, e) => s + e.workedHours, 0);
@@ -274,11 +277,11 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
             className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 appearance-none cursor-pointer font-medium text-slate-700"
           >
             <option value="__all__">Všechna oddělení</option>
-            {departments.map((d) => (
+            {allDepts.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
-            {/* Show selectedDept even if not yet in list */}
-            {selectedDept !== '__all__' && !departments.includes(selectedDept) && (
+            {/* Show selectedDept immediately even before allDepts loads */}
+            {selectedDept !== '__all__' && !allDepts.includes(selectedDept) && (
               <option value={selectedDept}>{selectedDept}</option>
             )}
           </select>

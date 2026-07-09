@@ -131,10 +131,12 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Work type breakdown across org
+  // Work type breakdown — only for employees that passed the dept filter
+  const filteredEmpIds = new Set(employees.map((e) => e.id));
   const workTypeMap = new Map<string, number>();
   for (const l of logs) {
     if (!l.check_in || !l.check_out) continue;
+    if (!filteredEmpIds.has(l.employee_id)) continue;
     const key = l.work_type_name ?? 'Neurčeno';
     const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
     workTypeMap.set(key, (workTypeMap.get(key) ?? 0) + mins);
