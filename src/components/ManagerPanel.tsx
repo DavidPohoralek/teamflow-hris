@@ -670,9 +670,9 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
               <input type="time" value={addCheckOut} onChange={e => setAddCheckOut(e.target.value)}
                 className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
-            {workTypes.length > 0 && (
-              <div className="flex flex-col gap-1 min-w-[140px]">
-                <label className="text-xs font-medium text-slate-600">Oddělení</label>
+            <div className="flex flex-col gap-1 min-w-[140px]">
+              <label className="text-xs font-medium text-slate-600">Oddělení</label>
+              {workTypes.length > 0 ? (
                 <select
                   value={addWorkTypeId}
                   onChange={e => {
@@ -687,8 +687,16 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
                     <option key={wt.id} value={wt.id}>{wt.name}</option>
                   ))}
                 </select>
-              </div>
-            )}
+              ) : (
+                <input
+                  type="text"
+                  value={addWorkTypeName}
+                  onChange={e => setAddWorkTypeName(e.target.value)}
+                  placeholder="např. HomeOffice"
+                  className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              )}
+            </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
               <label className="text-xs font-medium text-slate-600">Poznámka</label>
               <input type="text" value={addNote} onChange={e => setAddNote(e.target.value)} placeholder="volitelná"
