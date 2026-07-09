@@ -153,7 +153,6 @@ export async function GET(req: NextRequest) {
     const satBonusPct: number = extra['bonus_saturday_pct'] != null ? Number(extra['bonus_saturday_pct']) : 0
     const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : []
     const empDept: string = (employee as { department?: string | null }).department ?? ''
-    const satEligible = satBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept))
     const isSat = (dateStr: string): boolean => new Date(dateStr + 'T12:00:00').getDay() === 6
 
     // All logs for display (sorted by date desc, check_in desc)
@@ -164,11 +163,16 @@ export async function GET(req: NextRequest) {
           ? (new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 3_600_000
           : null
 
+      // Bonus applies if: pct is set AND (no dept restriction OR employee dept matches OR log's work_type matches)
       let satBonusHours: number | null = null
-      if (satEligible && durationHours !== null && isSat(l.date)) {
-        satBonusHours = Math.round(durationHours * (satBonusPct / 100) * 100) / 100
-        if (l.date >= thisRange.firstDay && l.date <= thisRange.lastDay) {
-          thisMonthSatBonusHours += satBonusHours
+      if (satBonusPct > 0 && durationHours !== null && isSat(l.date)) {
+        const logDept = l.work_type_name ?? ''
+        const deptMatch = satBonusDepts.length === 0 || satBonusDepts.includes(empDept) || satBonusDepts.includes(logDept)
+        if (deptMatch) {
+          satBonusHours = Math.round(durationHours * (satBonusPct / 100) * 100) / 100
+          if (l.date >= thisRange.firstDay && l.date <= thisRange.lastDay) {
+            thisMonthSatBonusHours += satBonusHours
+          }
         }
       }
 
