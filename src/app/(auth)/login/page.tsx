@@ -6,6 +6,23 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n';
 
+// Odstraní případné poškozené / zbytkové Supabase přihlašovací cookies (všechny
+// chunky "sb-...-auth-token"). Řeší zaseknuté profily po dřívějším výpadku
+// obnovování session v middleware, kdy stará cookie tiše bránila novému
+// přihlášení "chytnout". Bezpečné volat vždy před loginem – čerstvé přihlášení
+// si potřebné cookies stejně vytvoří znovu.
+function clearStaleSupabaseAuthCookies() {
+  if (typeof document === 'undefined') return;
+  const host = window.location.hostname;
+  for (const cookie of document.cookie.split(';')) {
+    const name = cookie.split('=')[0].trim();
+    if (!name.startsWith('sb-')) continue;
+    document.cookie = `${name}=; Max-Age=0; path=/`;
+    document.cookie = `${name}=; Max-Age=0; path=/; domain=${host}`;
+    document.cookie = `${name}=; Max-Age=0; path=/; domain=.${host}`;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -20,6 +37,12 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
+    // Samohojení: než se přihlásíme, pročisti případnou starou/poškozenou
+    // přihlašovací session, aby se čerstvé přihlášení vždy uchytilo (jinak
+    // zaseknutý profil "nic neudělá" a spadne zpátky na login).
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    clearStaleSupabaseAuthCookies();
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
