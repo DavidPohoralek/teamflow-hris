@@ -672,30 +672,21 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
             </div>
             <div className="flex flex-col gap-1 min-w-[140px]">
               <label className="text-xs font-medium text-slate-600">Oddělení</label>
-              {workTypes.length > 0 ? (
-                <select
-                  value={addWorkTypeId}
-                  onChange={e => {
-                    const wt = workTypes.find(w => w.id === e.target.value);
-                    setAddWorkTypeId(e.target.value);
-                    setAddWorkTypeName(wt?.name ?? '');
-                  }}
-                  className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                >
-                  <option value="">— bez oddělení —</option>
-                  {workTypes.map(wt => (
-                    <option key={wt.id} value={wt.id}>{wt.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={addWorkTypeName}
-                  onChange={e => setAddWorkTypeName(e.target.value)}
-                  placeholder="např. HomeOffice"
-                  className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              )}
+              <select
+                value={addWorkTypeId}
+                onChange={e => {
+                  const wt = workTypes.find(w => w.id === e.target.value);
+                  setAddWorkTypeId(e.target.value);
+                  setAddWorkTypeName(wt?.name ?? '');
+                }}
+                disabled={workTypes.length === 0}
+                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+              >
+                <option value="">{workTypes.length === 0 ? 'Nejprve přidejte typy práce' : '— bez oddělení —'}</option>
+                {workTypes.map(wt => (
+                  <option key={wt.id} value={wt.id}>{wt.name}</option>
+                ))}
+              </select>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
               <label className="text-xs font-medium text-slate-600">Poznámka</label>
