@@ -532,7 +532,8 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
     if (!orgId) return;
     fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`)
       .then(r => r.json())
-      .then((data: { id: string; name: string; color?: string }[]) => setWorkTypes(Array.isArray(data) ? data.filter(w => w.id) : []))
+      .then((data: { workTypes?: { id: string; name: string; color?: string }[] }) =>
+        setWorkTypes(Array.isArray(data.workTypes) ? data.workTypes.filter(w => w.id) : []))
       .catch(() => {});
   }, [orgId]);
 
