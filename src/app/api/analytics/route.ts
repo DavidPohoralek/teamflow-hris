@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
-// GET /api/analytics?month=YYYY-MM
+// GET /api/analytics?month=YYYY-MM&department=Prodejna
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const deptFilter = searchParams.get('department');
 
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
@@ -18,7 +19,11 @@ export async function GET(req: NextRequest) {
   const sb = supabase as any;
 
   let empQuery = sb.from('employees').select('id, name, department, target_hours, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
-  if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
+  if (deptFilter && deptFilter !== '__all__') {
+    empQuery = empQuery.eq('department', deptFilter);
+  } else if (departments && departments.length > 0) {
+    empQuery = empQuery.in('department', departments);
+  }
 
   const [empRes, logsRes, plansRes, requestsRes, settingsRes] = await Promise.all([
     empQuery,
@@ -110,6 +115,7 @@ export async function GET(req: NextRequest) {
     return {
       id: emp.id,
       name: emp.name,
+      department: emp.department ?? null,
       workedHours: Math.round(workedHours * 10) / 10,
       plannedHours: Math.round(plannedHours * 10) / 10,
       targetHours,
