@@ -2314,164 +2314,93 @@ export default function WorkPlanGrid({
         </>
       )}
 
-      {/* ── DESKTOP WEEK GRID ─ vertical day list ───────────────────── */}
-      {desktopViewMode === 'week' && !loading && !error && (
-        <>
-          <div className="flex flex-col gap-3">
-            {desktopWeekDays.map((dateStr) => {
-              const wd = mondayWeekday(dateStr);
-              const isWeekend = wd === 5 || wd === 6;
-              const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
-              const isToday = dateStr === todayStr;
-              const allEntries = entriesByDate.get(dateStr) ?? [];
-              const visibleEntries = (() => {
-                let es = myShiftsOnly && sessionEmployee
-                  ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
-                  : allEntries;
-                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
-                if (eveningFilter && eveningConfig?.enabled) {
-                  const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
-                  const eMin = toMin(eveningConfig.start ?? '17:00');
-                  es = es.filter((e) => {
-                    if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
-                    const startMin = e.startTime ? toMin(e.startTime) : null;
-                    const endMin = e.endTime ? toMin(e.endTime) : null;
-                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
-                  });
-                }
-                return es;
-              })();
-              const day = new Date(dateStr + 'T00:00:00');
-              const dayNum = day.getDate();
-              const monthIdx = day.getMonth();
-              const CZ_MONTHS_SHORT = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
-              return (
-                <div
-                  key={dateStr}
-                  className={`rounded-xl border shadow-sm transition-all ${
-                    isToday
-                      ? 'border-rose-300 shadow-rose-100 ring-1 ring-rose-200'
-                      : isWeekend
-                      ? 'border-blue-100 bg-blue-50/20'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  {/* Day header */}
-                  <div
-                    className={`flex items-center gap-3 px-4 py-2.5 border-b ${
-                      isToday ? 'border-rose-200 bg-rose-50/60' : isWeekend ? 'border-blue-100 bg-blue-50/30' : 'border-slate-100 bg-white'
-                    } rounded-t-xl relative`}
-                    style={isClosed ? { background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.08) 0px, rgba(148,163,184,0.08) 3px, transparent 3px, transparent 10px)' } : undefined}
-                  >
-                    <div className={`shrink-0 w-10 h-10 flex flex-col items-center justify-center rounded-lg ${
-                      isToday ? 'bg-rose-500 text-white' : isWeekend ? 'bg-blue-100 text-blue-500' : isClosed ? 'bg-slate-100 text-slate-400' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      <span className="text-[10px] font-semibold uppercase leading-none">{DAY_NAMES_SHORT[wd]}</span>
-                      <span className="text-lg font-bold leading-tight">{dayNum}</span>
-                    </div>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-sm font-semibold ${isToday ? 'text-rose-700' : isWeekend ? 'text-blue-600' : 'text-slate-700'}`}>
-                        {DAY_NAMES_LONG[day.getDay()]}
-                      </span>
-                      <span className="text-xs text-slate-400">{dayNum}. {CZ_MONTHS_SHORT[monthIdx]}.</span>
-                      {isClosed && (
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>
-                      )}
-                      {isToday && (
-                        <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">{t('Dnes', 'Today')}</span>
-                      )}
-                    </div>
-                    {/* Count badge + edit button */}
-                    <div className="ml-auto flex items-center gap-2">
-                      {isManagerMode && metaByDate.get(dateStr) && (() => {
-                        const meta = metaByDate.get(dateStr)!;
-                        return (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${meta.assignedCount >= meta.requiredTotal ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
-                            {meta.assignedCount}/{meta.requiredTotal}
-                          </span>
-                        );
-                      })()}
-                      {visibleEntries.length > 0 && (
-                        <span className="text-xs text-slate-400 tabular-nums">{visibleEntries.length} {t('směn', 'shifts')}</span>
-                      )}
-                      {isManagerMode && (
-                        <button
-                          onClick={() => setEditingDate(dateStr)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors"
-                          title={t('Upravit den', 'Edit day')}
-                        >
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                        </button>
-                      )}
-                      {isManagerMode && (
-                        <button
-                          onClick={() => { setAddShiftDate(dateStr); setShowModal(true); }}
-                          className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-500 hover:text-blue-700 transition-colors"
-                          title={t('Přidat směnu', 'Add shift')}
-                        >
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
+      {/* ── DESKTOP WEEK GRID ─ all weeks in month, scroll vertically ── */}
+      {desktopViewMode === 'week' && !loading && !error && (() => {
+        // Build list of all week-starts (Mondays) that overlap with current month
+        const [yr, mo] = month.split('-').map(Number);
+        const monthStart = new Date(yr, mo - 1, 1);
+        const monthEnd = new Date(yr, mo, 0);
+        const weeks: string[][] = [];
+        // First Monday on or before the 1st of month
+        const cur = new Date(monthStart);
+        const dow = cur.getDay();
+        cur.setDate(cur.getDate() - (dow === 0 ? 6 : dow - 1));
+        while (cur <= monthEnd) {
+          weeks.push(getWeekDays(new Date(cur)));
+          cur.setDate(cur.getDate() + 7);
+        }
 
-                  {/* Entries row */}
-                  <div
-                    className="px-4 py-3 flex flex-wrap gap-2"
-                    onClick={() => { if (clipboard && handlePaste) handlePaste(dateStr); else handleClickDay(dateStr); }}
-                    style={{ cursor: clipboard ? 'copy' : 'default' }}
-                  >
-                    {visibleEntries.length === 0 ? (
-                      <span className="text-sm text-slate-400 italic py-1">{isClosed && !isManagerMode ? t('Zavřeno', 'Closed') : t('Žádné směny', 'No shifts')}</span>
-                    ) : (
-                      visibleEntries.map((entry, idx) => {
-                        const color = entry.workTypeColor ?? '#94a3b8';
-                        const parts = (entry.employeeName ?? '—').trim().split(/\s+/);
-                        const shortName = parts.length < 2 ? (entry.employeeName ?? '—') : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
-                        const timeLabel = entry.startTime && entry.endTime ? `${entry.startTime.slice(0,5)}–${entry.endTime.slice(0,5)}` : '';
-                        const canEdit = isManagerMode || (sessionEmployee?.id && entry.employeeId === sessionEmployee.id);
-                        return (
-                          <div
-                            key={idx}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${canEdit ? 'cursor-context-menu' : ''}`}
-                            style={{ borderLeft: `3px solid ${color}`, backgroundColor: `${color}22`, color: '#1e293b' }}
-                            title={canEdit ? t('Pravý klik = upravit', 'Right-click = edit') : `${entry.employeeName ?? '—'}${timeLabel ? ' · ' + timeLabel : ''}`}
-                            onContextMenu={canEdit && (isManagerMode || sessionEmployee) ? (e) => { e.preventDefault(); e.stopPropagation(); setEditingEntry(entry); } : undefined}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <span className="font-semibold whitespace-nowrap">{shortName}</span>
-                            {timeLabel && <span className="text-slate-500 whitespace-nowrap">{timeLabel}</span>}
-                            {entry.workTypeName && <span className="text-slate-400 truncate max-w-[80px]">{entry.workTypeName}</span>}
-                            {(isManagerMode || (sessionEmployee?.id && entry.employeeId === sessionEmployee.id)) && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); isManagerMode ? handleRemoveEmployee(dateStr, entry.id) : handleRemoveEmployeeSelf(dateStr, entry.id); }}
-                                className="text-slate-400 hover:text-red-500 transition-colors ml-0.5"
-                                title={t('Odebrat', 'Remove')}
-                              >
-                                <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+        return (
+          <>
+            {/* Sticky day-name header */}
+            <div className="grid grid-cols-7 gap-2 mb-3 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2 sticky top-0 z-10">
+              {DAY_NAMES_SHORT.map((d, idx) => (
+                <div key={idx} className={`text-center text-xs font-semibold py-0.5 ${idx >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
+                  {d}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          <div className="mt-4">
+            {/* Week rows — scroll vertically through all weeks of the month */}
+            <div className="flex flex-col gap-4">
+              {weeks.map((weekDays, wi) => (
+                <div key={wi} className="grid grid-cols-7 gap-2 items-start">
+                  {weekDays.map((dateStr) => {
+                    const wd = mondayWeekday(dateStr);
+                    const isWeekend = wd === 5 || wd === 6;
+                    const isClosed = closedDates.has(dateStr) || closedWeekdays.has(new Date(dateStr + 'T00:00:00').getDay());
+                    const allEntries = entriesByDate.get(dateStr) ?? [];
+                    const visibleEntries = (() => {
+                      let es = myShiftsOnly && sessionEmployee
+                        ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
+                        : allEntries;
+                      if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                      if (eveningFilter && eveningConfig?.enabled) {
+                        const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
+                        const eMin = toMin(eveningConfig.start ?? '17:00');
+                        es = es.filter((e) => {
+                          if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
+                          const startMin = e.startTime ? toMin(e.startTime) : null;
+                          const endMin = e.endTime ? toMin(e.endTime) : null;
+                          return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
+                        });
+                      }
+                      return es;
+                    })();
+                    return (
+                      <DayCard
+                        key={dateStr}
+                        dateStr={dateStr}
+                        entries={visibleEntries}
+                        scheduleMeta={metaByDate.get(dateStr)}
+                        isManagerMode={isManagerMode}
+                        isWeekend={isWeekend}
+                        isClosed={isClosed}
+                        clipboard={clipboard}
+                        sessionEmployeeId={sessionEmployee?.id}
+                        dayNamesShort={DAY_NAMES_SHORT}
+                        eveningConfig={eveningConfig}
+                        orgId={orgId}
+                        onClickDay={handleClickDay}
+                        onEditDay={isManagerMode ? setEditingDate : undefined}
+                        onRemoveEmployee={isManagerMode ? handleRemoveEmployee : (sessionEmployee ? handleRemoveEmployeeSelf : undefined)}
+                        onEditEntry={(isManagerMode || sessionEmployee) ? setEditingEntry : undefined}
+                        onCopyEntry={handleCopyEntry}
+                        onPaste={handlePaste}
+                        isMyVacation={myVacation && vacationDates.has(dateStr)}
+                        isToday={dateStr === todayStr}
+                        expanded={true}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
             <Legend workTypes={workTypes} isManagerMode={isManagerMode} onChanged={fetchWorkTypes} />
-          </div>
-        </>
-      )}
+          </>
+        );
+      })()}
       </div>{/* end desktop */}
 
       {/* Shared modals — fixed position, visible on both mobile and desktop */}
