@@ -4,6 +4,11 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Service worker must never be cached so updates are picked up immediately.
+        source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
+      },
+      {
         // HTML pages must never be cached in the PWA — after a deploy,
         // stale HTML references old JS chunk hashes that no longer exist,
         // causing React hydration to silently fail (buttons become dead).
