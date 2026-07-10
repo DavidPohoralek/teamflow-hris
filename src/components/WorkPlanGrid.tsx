@@ -1977,7 +1977,7 @@ export default function WorkPlanGrid({
             </button>
           )}
           <span className="text-sm font-semibold text-slate-800 min-w-[160px] text-center px-2">
-            {desktopViewMode === 'week' ? desktopWeekLabel : formatMonthLabel(month, MONTH_NAMES)}
+            {formatMonthLabel(month, MONTH_NAMES)}
           </span>
           {desktopViewMode !== 'week' && (
             <button
