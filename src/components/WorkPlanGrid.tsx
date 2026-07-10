@@ -1322,7 +1322,7 @@ export default function WorkPlanGrid({
   const [eveningFilter, setEveningFilter] = useState(false);
 
   // Desktop view mode: month (default) or week
-  const [desktopViewMode, setDesktopViewMode] = useState<'month' | 'week'>('month');
+  const [desktopViewMode, setDesktopViewMode] = useState<'month' | 'week'>('week');
   const [desktopWeekStart, setDesktopWeekStart] = useState<Date>(() => getWeekStart(new Date()));
   // Extra plans for the adjacent month when the visible week spans two months
   const [weekExtraPlans, setWeekExtraPlans] = useState<WorkPlanEntry[]>([]);
@@ -1965,31 +1965,27 @@ export default function WorkPlanGrid({
 
         {/* Month / Week navigation */}
         <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
-          {desktopViewMode !== 'week' && (
-            <button
-              onClick={() => onMonthChange(prevMonth(month))}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-              aria-label={t('Předchozí měsíc', 'Previous month')}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
-          )}
+          <button
+            onClick={() => onMonthChange(prevMonth(month))}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            aria-label={t('Předchozí měsíc', 'Previous month')}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
           <span className="text-sm font-semibold text-slate-800 min-w-[160px] text-center px-2">
             {formatMonthLabel(month, MONTH_NAMES)}
           </span>
-          {desktopViewMode !== 'week' && (
-            <button
-              onClick={() => onMonthChange(nextMonth(month))}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
-              aria-label={t('Následující měsíc', 'Next month')}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </button>
-          )}
+          <button
+            onClick={() => onMonthChange(nextMonth(month))}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            aria-label={t('Následující měsíc', 'Next month')}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
 
         {/* Department filter pills */}
