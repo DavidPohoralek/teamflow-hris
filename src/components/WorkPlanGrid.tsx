@@ -1480,18 +1480,32 @@ export default function WorkPlanGrid({
     });
   }, [month, onMonthChange]);
 
-  // When week spans two months, also fetch the adjacent month's data
+  // Fetch adjacent-month plans for all border weeks visible in the multi-week view
   useEffect(() => {
     if (desktopViewMode !== 'week') { setWeekExtraPlans([]); return; }
-    const weekDays = getWeekDays(desktopWeekStart);
-    const otherMonths = weekDays.map(d => d.slice(0, 7)).filter(m => m !== month);
-    const extraMonth = otherMonths.find(m => m !== month);
-    if (!extraMonth) { setWeekExtraPlans([]); return; }
-    fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(extraMonth)}`)
-      .then(r => r.json())
-      .then(json => setWeekExtraPlans(json.workPlans ?? []))
-      .catch(() => setWeekExtraPlans([]));
-  }, [desktopViewMode, desktopWeekStart, month, orgId]);
+    const [yr, mo] = month.split('-').map(Number);
+    const monthStart = new Date(yr, mo - 1, 1);
+    const monthEnd = new Date(yr, mo, 0);
+    const cur = new Date(monthStart);
+    const dow = cur.getDay();
+    cur.setDate(cur.getDate() - (dow === 0 ? 6 : dow - 1));
+    const allDays: string[] = [];
+    while (cur <= monthEnd) {
+      getWeekDays(new Date(cur)).forEach((d) => allDays.push(d));
+      cur.setDate(cur.getDate() + 7);
+    }
+    const seen = new Set<string>();
+    const extraMonths = allDays.map((d) => d.slice(0, 7)).filter((m) => m !== month && !seen.has(m) && seen.add(m) !== undefined);
+    if (extraMonths.length === 0) { setWeekExtraPlans([]); return; }
+    Promise.all(
+      extraMonths.map((em) =>
+        fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(em)}`)
+          .then((r) => r.json())
+          .then((json) => json.workPlans ?? [])
+          .catch(() => [])
+      )
+    ).then((results: WorkPlanEntry[][]) => setWeekExtraPlans(results.flat()));
+  }, [desktopViewMode, month, orgId]);
 
 
   const handleShiftSuccess = useCallback(() => {
