@@ -10,6 +10,13 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
   const lang = (searchParams.get('lang') ?? 'cs') as 'cs' | 'en';
+  const allowedEmpIds = searchParams.get('employees')
+    ? new Set(searchParams.get('employees')!.split(',').filter(Boolean))
+    : null;
+  const allowedCols = searchParams.get('cols')
+    ? new Set(searchParams.get('cols')!.split(',').filter(Boolean))
+    : null;
+  const col = (key: string) => !allowedCols || allowedCols.has(key);
 
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
@@ -72,7 +79,11 @@ export async function GET(req: NextRequest) {
     }, 0);
   }
 
-  const rows = employees.map((emp) => {
+  const filteredEmployees = allowedEmpIds
+    ? employees.filter((e) => allowedEmpIds.has(e.id))
+    : employees;
+
+  const rows = filteredEmployees.map((emp) => {
     const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
     const empPlans = plans.filter((p) => p.employee_id === emp.id);
     const hasAttendance = empLogs.length > 0;
@@ -134,40 +145,43 @@ export async function GET(req: NextRequest) {
   const isEn = lang === 'en';
   const BOM = '﻿';
 
-  // Legacy keys → display label; custom types stored as-is
   const LEGACY: Record<string, string> = { hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO' };
-
   const fmt = (n: number) => n.toFixed(2);
 
-  // Dynamic benefit columns
-  const benefitHeaders = activeBenefits.map((b) =>
-    isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)`
-  );
+  const includeBenefits = col('benefits') && activeBenefits.length > 0;
+  const benefitHeaders = includeBenefits
+    ? activeBenefits.map((b) => isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)`)
+    : [];
 
-  const baseHeaders = isEn
-    ? ['Name', 'Employment type', 'Data source', 'Hours worked', 'Of which Saturday', 'Saturday bonus (h)', 'Overtime bonus (h)']
-    : ['Jméno', 'Pracovní poměr', 'Zdroj dat', 'Odpracováno (h)', 'Z toho soboty (h)', 'Bonus soboty (h)', 'Bonus přesčas (h)'];
-
-  const tailHeaders = isEn
-    ? [...benefitHeaders, 'Total bonus (h)', 'Target hours', 'Difference', 'Vacation days used']
-    : [...benefitHeaders, 'Bonus celkem (h)', 'Fond hodin (h)', 'Rozdíl (h)', 'Dovolená čerpáno (dní)'];
-
-  const header = [...baseHeaders, ...tailHeaders].join(';');
+  const header = [
+    isEn ? 'Name' : 'Jméno',
+    ...(col('employmentType') ? [isEn ? 'Employment type' : 'Pracovní poměr'] : []),
+    ...(col('source')         ? [isEn ? 'Data source'     : 'Zdroj dat']       : []),
+    ...(col('workedHours')    ? [isEn ? 'Hours worked'    : 'Odpracováno (h)']  : []),
+    ...(col('saturdayHours')  ? [isEn ? 'Of which Saturday' : 'Z toho soboty (h)'] : []),
+    ...(col('satBonusHours')  ? [isEn ? 'Saturday bonus (h)' : 'Bonus soboty (h)'] : []),
+    ...(col('otBonusHours')   ? [isEn ? 'Overtime bonus (h)' : 'Bonus přesčas (h)'] : []),
+    ...benefitHeaders,
+    ...(col('totalBonusHours') ? [isEn ? 'Total bonus (h)' : 'Bonus celkem (h)'] : []),
+    ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']   : []),
+    ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']       : []),
+    ...(col('vacDays')        ? [isEn ? 'Vacation days used' : 'Dovolená čerpáno (dní)'] : []),
+  ].join(';');
 
   const csvRows = rows.map((r) =>
     [
       r.name,
-      LEGACY[r.employmentType] ?? r.employmentType,
-      r.source,
-      fmt(r.workedHours),
-      fmt(r.saturdayHours),
-      fmt(r.satBonusHours),
-      fmt(r.otBonusHours),
-      ...activeBenefits.map((b) => fmt(r.benefitHours[b.key] ?? 0)),
-      fmt(r.totalBonusHours),
-      fmt(r.targetHours),
-      fmt(r.delta),
-      String(r.vacDays),
+      ...(col('employmentType') ? [LEGACY[r.employmentType] ?? r.employmentType] : []),
+      ...(col('source')         ? [r.source]               : []),
+      ...(col('workedHours')    ? [fmt(r.workedHours)]      : []),
+      ...(col('saturdayHours')  ? [fmt(r.saturdayHours)]    : []),
+      ...(col('satBonusHours')  ? [fmt(r.satBonusHours)]    : []),
+      ...(col('otBonusHours')   ? [fmt(r.otBonusHours)]     : []),
+      ...(includeBenefits ? activeBenefits.map((b) => fmt(r.benefitHours[b.key] ?? 0)) : []),
+      ...(col('totalBonusHours') ? [fmt(r.totalBonusHours)] : []),
+      ...(col('targetHours')    ? [fmt(r.targetHours)]      : []),
+      ...(col('delta')          ? [fmt(r.delta)]            : []),
+      ...(col('vacDays')        ? [String(r.vacDays)]       : []),
     ].join(';')
   );
 

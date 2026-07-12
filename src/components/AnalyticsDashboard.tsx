@@ -108,6 +108,20 @@ function ChartShell({ title, badge, children, minH = 240 }: { title: string; bad
   );
 }
 
+const EXPORT_COLS = [
+  { key: 'employmentType', label: 'Pracovní poměr' },
+  { key: 'source',         label: 'Zdroj dat' },
+  { key: 'workedHours',   label: 'Odpracováno (h)' },
+  { key: 'saturdayHours', label: 'Z toho soboty (h)' },
+  { key: 'satBonusHours', label: 'Bonus soboty (h)' },
+  { key: 'otBonusHours',  label: 'Bonus přesčas (h)' },
+  { key: 'benefits',      label: 'Benefity (h)' },
+  { key: 'totalBonusHours', label: 'Bonus celkem (h)' },
+  { key: 'targetHours',   label: 'Fond hodin (h)' },
+  { key: 'delta',         label: 'Rozdíl (h)' },
+  { key: 'vacDays',       label: 'Dovolená čerpáno (dní)' },
+] as const;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label, unit = 'h' }: any) {
   if (!active || !payload?.length) return null;
@@ -141,6 +155,9 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   const [trendLoading, setTrendLoading] = useState(true);
   const [weekdayLoading, setWeekdayLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportEmpIds, setExportEmpIds] = useState<Set<string>>(new Set());
+  const [exportColKeys, setExportColKeys] = useState<Set<string>>(new Set<string>(EXPORT_COLS.map((c) => c.key)));
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [nameSearch, setNameSearch] = useState('');
   // allDepts: fetched once at mount from unfiltered response so dropdown always shows all options
@@ -252,10 +269,21 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   const [y, mo] = month.split('-').map(Number);
   const monthLabel = `${CZ_MONTHS[mo - 1]} ${y}`;
 
+  const openExportModal = () => {
+    setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)));
+    setExportColKeys(new Set<string>(EXPORT_COLS.map((c) => c.key)));
+    setShowExportModal(true);
+  };
+
   const handleExport = async () => {
     setExportLoading(true);
     try {
-      const res = await managerFetch(`/api/analytics/export?month=${month}&lang=${lang}`);
+      const emps = Array.from(exportEmpIds).join(',');
+      const cols = Array.from(exportColKeys).join(',');
+      const params = new URLSearchParams({ month, lang });
+      if (emps) params.set('employees', emps);
+      if (cols) params.set('cols', cols);
+      const res = await managerFetch(`/api/analytics/export?${params.toString()}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -263,6 +291,7 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
       a.download = `export-${month}${lang === 'en' ? '-en' : ''}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+      setShowExportModal(false);
     } catch { /* ignore */ }
     finally { setExportLoading(false); }
   };
@@ -322,14 +351,14 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
         </div>
 
         <button
-          onClick={handleExport}
-          disabled={exportLoading || loading}
+          onClick={openExportModal}
+          disabled={loading}
           className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          {exportLoading ? 'Generuji…' : 'Export CSV'}
+          Export CSV
         </button>
       </div>
 
@@ -666,6 +695,114 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
             </section>
           )}
         </>
+      )}
+
+      {/* ── Export Modal ── */}
+      {showExportModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowExportModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-base font-semibold text-slate-800">Export CSV</h2>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body — two columns */}
+            <div className="flex-1 overflow-auto p-6 grid grid-cols-2 gap-6">
+              {/* Employees */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">Zaměstnanci</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button onClick={() => setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)))} className="text-blue-600 hover:underline">Vše</button>
+                    <span className="text-slate-300">|</span>
+                    <button onClick={() => setExportEmpIds(new Set())} className="text-slate-400 hover:underline">Žádný</button>
+                  </div>
+                </div>
+                <div className="border border-slate-200 rounded-xl overflow-auto max-h-64 divide-y divide-slate-50">
+                  {(data?.stats ?? []).map((emp) => (
+                    <label key={emp.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={exportEmpIds.has(emp.id)}
+                        onChange={(e) => {
+                          const next = new Set(exportEmpIds);
+                          if (e.target.checked) next.add(emp.id); else next.delete(emp.id);
+                          setExportEmpIds(next);
+                        }}
+                        className="accent-blue-600 w-4 h-4 shrink-0"
+                      />
+                      <span className="text-sm text-slate-700 truncate">{emp.name}</span>
+                      {emp.department && <span className="text-xs text-slate-400 ml-auto shrink-0">{emp.department}</span>}
+                    </label>
+                  ))}
+                </div>
+                <span className="text-xs text-slate-400">{exportEmpIds.size} / {(data?.stats ?? []).length} vybráno</span>
+              </div>
+
+              {/* Columns */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">Sloupce</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button onClick={() => setExportColKeys(new Set<string>(EXPORT_COLS.map((c) => c.key)))} className="text-blue-600 hover:underline">Vše</button>
+                    <span className="text-slate-300">|</span>
+                    <button onClick={() => setExportColKeys(new Set())} className="text-slate-400 hover:underline">Žádný</button>
+                  </div>
+                </div>
+                <div className="border border-slate-200 rounded-xl overflow-auto max-h-64 divide-y divide-slate-50">
+                  {EXPORT_COLS.map((col) => (
+                    <label key={col.key} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={exportColKeys.has(col.key)}
+                        onChange={(e) => {
+                          const next = new Set(exportColKeys);
+                          if (e.target.checked) next.add(col.key); else next.delete(col.key);
+                          setExportColKeys(next);
+                        }}
+                        className="accent-blue-600 w-4 h-4 shrink-0"
+                      />
+                      <span className="text-sm text-slate-700">{col.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <span className="text-xs text-slate-400">{exportColKeys.size} / {EXPORT_COLS.length} vybráno</span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100">
+              <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
+                Zrušit
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exportLoading || exportEmpIds.size === 0 || exportColKeys.size === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
+              >
+                {exportLoading ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                )}
+                {exportLoading ? 'Generuji…' : 'Exportovat CSV'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
