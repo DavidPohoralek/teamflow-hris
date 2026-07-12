@@ -689,9 +689,15 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       {/* Check-out Screen */}
       {screen === 'checkout' && (
         <div className="w-full max-w-lg flex flex-col items-center gap-8">
-          <h1 className="text-4xl font-bold text-slate-100 text-center">
-            {t('Dobrý den', 'Hello')}, {employeeName}!
-          </h1>
+          <div className="text-center">
+            <div className="text-6xl mb-4">👋</div>
+            <h1 className="text-4xl font-bold text-slate-100">
+              {employeeName},
+            </h1>
+            <p className="text-2xl text-slate-300 mt-2">
+              {t('přejete si odejít?', 'would you like to clock out?')}
+            </p>
+          </div>
 
           {presence && (
             <div className="bg-slate-700 rounded-2xl p-6 w-full text-center space-y-2">
@@ -997,8 +1003,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       {/* Success Check-out Screen */}
       {screen === 'success-checkout' && (
         <div className="w-full max-w-md flex flex-col items-center gap-6 bg-emerald-600 rounded-3xl p-12">
-          <div className="text-8xl">✓</div>
-          <p className="text-3xl font-bold text-white text-center">{successMessage}</p>
+          <div className="text-8xl">👋</div>
+          <p className="text-3xl font-bold text-white text-center">
+            {t('Nashledanou', 'Goodbye')}, {employeeName}!
+          </p>
+          <p className="text-xl text-emerald-100 text-center">
+            {t('Hezký zbytek dne!', 'Have a great rest of your day!')}
+          </p>
+          <p className="text-emerald-200 text-base text-center">{successMessage}</p>
           <p className="text-emerald-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
         </div>
       )}
