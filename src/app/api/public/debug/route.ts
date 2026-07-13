@@ -1,15 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-// GET /api/public/debug?orgId=UUID  — diagnostika DB sloupců (dočasný endpoint)
+// GET /api/public/debug?orgId=UUID  — diagnostika DB sloupců + env vars
 export async function GET(req: NextRequest) {
   const orgId = new URL(req.url).searchParams.get('orgId');
-  if (!orgId) return NextResponse.json({ error: 'chybí orgId' }, { status: 400 });
 
-  const supabase = createClient(
-    (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // Env var diagnostic (no secret values exposed)
+  const envDiag = {
+    SUPABASE_URL: !!process.env.SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_URL_value: (process.env.SUPABASE_URL ?? '').slice(0, 30) || '(undefined)',
+    NEXT_PUBLIC_SUPABASE_URL_value: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').slice(0, 30) || '(undefined)',
+    SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  };
+
+  if (!orgId) return NextResponse.json({ env: envDiag });
+
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return NextResponse.json({ env: envDiag, error: 'missing url or key' }, { status: 500 });
+
+  const supabase = createClient(url, key);
 
   // Zkusit načíst jednoho zaměstnance se všemi sloupci
   const { data, error } = await supabase
