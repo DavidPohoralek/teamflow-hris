@@ -6,6 +6,9 @@ frontend:
         - npm ci
     build:
       commands:
+        - echo "SUPABASE_URL=$SUPABASE_URL" >> .env.production
+        - echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> .env.production
+        - echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
