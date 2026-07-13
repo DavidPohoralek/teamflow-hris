@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  AreaChart, Area, BarChart, Bar,
+  ComposedChart, AreaChart, Area, BarChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
@@ -50,6 +50,14 @@ interface WeekdayPoint {
   day: string;
   avgLateMin: number;
   sampleCount: number;
+}
+
+interface DailyPoint {
+  date: string;
+  dayLabel: string;
+  isWeekend: boolean;
+  plannedHours: number;
+  workedHours: number;
 }
 
 const CZ_MONTHS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
@@ -151,9 +159,11 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
   const [weekdayData, setWeekdayData] = useState<WeekdayPoint[]>([]);
+  const [dailyData, setDailyData] = useState<DailyPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendLoading, setTrendLoading] = useState(true);
   const [weekdayLoading, setWeekdayLoading] = useState(true);
+  const [dailyLoading, setDailyLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportEmpIds, setExportEmpIds] = useState<Set<string>>(new Set());
@@ -200,6 +210,17 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
     finally { setTrendLoading(false); }
   }, [month, selectedDept]);
 
+  // Fetch daily plan vs worked for current month
+  const fetchDaily = useCallback(async () => {
+    setDailyLoading(true);
+    try {
+      const dept = selectedDept !== '__all__' ? `&department=${encodeURIComponent(selectedDept)}` : '';
+      const res = await managerFetch(`/api/analytics/daily?month=${month}${dept}`);
+      if (res.ok) setDailyData(await res.json());
+    } catch { /* ignore */ }
+    finally { setDailyLoading(false); }
+  }, [month, selectedDept]);
+
   // Fetch weekday punctuality (server-side dept filter)
   const fetchWeekday = useCallback(async () => {
     setWeekdayLoading(true);
@@ -214,6 +235,7 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchTrend(); }, [fetchTrend]);
   useEffect(() => { fetchWeekday(); }, [fetchWeekday]);
+  useEffect(() => { fetchDaily(); }, [fetchDaily]);
 
   // Reset employee chips when dept changes
   useEffect(() => { setSelectedEmployees(new Set()); }, [selectedDept]);
@@ -412,46 +434,57 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
               sub={punctVals.length > 0 ? `${punctVals.length} měření` : undefined} />
           </div>
 
-          {/* ── Graf 1: Časový trend fondu (Area Chart) ── */}
+          {/* ── Graf 1: Denní přehled hodin (plán vs odpracováno) ── */}
           <ChartShell
-            title="Časový trend fondu hodin"
+            title="Denní přehled hodin"
             badge={
               <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1">
-                Posledních 12 měsíců · {selectedDept !== '__all__' ? selectedDept : 'vše'}
+                {monthLabel} · {selectedDept !== '__all__' ? selectedDept : 'vše'}
               </span>
             }
             minH={220}
           >
-            {trendLoading ? (
+            {dailyLoading ? (
               <div className="flex items-center justify-center h-[220px] text-slate-400 text-sm">Načítám…</div>
-            ) : trendData.length === 0 ? (
+            ) : dailyData.length === 0 ? (
               <div className="flex items-center justify-center h-[220px] text-slate-300 text-sm">Žádná data</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gTarget" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#e2e8f0" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#e2e8f0" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gWorked" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <ComposedChart data={dailyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                    <XAxis dataKey="monthLabel" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <XAxis
+                      dataKey="dayLabel"
+                      tick={{ fontSize: 10, fill: '#94a3b8' }}
+                      axisLine={false} tickLine={false}
+                      interval={1}
+                    />
                     <YAxis unit="h" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={44} />
                     <Tooltip content={<CustomTooltip unit="h" />} />
-                    <Area type="monotone" dataKey="targetHours" name="Fond" stroke="#cbd5e1" strokeWidth={1.5} fill="url(#gTarget)" dot={false} />
-                    <Area type="monotone" dataKey="workedHours" name="Odpracováno" stroke="#3b82f6" strokeWidth={2} fill="url(#gWorked)"
-                      dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#3b82f6' }} />
-                  </AreaChart>
+                    <Bar dataKey="workedHours" name="Odpracováno" radius={[3, 3, 0, 0]} maxBarSize={18}>
+                      {dailyData.map((d, i) => (
+                        <Cell key={i} fill={d.isWeekend ? '#bfdbfe' : '#3b82f6'} />
+                      ))}
+                    </Bar>
+                    <Line
+                      type="stepAfter"
+                      dataKey="plannedHours"
+                      name="Plán"
+                      stroke="#94a3b8"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#94a3b8' }}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
                 <div className="flex gap-5 mt-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-slate-300" />Fond (cíl)</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-blue-500" />Odpracováno</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-blue-200" />Sobota</span>
+                  <span className="flex items-center gap-1.5 ml-1">
+                    <svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3"/></svg>
+                    Plán
+                  </span>
                 </div>
               </>
             )}
