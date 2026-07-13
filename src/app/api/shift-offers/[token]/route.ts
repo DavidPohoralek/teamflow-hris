@@ -23,7 +23,7 @@ async function notifyManager(sb: SupabaseClient, offer: { org_id: string; employ
 // Public endpoint — no manager auth needed, only the token is the secret
 function getServiceSupabase() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 }

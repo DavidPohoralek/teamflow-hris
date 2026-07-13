@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   // Service role client bypasses RLS — safe only on server
   const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
