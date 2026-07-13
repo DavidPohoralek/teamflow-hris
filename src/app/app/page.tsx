@@ -130,8 +130,11 @@ export default function HomePage() {
   async function fetchOrg(showLoadingSpinner: boolean) {
     if (showLoadingSpinner) setLoading(true)
     try {
-      // Use authenticated endpoint — returns org for the logged-in user
-      const res = await fetch('/api/me/org')
+      // Try authenticated endpoint first; fall back to public (unauthenticated kiosk devices)
+      let res = await fetch('/api/me/org')
+      if (!res.ok) {
+        res = await fetch('/api/public/org')
+      }
       if (!res.ok) {
         setError('Systém není nastaven. Kontaktujte správce.')
         return
