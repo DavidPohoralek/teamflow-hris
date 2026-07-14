@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 function getServiceClient() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -8,16 +8,21 @@ function getServiceClient() {
   return createClient(url, key)
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const supabase = getServiceClient()
+    const slug = new URL(req.url).searchParams.get('slug')
 
-    const { data: org, error } = await supabase
-      .from('organizations')
-      .select('id, name')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .single()
+    let query = supabase.from('organizations').select('id, name')
+
+    if (slug) {
+      query = query.eq('slug', slug)
+    } else {
+      // No slug — refuse to guess; kiosk must always supply ?slug=
+      return NextResponse.json({ error: 'Parametr slug je povinný' }, { status: 400 })
+    }
+
+    const { data: org, error } = await query.single()
 
     if (error || !org) {
       return NextResponse.json({ error: 'Žádná organizace nenalezena' }, { status: 404 })

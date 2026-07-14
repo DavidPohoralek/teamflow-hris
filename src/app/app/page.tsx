@@ -133,7 +133,14 @@ export default function HomePage() {
       // Try authenticated endpoint first; fall back to public (unauthenticated kiosk devices)
       let res = await fetch('/api/me/org')
       if (!res.ok) {
-        res = await fetch('/api/public/org')
+        // Kiosk devices must supply ?org=slug in the URL so we know which org to load
+        const slug = new URLSearchParams(window.location.search).get('org')
+        if (!slug) {
+          setError('Zadejte URL s parametrem ?org=... (např. ?org=helveti). Kontaktujte správce.')
+          setLoading(false)
+          return
+        }
+        res = await fetch(`/api/public/org?slug=${encodeURIComponent(slug)}`)
       }
       if (!res.ok) {
         setError('Systém není nastaven. Kontaktujte správce.')
