@@ -20,6 +20,7 @@ interface WorkPlanEntry {
   workTypeColor: string | null;
   startTime: string | null;
   endTime: string | null;
+  isEvening?: boolean;
 }
 
 interface ScheduleDayMeta {
@@ -168,6 +169,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [note, setNote] = useState('');
+  const [isEvening, setIsEvening] = useState(false);
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -214,6 +216,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
             startTime: startTime || undefined,
             endTime: endTime || undefined,
             note: note || undefined,
+            isEvening,
           }),
         });
         const json = await res.json();
@@ -230,7 +233,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
         const res = await fetch('/api/public/schedule/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orgId, pin: usedPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined }),
+          body: JSON.stringify({ orgId, pin: usedPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined, isEvening }),
         });
         const json = await res.json();
         if (!res.ok) { setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.')); }
@@ -313,6 +316,13 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder={t('Volitelná poznámka…', 'Optional note…')} />
           </div>
+
+          {/* Evening flag */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400" />
+            <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
+          </label>
 
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
 
@@ -552,157 +562,7 @@ interface ClipboardEntry {
   endTime: string | null;
 }
 
-// ─── EveningCandidatesModal ───────────────────────────────────────────────────
-
-interface EveningCandidate {
-  id: string;
-  name: string;
-  tier: number;
-  targetHours: number;
-  monthlyHours: number;
-  scheduledToday: boolean;
-  todayShift: { start_time: string | null; end_time: string | null; work_type: string | null } | null;
-}
-
-function EveningCandidatesModal({
-  orgId, dateStr, eveningConfig, onClose, onSuccess,
-}: {
-  orgId: string;
-  dateStr: string;
-  eveningConfig: { enabled: boolean; start: string; end: string; minStaff: number; label: string };
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const t = useT();
-  const [candidates, setCandidates] = useState<EveningCandidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState<string | null>(null);
-  const [workTypes, setWorkTypes] = useState<{ id: string; name: string; color: string | null }[]>([]);
-  const [selectedWorkTypeId, setSelectedWorkTypeId] = useState('');
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      managerFetch(`/api/manager/evening-candidates?date=${dateStr}`).then((r) => r.json()),
-      fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`).then((r) => r.json()),
-    ])
-      .then(([candData, wtData]) => {
-        setCandidates(candData.candidates ?? []);
-        const wts = wtData.workTypes ?? [];
-        setWorkTypes(wts);
-        if (wts.length > 0) setSelectedWorkTypeId(wts[0].id);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [dateStr, orgId]);
-
-  const handleAdd = async (candidate: EveningCandidate) => {
-    if (!selectedWorkTypeId) return;
-    setAdding(candidate.id);
-    try {
-      const wt = workTypes.find((w) => w.id === selectedWorkTypeId);
-      await managerFetch('/api/work-plans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId,
-          employeeId: candidate.id,
-          date: dateStr,
-          workTypeId: selectedWorkTypeId,
-          workType: wt?.name ?? '',
-          startTime: eveningConfig.start,
-          endTime: eveningConfig.end,
-        }),
-      });
-      setCandidates((prev) => prev.filter((c) => c.id !== candidate.id));
-      onSuccess();
-    } catch { /* ignore */ }
-    finally { setAdding(null); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-semibold text-gray-800">
-              🌙 {t('Večerní směna', 'Evening shift')} — {eveningConfig.start}–{eveningConfig.end}
-            </h3>
-            <p className="text-xs text-gray-400 mt-0.5">{dateStr} · {t('Min.', 'Min.')} {eveningConfig.minStaff} {t('lidí', 'staff')}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-        </div>
-
-        {/* Work type selector */}
-        {workTypes.length > 0 && (
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-500 mb-1">{t('Typ práce', 'Work type')}</label>
-            <select
-              value={selectedWorkTypeId}
-              onChange={(e) => setSelectedWorkTypeId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-            >
-              {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
-            </select>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : candidates.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6 italic">
-            {t('Žádní dostupní kandidáti se štítkem', 'No available candidates with label')} &quot;{eveningConfig.label}&quot;
-          </p>
-        ) : (
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {candidates.map((c) => (
-              <div key={c.id} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${c.scheduledToday ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'}`}>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-800 truncate">{c.name}</span>
-                    {c.scheduledToday && (
-                      <span className="text-[9px] font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                        ✓ {t('dnes plánovaný', 'scheduled today')}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-2 mt-0.5 text-[10px] text-gray-400">
-                    {c.scheduledToday && c.todayShift?.start_time && (
-                      <span>
-                        {c.todayShift.start_time.slice(0,5)}–{c.todayShift.end_time?.slice(0,5) ?? '?'}
-                        {' → '}
-                        <span className="text-orange-500 font-medium">+{eveningConfig.end}</span>
-                      </span>
-                    )}
-                    <span>{c.monthlyHours}h / {c.targetHours}h {t('měsíc', 'month')}</span>
-                    {c.tier > 0 && <span>T{c.tier}</span>}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleAdd(c)}
-                  disabled={adding === c.id}
-                  className="ml-2 shrink-0 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
-                >
-                  {adding === c.id ? '…' : t('+ Přidat', '+ Add')}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface EveningConfig {
-  enabled: boolean;
-  start: string; // "17:00"
-  end: string;   // "19:00"
-  minStaff: number;
-  label: string;
-}
+// ─── DayCard ──────────────────────────────────────────────────────────────────
 
 interface DayCardProps {
   dateStr: string;
@@ -714,7 +574,6 @@ interface DayCardProps {
   clipboard: ClipboardEntry | null;
   sessionEmployeeId?: string;
   dayNamesShort: string[];
-  eveningConfig?: EveningConfig | null;
   orgId?: string;
   onClickDay?: (dateStr: string) => void;
   onEditDay?: (dateStr: string) => void;
@@ -737,7 +596,6 @@ function DayCard({
   clipboard,
   sessionEmployeeId,
   dayNamesShort,
-  eveningConfig,
   orgId,
   onClickDay,
   onEditDay,
@@ -874,6 +732,7 @@ function EntryChip({
   const name = entry.employeeName ?? '—';
   const parts = name.trim().split(/\s+/);
   const shortName = parts.length < 2 ? name : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+  const eveningMark = entry.isEvening ? ' 🌙' : '';
 
   return (
     <div
@@ -887,7 +746,7 @@ function EntryChip({
       onContextMenu={canEdit && onEditEntry ? (e) => { e.preventDefault(); e.stopPropagation(); onEditEntry(entry); } : undefined}
     >
       <span className="truncate min-w-0">
-        <span className="font-semibold">{shortName}</span>
+        <span className="font-semibold">{shortName}{eveningMark}</span>
         {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
       </span>
       {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
@@ -941,6 +800,7 @@ function EditShiftModal({
   const [workTypeId, setWorkTypeId] = useState(entry.workTypeId ?? '');
   const [startTime, setStartTime] = useState(entry.startTime?.slice(0, 5) ?? '');
   const [endTime, setEndTime] = useState(entry.endTime?.slice(0, 5) ?? '');
+  const [isEvening, setIsEvening] = useState(entry.isEvening ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -952,6 +812,7 @@ function EditShiftModal({
       if (workTypeId && workTypeId !== entry.workTypeId) body.workTypeId = workTypeId;
       body.startTime = startTime || null;
       body.endTime = endTime || null;
+      body.isEvening = isEvening;
       if (!isManagerMode && sessionPin) body.pin = sessionPin;
 
       const res = isManagerMode
@@ -998,6 +859,12 @@ function EditShiftModal({
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
           </div>
+          {/* Evening flag */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400" />
+            <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
+          </label>
         </div>
 
         {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
@@ -1254,8 +1121,6 @@ export default function WorkPlanGrid({
   // Closed days from company settings
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
-  // Evening shift config from company settings
-  const [eveningConfig, setEveningConfig] = useState<{ enabled: boolean; start: string; end: string; minStaff: number; label: string } | null>(null);
   // Employee PIN session — set once in header, unlocks actions
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string; targetHours?: number } | null>(null);
@@ -1318,7 +1183,7 @@ export default function WorkPlanGrid({
   // Shift-type filter (pills show unique work type names from current month's schedule)
   const [deptFilter, setDeptFilter] = useState<string | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
-  // Evening-only filter — show only shifts starting at/after eveningConfig.start
+  // Evening-only filter — show only shifts marked as is_evening
   const [eveningFilter, setEveningFilter] = useState(false);
 
   // Desktop view mode: month (default) or week
@@ -1446,15 +1311,6 @@ export default function WorkPlanGrid({
           if (key in s && !s[key]) closed.add(wd);
         }
         setClosedWeekdays(closed);
-        // Evening shift config
-        const enabled = s.evening_shift_enabled === true || s.evening_shift_enabled === 'true';
-        setEveningConfig({
-          enabled,
-          start: typeof s.evening_shift_start === 'string' && s.evening_shift_start ? s.evening_shift_start : '17:00',
-          end: typeof s.evening_shift_end === 'string' && s.evening_shift_end ? s.evening_shift_end : '19:00',
-          minStaff: Number(s.evening_shift_min_staff) || 2,
-          label: typeof s.evening_shift_label === 'string' && s.evening_shift_label ? s.evening_shift_label : 'Prodejna',
-        });
       })
       .catch(() => {});
   }, [orgId]);
@@ -1844,16 +1700,7 @@ export default function WorkPlanGrid({
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
                 if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
-                if (eveningFilter && eveningConfig?.enabled) {
-                  const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
-                  const eMin = toMin(eveningConfig.start ?? '17:00');
-                  es = es.filter((e) => {
-                    if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
-                    const startMin = e.startTime ? toMin(e.startTime) : null;
-                    const endMin = e.endTime ? toMin(e.endTime) : null;
-                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
-                  });
-                }
+                if (eveningFilter) es = es.filter((e) => e.isEvening === true);
                 return es;
               })();
               const dayLong = DAY_NAMES_LONG[wd];
@@ -2020,14 +1867,12 @@ export default function WorkPlanGrid({
                 {dept}
               </button>
             ))}
-            {eveningConfig?.enabled && (
-              <button
-                onClick={() => setEveningFilter(v => !v)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
-              >
-                🌙 {t('Večerní', 'Evening')}
-              </button>
-            )}
+            <button
+              onClick={() => setEveningFilter(v => !v)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+            >
+              🌙 {t('Večerní', 'Evening')}
+            </button>
           </div>
         )}
 
@@ -2284,16 +2129,7 @@ export default function WorkPlanGrid({
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
                 if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
-                if (eveningFilter && eveningConfig?.enabled) {
-                  const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
-                  const eMin = toMin(eveningConfig.start ?? '17:00');
-                  es = es.filter((e) => {
-                    if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
-                    const startMin = e.startTime ? toMin(e.startTime) : null;
-                    const endMin = e.endTime ? toMin(e.endTime) : null;
-                    return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
-                  });
-                }
+                if (eveningFilter) es = es.filter((e) => e.isEvening === true);
                 return es;
               })();
               return (
@@ -2308,7 +2144,6 @@ export default function WorkPlanGrid({
                   clipboard={clipboard}
                   sessionEmployeeId={sessionEmployee?.id}
                   dayNamesShort={DAY_NAMES_SHORT}
-                  eveningConfig={eveningConfig}
                   orgId={orgId}
                   onClickDay={handleClickDay}
                   onEditDay={isManagerMode ? setEditingDate : undefined}
@@ -2369,16 +2204,7 @@ export default function WorkPlanGrid({
                         ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                         : allEntries;
                       if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
-                      if (eveningFilter && eveningConfig?.enabled) {
-                        const toMin = (tv: string) => { const [h, m] = tv.split(':').map(Number); return h * 60 + (m || 0); };
-                        const eMin = toMin(eveningConfig.start ?? '17:00');
-                        es = es.filter((e) => {
-                          if (e.workTypeName === 'HomeOffice' || e.employeeDepartment === 'HomeOffice') return false;
-                          const startMin = e.startTime ? toMin(e.startTime) : null;
-                          const endMin = e.endTime ? toMin(e.endTime) : null;
-                          return (startMin !== null && startMin >= eMin) || (endMin !== null && endMin > eMin);
-                        });
-                      }
+                      if (eveningFilter) es = es.filter((e) => e.isEvening === true);
                       return es;
                     })();
                     return (
@@ -2393,7 +2219,6 @@ export default function WorkPlanGrid({
                         clipboard={clipboard}
                         sessionEmployeeId={sessionEmployee?.id}
                         dayNamesShort={DAY_NAMES_SHORT}
-                        eveningConfig={eveningConfig}
                         orgId={orgId}
                         onClickDay={handleClickDay}
                         onEditDay={isManagerMode ? setEditingDate : undefined}

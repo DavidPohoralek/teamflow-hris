@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     startTime?: string;
     endTime?: string;
     note?: string;
+    isEvening?: boolean;
   };
 
   try {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neplatné tělo požadavku.' }, { status: 400 });
   }
 
-  const { orgId, pin, date, workTypeId, startTime, endTime, note } = body;
+  const { orgId, pin, date, workTypeId, startTime, endTime, note, isEvening } = body;
 
   if (!orgId || !pin || !date || !workTypeId) {
     return NextResponse.json(
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
       start_time: startTime ?? null,
       end_time: endTime ?? null,
       note: note ?? null,
+      is_evening: isEvening ?? false,
       active: true,
     });
 

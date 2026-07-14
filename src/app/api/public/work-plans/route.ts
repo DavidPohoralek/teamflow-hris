@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('work_plans')
-    .select('id, date, start_time, end_time, work_type')
+    .select('id, date, start_time, end_time, work_type, is_evening')
     .eq('organization_id', orgId)
     .eq('employee_id', employeeId)
     .eq('active', true)
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     startTime?: string
     endTime?: string
     note?: string
+    isEvening?: boolean
   }
   try {
     body = await req.json()
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neplatné tělo požadavku.' }, { status: 400 })
   }
 
-  const { orgId, employeeId, workTypeId, date, startTime, endTime, note } = body
+  const { orgId, employeeId, workTypeId, date, startTime, endTime, note, isEvening } = body
 
   if (!orgId || !employeeId || !workTypeId || !date) {
     return NextResponse.json({ error: 'Chybí povinné parametry.' }, { status: 400 })
@@ -131,6 +132,7 @@ export async function POST(req: NextRequest) {
       start_time: startTime ?? null,
       end_time: endTime ?? null,
       note: note ?? null,
+      is_evening: isEvening ?? false,
       active: true,
     })
     .select('id')
@@ -234,11 +236,12 @@ export async function PATCH(req: NextRequest) {
     startTime?: string | null
     endTime?: string | null
     pin?: string
+    isEvening?: boolean
   }
   try { body = await req.json() }
   catch { return NextResponse.json({ error: 'Neplatné tělo.' }, { status: 400 }) }
 
-  const { orgId, workPlanId, workTypeId, startTime, endTime, pin } = body
+  const { orgId, workPlanId, workTypeId, startTime, endTime, pin, isEvening } = body
   if (!orgId || !workPlanId) return NextResponse.json({ error: 'Chybí parametry.' }, { status: 400 })
 
   const supabase = getServiceClient()
@@ -272,6 +275,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (startTime !== undefined) update.start_time = startTime ?? null
   if (endTime !== undefined) update.end_time = endTime ?? null
+  if (isEvening !== undefined) update.is_evening = isEvening
 
   if (!Object.keys(update).length)
     return NextResponse.json({ error: 'Nic ke změně.' }, { status: 400 })
