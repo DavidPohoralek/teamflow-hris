@@ -133,10 +133,12 @@ export default function HomePage() {
       // Try authenticated endpoint first; fall back to public (unauthenticated kiosk devices)
       let res = await fetch('/api/me/org')
       if (!res.ok) {
-        // Check for kiosk mode (?org=slug in URL)
-        const slug = new URLSearchParams(window.location.search).get('org')
+        // Try ?org= URL param, then localStorage (set when manager logged in)
+        const slug =
+          new URLSearchParams(window.location.search).get('org') ??
+          (() => { try { return localStorage.getItem('hris_org_slug') } catch { return null } })()
         if (!slug) {
-          // Not authenticated and not a kiosk URL → send to login
+          // Device was never set up by a manager → send to login
           window.location.href = '/login'
           return
         }
@@ -146,7 +148,11 @@ export default function HomePage() {
         setError('Systém není nastaven. Kontaktujte správce.')
         return
       }
-      const data = (await res.json()) as { id: string; name: string }
+      const data = (await res.json()) as { id: string; name: string; slug?: string }
+      // Remember which org this device belongs to (set by manager login)
+      if (data.slug) {
+        try { localStorage.setItem('hris_org_slug', data.slug) } catch { /* ignore */ }
+      }
       setOrgId(data.id)
       setOrgName(data.name)
 
