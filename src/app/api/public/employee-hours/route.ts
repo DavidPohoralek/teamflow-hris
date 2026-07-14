@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
       .select('id, name, active, department, vacation_days_per_year')
       .eq('organization_id', orgId)
       .eq('active', true)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .maybeSingle()
 
     if (empError || !employee) {

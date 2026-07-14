@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       .select('id')
       .eq('organization_id', orgId)
       .eq('active', true)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .maybeSingle();
 
     if (empError) {
@@ -124,7 +124,7 @@ export async function DELETE(req: NextRequest) {
       .select('id')
       .eq('organization_id', orgId)
       .eq('active', true)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .maybeSingle();
 
     if (empError || !employee) {
@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
       .select('id')
       .eq('organization_id', orgId)
       .eq('active', true)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .maybeSingle();
 
     if (empError) {

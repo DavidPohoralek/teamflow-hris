@@ -166,7 +166,7 @@ export async function DELETE(req: NextRequest) {
       .from('employees')
       .select('id')
       .eq('organization_id', orgId)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .eq('active', true)
       .maybeSingle()
 
@@ -252,7 +252,7 @@ export async function PATCH(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: emp } = await (supabase as any)
       .from('employees').select('id').eq('organization_id', orgId)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`).eq('active', true).maybeSingle()
+      .eq('pin_code', pin).eq('active', true).maybeSingle()
     if (!emp) return NextResponse.json({ error: 'Neplatný PIN.' }, { status: 401 })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: plan } = await (supabase as any)

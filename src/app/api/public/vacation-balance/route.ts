@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     .select('id, name, vacation_days_per_year, employment_type')
     .eq('organization_id', orgId)
     .eq('active', true)
-    .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+    .eq('pin_code', pin)
     .maybeSingle();
 
   if (!employee) {

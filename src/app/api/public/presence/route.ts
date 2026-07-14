@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       .from('employees')
       .select('id, name, active, department, target_hours')
       .eq('organization_id', orgId)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .eq('active', true)
       .maybeSingle();
 

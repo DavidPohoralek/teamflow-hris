@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       .from('employees')
       .select('id, is_manager, managed_departments, manager_permissions')
       .eq('organization_id', orgId)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .eq('active', true)
       .eq('is_manager', true)
       .maybeSingle()

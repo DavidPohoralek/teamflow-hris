@@ -14,7 +14,7 @@ async function resolveEmployee(supabase: ReturnType<typeof getServiceClient>, or
     .select('id')
     .eq('organization_id', orgId)
     .eq('active', true)
-    .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+    .eq('pin_code', pin)
     .maybeSingle()
   if (error || !data) return null
   return data

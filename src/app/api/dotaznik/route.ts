@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     .from('employees')
     .select('id, name')
     .eq('organization_id', orgId)
-    .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+    .eq('pin_code', pin)
     .neq('id', employee.id)
     .maybeSingle();
 
