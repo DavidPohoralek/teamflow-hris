@@ -96,7 +96,6 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
 
   const handleSelectLog = (log: LogEntry) => {
     if (linkedLog?.id === log.id) {
-      // Deselect → back to full correction
       setLinkedLog(null);
       setCorrectionField('both');
       setTimeIn('');
@@ -106,20 +105,19 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
     setLinkedLog(log);
     setTimeIn('');
     setTimeOut('');
-    if (log.check_in && !log.check_out) {
-      // Most common: forgot to clock out → only ask for Odchod
-      setCorrectionField('check_out');
-    } else if (!log.check_in) {
+    if (!log.check_in) {
       setCorrectionField('check_in');
     } else {
-      // Both present — user picks which to correct; default to both
+      // Default to 'both' so user can pick; for open sessions check_out field stays empty
       setCorrectionField('both');
     }
   };
 
+  const openSession = !!(linkedLog?.check_in && !linkedLog?.check_out);
   const correctionValid =
     correctionField === 'check_in' ? !!timeIn
     : correctionField === 'check_out' ? !!timeOut
+    : openSession ? !!(timeIn || timeOut)   // open session: aspoň jeden čas stačí
     : !!(timeIn && timeOut);
 
   // Convert local HH:MM time on a given date to UTC ISO string so the server
@@ -248,7 +246,8 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
               required
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm"
+              onClick={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch { /* unsupported */ } }}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm cursor-pointer"
             />
           </div>
 
@@ -321,8 +320,8 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                 </div>
               )}
 
-              {/* Field selector — only shown when linked log has both times */}
-              {linkedLog && linkedLog.check_in && linkedLog.check_out && (
+              {/* Field selector — shown whenever a log is selected */}
+              {linkedLog && linkedLog.check_in && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Co chcete opravit?</label>
                   <div className="flex gap-2">
@@ -408,7 +407,8 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                 value={dateTo}
                 min={dateFrom}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm"
+                onClick={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch { /* unsupported */ } }}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm cursor-pointer"
               />
             </div>
           )}
