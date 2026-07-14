@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const supabase = getServiceClient()
     const slug = new URL(req.url).searchParams.get('slug')
 
-    let query = supabase.from('organizations').select('id, name')
+    let query = supabase.from('organizations').select('id, name, slug')
 
     if (slug) {
       query = query.eq('slug', slug)
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Žádná organizace nenalezena' }, { status: 404 })
     }
 
-    return NextResponse.json({ id: org.id, name: org.name })
+    return NextResponse.json({ id: org.id, name: org.name, slug: org.slug ?? null })
   } catch (err) {
     console.error('GET /api/public/org error:', err)
     return NextResponse.json({ error: 'Interní chyba serveru' }, { status: 500 })

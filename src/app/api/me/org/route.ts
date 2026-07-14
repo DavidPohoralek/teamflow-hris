@@ -27,7 +27,7 @@ export async function GET() {
 
   const { data: org } = await admin
     .from('organizations')
-    .select('id, name')
+    .select('id, name, slug')
     .eq('id', profile.organization_id)
     .single();
 
@@ -35,5 +35,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Organizace nenalezena.' }, { status: 404 });
   }
 
-  return NextResponse.json({ id: org.id, name: org.name });
+  return NextResponse.json({ id: org.id, name: org.name, slug: (org as any).slug ?? null });
 }

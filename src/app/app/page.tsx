@@ -133,8 +133,10 @@ export default function HomePage() {
       // Try authenticated endpoint first; fall back to public (unauthenticated kiosk devices)
       let res = await fetch('/api/me/org')
       if (!res.ok) {
-        // Kiosk devices must supply ?org=slug in the URL so we know which org to load
-        const slug = new URLSearchParams(window.location.search).get('org')
+        // Prefer explicit ?org= param, then localStorage cache, then error
+        const slug =
+          new URLSearchParams(window.location.search).get('org') ??
+          (() => { try { return localStorage.getItem('hris_org_slug') } catch { return null } })()
         if (!slug) {
           setError('Zadejte URL s parametrem ?org=... (např. ?org=helveti). Kontaktujte správce.')
           setLoading(false)
@@ -146,7 +148,11 @@ export default function HomePage() {
         setError('Systém není nastaven. Kontaktujte správce.')
         return
       }
-      const data = (await res.json()) as { id: string; name: string }
+      const data = (await res.json()) as { id: string; name: string; slug?: string }
+      // Cache the org slug so kiosk devices remember it across sessions
+      if (data.slug) {
+        try { localStorage.setItem('hris_org_slug', data.slug) } catch { /* ignore */ }
+      }
       setOrgId(data.id)
       setOrgName(data.name)
 
