@@ -143,6 +143,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [hoFormWorkTypeId, setHoFormWorkTypeId] = useState('');
   const [hoFormWorkTypeName, setHoFormWorkTypeName] = useState('');
 
+  // Check-in correction (submitted while still checked in, before checkout)
+  const [showCheckinCorrection, setShowCheckinCorrection] = useState(false);
+  const [correctionTimeIn, setCorrectionTimeIn] = useState('');
+  const [correctionNote, setCorrectionNote] = useState('');
+  const [correctionLoading, setCorrectionLoading] = useState(false);
+  const [correctionSuccess, setCorrectionSuccess] = useState(false);
+
   // HO Stopwatch — persisted in localStorage so kiosk can be shared while timer runs
   const [hoSw, setHoSw] = useState<HoStopwatchData | null>(null);
   const [hoSwDisplay, setHoSwDisplay] = useState('00:00:00');
@@ -205,6 +212,10 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setPinError(false);
       setHoLogId(null);
       setHoNote('');
+      setShowCheckinCorrection(false);
+      setCorrectionTimeIn('');
+      setCorrectionNote('');
+      setCorrectionSuccess(false);
       setHoFormDate('');
       setHoFormStart('');
       setHoFormEnd('');
@@ -350,6 +361,38 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       resetKiosk();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCheckinCorrectionSubmit = async () => {
+    if (!correctionTimeIn) return;
+    setCorrectionLoading(true);
+    try {
+      const today = localDateStr(0);
+      await fetch('/api/public/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId,
+          pin,
+          type: 'correction',
+          dateFrom: today,
+          correctionField: 'check_in',
+          timeIn: `${today}T${correctionTimeIn}:00`,
+          note: correctionNote.trim() || undefined,
+        }),
+      });
+      setCorrectionSuccess(true);
+      setCorrectionNote('');
+      setTimeout(() => {
+        setShowCheckinCorrection(false);
+        setCorrectionSuccess(false);
+        setCorrectionTimeIn('');
+      }, 2500);
+    } catch {
+      // fail silently — the employee can still check out
+    } finally {
+      setCorrectionLoading(false);
     }
   };
 
@@ -707,6 +750,70 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               </p>
               {presence.workTypeName && (
                 <p className="text-slate-300 text-xl">({presence.workTypeName})</p>
+              )}
+            </div>
+          )}
+
+          {/* Check-in correction — inline form */}
+          {!showCheckinCorrection ? (
+            <button
+              onClick={() => {
+                setShowCheckinCorrection(true);
+                setCorrectionSuccess(false);
+                setCorrectionTimeIn('');
+                setCorrectionNote('');
+              }}
+              className="text-slate-400 hover:text-slate-200 text-sm underline underline-offset-2 transition-colors"
+            >
+              ✏️ {t('Opravit čas příchodu', 'Correct arrival time')}
+            </button>
+          ) : (
+            <div className="w-full bg-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+              {correctionSuccess ? (
+                <p className="text-emerald-400 font-semibold text-center text-lg">
+                  ✓ {t('Žádost o opravu odeslána', 'Correction request sent')}
+                </p>
+              ) : (
+                <>
+                  <p className="text-slate-300 font-semibold text-base">
+                    ✏️ {t('Oprava času příchodu', 'Arrival time correction')}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-sm">{t('Správný čas příchodu', 'Correct arrival time')}</label>
+                    <input
+                      type="time"
+                      value={correctionTimeIn}
+                      onChange={(e) => setCorrectionTimeIn(e.target.value)}
+                      className="bg-slate-700 text-white rounded-xl px-4 py-3 text-xl font-mono outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-sm">{t('Poznámka (volitelné)', 'Note (optional)')}</label>
+                    <input
+                      type="text"
+                      value={correctionNote}
+                      onChange={(e) => setCorrectionNote(e.target.value)}
+                      placeholder={t('Např. zapomněl/a jsem přijít', 'E.g. forgot to clock in')}
+                      className="bg-slate-700 text-white rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowCheckinCorrection(false)}
+                      className="flex-1 min-h-[48px] bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all"
+                    >
+                      {t('Zrušit', 'Cancel')}
+                    </button>
+                    <button
+                      onClick={handleCheckinCorrectionSubmit}
+                      disabled={!correctionTimeIn || correctionLoading}
+                      className="flex-[2] min-h-[48px] bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {correctionLoading && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      {t('Odeslat žádost', 'Send request')}
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}
