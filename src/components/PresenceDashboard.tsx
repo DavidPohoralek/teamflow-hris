@@ -130,7 +130,7 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
   };
 
   useEffect(() => {
-    fetch(`/api/work-types?orgId=${encodeURIComponent(orgId)}`)
+    fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((json) => setWorkTypes((json.workTypes ?? []).map((wt: any) => ({ name: wt.name, color: wt.color ?? '#94a3b8', sort_order: wt.sort_order ?? 0 }))))
