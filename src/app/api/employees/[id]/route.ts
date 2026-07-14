@@ -98,9 +98,7 @@ export async function PUT(
   if (profile_id !== undefined)
     update.profile_id = typeof profile_id === 'string' ? profile_id : null;
   if (pin !== undefined) {
-    const pinVal = typeof pin === 'string' ? pin.trim() || null : null;
-    update.pin_code = pinVal;
-    update.pin = pinVal;
+    update.pin_code = typeof pin === 'string' ? pin.trim() || null : null;
   }
   if (vacation_days_per_year !== undefined)
     update.vacation_days_per_year = typeof vacation_days_per_year === 'number' ? vacation_days_per_year : 20;

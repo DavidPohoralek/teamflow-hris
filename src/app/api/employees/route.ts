@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
     target_hours: typeof target_hours === 'number' ? target_hours : 160,
     profile_id: typeof profile_id === 'string' ? profile_id : null,
     pin_code: typeof pin === 'string' ? pin.trim() || null : null,
-    pin: typeof pin === 'string' ? pin.trim() || null : null,
     vacation_days_per_year: typeof vacation_days_per_year === 'number' ? vacation_days_per_year : 20,
     employment_type: typeof employment_type === 'string' ? employment_type : 'hpp',
     is_manager: typeof is_manager === 'boolean' ? is_manager : false,

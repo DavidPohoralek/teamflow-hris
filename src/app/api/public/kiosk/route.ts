@@ -29,13 +29,13 @@ export async function POST(req: NextRequest) {
 
     const supabase = getServiceClient()
 
-    // Find employee by pin + org (active only — avoids .single() failing on duplicate PINs across active/inactive rows)
+    // Find employee by pin_code + org (active only)
     const { data: employee, error: empError } = await supabase
       .from('employees')
       .select('id, name, active')
       .eq('organization_id', orgId)
       .eq('active', true)
-      .or(`pin_code.eq.${pin},pin.eq.${pin}`)
+      .eq('pin_code', pin)
       .maybeSingle()
 
     if (empError || !employee) {
