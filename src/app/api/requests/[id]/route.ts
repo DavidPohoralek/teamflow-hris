@@ -195,32 +195,49 @@ export async function PUT(
         }
       }
     } else if (timeIn || timeOut) {
-      // No linked log — try to find the single existing log for this date and UPDATE it.
-      // Only fall back to INSERT when no log exists (avoids duplicate records).
+      // No linked log — resolve which log to update.
+      // For check_in corrections (from kiosk): prefer the open session (check_out IS NULL).
+      // For check_out or both: use the most recent log.
+      // Only fall back to INSERT when no log exists.
       const { data: existingLogs } = await svc
         .from('attendance_logs')
-        .select('id')
+        .select('id, check_out')
         .eq('organization_id', orgId)
         .eq('employee_id', existing.employee_id)
-        .eq('date', date);
+        .eq('date', date)
+        .order('check_in', { ascending: false });
 
       const logs = existingLogs ?? [];
+
+      let targetLogId: string | null = null;
       if (logs.length === 1) {
-        // Exactly one log → safe to update it
+        targetLogId = logs[0].id;
+      } else if (logs.length > 1) {
+        if (correctionField === 'check_in') {
+          // Pick the open session (check_out IS NULL), else most recent
+          const open = logs.find((l) => !l.check_out);
+          targetLogId = (open ?? logs[0]).id;
+        } else {
+          // check_out or both — most recent log
+          targetLogId = logs[0].id;
+        }
+      }
+
+      if (targetLogId) {
         const patch: Record<string, string | null> = {};
         if (timeIn) patch.check_in = toTimestamp(timeIn);
         if (timeOut) patch.check_out = toTimestamp(timeOut);
         const { error: logError } = await svc
           .from('attendance_logs')
           .update(patch)
-          .eq('id', logs[0].id)
+          .eq('id', targetLogId)
           .eq('organization_id', orgId)
           .eq('employee_id', existing.employee_id);
         if (logError) {
           console.error('Correction attendance_log update (no linkedId) error:', logError.message, logError);
         }
       } else if (timeIn && timeOut) {
-        // 0 or 2+ logs — insert a new complete record as fallback
+        // 0 logs — insert a new complete record
         const { error: logError } = await svc.from('attendance_logs').insert({
           organization_id: orgId,
           employee_id: existing.employee_id,

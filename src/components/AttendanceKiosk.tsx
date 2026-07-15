@@ -378,7 +378,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           type: 'correction',
           dateFrom: today,
           correctionField: 'check_in',
-          timeIn: `${today}T${correctionTimeIn}:00`,
+          timeIn: new Date(`${today}T${correctionTimeIn}:00`).toISOString(),
           note: correctionNote.trim() || undefined,
         }),
       });
