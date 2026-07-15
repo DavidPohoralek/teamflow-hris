@@ -1022,6 +1022,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   const days = req.date_to
                     ? Math.round((new Date(req.date_to + 'T00:00:00').getTime() - new Date(req.date_from + 'T00:00:00').getTime()) / 86400000) + 1
                     : 1;
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const isPast = req.date_from < todayStr;
                   return (
                     <div key={req.id} className="flex items-center gap-4 px-4 sm:px-5 py-3.5 hover:bg-slate-50 transition-colors">
                       <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 text-base">
@@ -1031,7 +1033,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                         <p className="text-sm font-semibold text-slate-800">{from}{to ? ` — ${to}` : ''}</p>
                         <p className="text-xs text-slate-400 mt-0.5">{days} {days === 1 ? t('den', 'day') : days < 5 ? t('dny', 'days') : t('dní', 'days')}</p>
                       </div>
-                      {(req.status === 'pending' || req.status === 'approved') && (
+                      {!isPast && (req.status === 'pending' || req.status === 'approved') && (
                         <button
                           onClick={() => handleDeleteRequest(req.id)}
                           disabled={deletingId === req.id}

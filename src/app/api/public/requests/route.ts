@@ -134,7 +134,7 @@ export async function DELETE(req: NextRequest) {
     // Verify the request belongs to this employee
     const { data: existing } = await supabase
       .from('requests')
-      .select('id, status')
+      .select('id, status, date_from')
       .eq('id', requestId)
       .eq('employee_id', employee.id)
       .eq('organization_id', orgId)
@@ -142,6 +142,15 @@ export async function DELETE(req: NextRequest) {
 
     if (!existing) {
       return NextResponse.json({ error: 'Žádost nebyla nalezena.' }, { status: 404 });
+    }
+
+    // Block deletion of requests whose start date is in the past
+    const today = new Date().toISOString().slice(0, 10);
+    if (existing.date_from && existing.date_from < today) {
+      return NextResponse.json(
+        { error: 'Proběhlé žádosti nelze smazat.' },
+        { status: 403 }
+      );
     }
 
     const { error: deleteError } = await supabase
