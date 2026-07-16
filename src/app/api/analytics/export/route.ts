@@ -125,6 +125,16 @@ export async function GET(req: NextRequest) {
 
     const totalBonusHours = Math.round((satBonusHours + otBonusHours + totalBenefitHours) * 100) / 100;
 
+    // Final billable total: worked + bonuses + blood − gym − english
+    const finalHours = Math.round((
+      workedHours
+      + satBonusHours
+      + otBonusHours
+      + (benefitHours['blood'] ?? 0)
+      - (benefitHours['gym'] ?? 0)
+      - (benefitHours['english'] ?? 0)
+    ) * 100) / 100;
+
     return {
       name: emp.name,
       employmentType: emp.employment_type ?? '',
@@ -136,6 +146,7 @@ export async function GET(req: NextRequest) {
       benefitHours,
       totalBenefitHours,
       totalBonusHours,
+      finalHours,
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
       vacDays: countVacDays(emp.id),
@@ -163,6 +174,7 @@ export async function GET(req: NextRequest) {
     ...(col('otBonusHours')   ? [isEn ? 'Overtime bonus (h)' : 'Bonus přesčas (h)'] : []),
     ...benefitHeaders,
     ...(col('totalBonusHours') ? [isEn ? 'Total bonus (h)' : 'Bonus celkem (h)'] : []),
+    ...(col('finalHours')     ? [isEn ? 'Final total (h)' : 'Výsledek (h)']     : []),
     ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']   : []),
     ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']       : []),
     ...(col('vacDays')        ? [isEn ? 'Vacation days used' : 'Dovolená čerpáno (dní)'] : []),
@@ -179,6 +191,7 @@ export async function GET(req: NextRequest) {
       ...(col('otBonusHours')   ? [fmt(r.otBonusHours)]     : []),
       ...(includeBenefits ? activeBenefits.map((b) => fmt(r.benefitHours[b.key] ?? 0)) : []),
       ...(col('totalBonusHours') ? [fmt(r.totalBonusHours)] : []),
+      ...(col('finalHours')     ? [fmt(r.finalHours)]       : []),
       ...(col('targetHours')    ? [fmt(r.targetHours)]      : []),
       ...(col('delta')          ? [fmt(r.delta)]            : []),
       ...(col('vacDays')        ? [String(r.vacDays)]       : []),

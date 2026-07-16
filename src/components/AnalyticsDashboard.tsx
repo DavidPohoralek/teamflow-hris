@@ -125,6 +125,7 @@ const EXPORT_COLS = [
   { key: 'otBonusHours',  label: 'Bonus přesčas (h)' },
   { key: 'benefits',      label: 'Benefity (h)' },
   { key: 'totalBonusHours', label: 'Bonus celkem (h)' },
+  { key: 'finalHours',    label: 'Výsledek (h)' },
   { key: 'targetHours',   label: 'Fond hodin (h)' },
   { key: 'delta',         label: 'Rozdíl (h)' },
   { key: 'vacDays',       label: 'Dovolená čerpáno (dní)' },
