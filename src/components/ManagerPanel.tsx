@@ -337,7 +337,7 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice'>(initialTab ?? 'employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice' | 'benefits'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showTour, setShowTour] = useState(false);
@@ -361,6 +361,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
     ...(isAdmin ? [{ id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' }] : []),
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
     { id: 'homeoffice' as const, label: t('HomeOffice', 'Home Office'), icon: '🏠' },
+    { id: 'benefits' as const, label: t('Benefity', 'Benefits'), icon: '🏋️' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     ...(isAdmin ? [{ id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' }] : []),
   ];
@@ -457,6 +458,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
           {activeTab === 'work-types' && isAdmin && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
+          {activeTab === 'benefits' && <BenefitEntriesTab orgId={orgId} />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && isAdmin && <SettingsTab />}
         </div>
@@ -1993,6 +1995,162 @@ function fmtDuration(mins: number | null): string {
 }
 
 const NOTE_LIMIT = 90;
+
+// ─── Benefit Entries Tab ──────────────────────────────────────────────────────
+
+const BENEFIT_ICONS: Record<string, string> = { blood: '🩸', english: '🇬🇧', gym: '🏋️' };
+const BENEFIT_LABELS: Record<string, string> = { blood: 'Darování krve', english: 'Angličtina', gym: 'Cvičení' };
+
+interface BenefitEntry {
+  id: string;
+  benefit_key: string;
+  date: string;
+  created_at: string;
+  employees: { id: string; name: string; department: string | null } | null;
+}
+
+function BenefitEntriesTab({ orgId }: { orgId: string }) {
+  const t = useT();
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [entries, setEntries] = useState<BenefitEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [filterKey, setFilterKey] = useState<string>('all');
+
+  const prevMonth = (m: string) => {
+    const [y, mo] = m.split('-').map(Number);
+    return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
+  };
+  const nextMonth = (m: string) => {
+    const [y, mo] = m.split('-').map(Number);
+    return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
+  };
+  const monthLabel = (m: string) => {
+    const [y, mo] = m.split('-').map(Number);
+    const CZ = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+    return `${CZ[mo - 1]} ${y}`;
+  };
+
+  const load = async (m: string) => {
+    setLoading(true);
+    try {
+      const res = await managerFetch(`/api/manager/benefit-entries?month=${m}`);
+      if (res.ok) {
+        const json = await res.json();
+        setEntries(json.entries ?? []);
+      }
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(month); }, [month]);
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const res = await managerFetch(`/api/manager/benefit-entries?entryId=${id}`, { method: 'DELETE' });
+      if (res.ok) setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
+  };
+
+  // Count per employee per benefit key for the selected month
+  const summary: Record<string, Record<string, number>> = {};
+  for (const e of entries) {
+    const name = e.employees?.name ?? '—';
+    if (!summary[name]) summary[name] = {};
+    summary[name][e.benefit_key] = (summary[name][e.benefit_key] ?? 0) + 1;
+  }
+
+  const benefitKeys = Array.from(new Set(entries.map((e) => e.benefit_key))).sort();
+  const filtered = filterKey === 'all' ? entries : entries.filter((e) => e.benefit_key === filterKey);
+
+  return (
+    <div className="p-6 space-y-5">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
+          <button onClick={() => setMonth(prevMonth(month))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+          </button>
+          <span className="text-sm font-semibold text-slate-800 min-w-[140px] text-center">{monthLabel(month)}</span>
+          <button onClick={() => setMonth(nextMonth(month))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+          </button>
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', ...benefitKeys].map((k) => (
+            <button key={k} onClick={() => setFilterKey(k)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
+              {k === 'all' ? t('Vše', 'All') : `${BENEFIT_ICONS[k] ?? ''} ${t(BENEFIT_LABELS[k] ?? k, BENEFIT_LABELS[k] ?? k)}`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      {Object.keys(summary).length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {Object.entries(summary).sort(([a], [b]) => a.localeCompare(b, 'cs')).map(([name, counts]) => (
+            <div key={name} className="bg-white rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-semibold text-slate-700 truncate mb-1.5">{name}</p>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(counts).map(([k, n]) => (
+                  <span key={k} className="inline-flex items-center gap-0.5 text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                    {BENEFIT_ICONS[k] ?? ''} {n}×
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Entries list */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <span className="text-sm font-semibold text-slate-700">{t('Záznamy', 'Entries')}</span>
+          {loading && <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />}
+          <span className="text-xs text-slate-400">{filtered.length} {t('záznamů', 'records')}</span>
+        </div>
+        {filtered.length === 0 && !loading ? (
+          <p className="text-sm text-slate-400 text-center py-8">{t('Žádné záznamy.', 'No entries.')}</p>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {filtered.map((e) => (
+              <div key={e.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                <span className="text-lg shrink-0">{BENEFIT_ICONS[e.benefit_key] ?? '📌'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{e.employees?.name ?? '—'}</p>
+                  <p className="text-xs text-slate-400">{e.employees?.department ?? ''}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-medium text-slate-700">
+                    {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </p>
+                  <p className="text-xs text-slate-400">{t(BENEFIT_LABELS[e.benefit_key] ?? e.benefit_key, BENEFIT_LABELS[e.benefit_key] ?? e.benefit_key)}</p>
+                </div>
+                <button
+                  onClick={() => handleDelete(e.id)}
+                  disabled={deletingId === e.id}
+                  className="shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  title={t('Smazat záznam', 'Delete entry')}
+                >
+                  {deletingId === e.id
+                    ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+                  }
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function HomeOfficeTab() {
   const t = useT();

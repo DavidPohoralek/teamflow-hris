@@ -103,6 +103,8 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [benefitCounts, setBenefitCounts] = useState<Record<string, number>>({});
   const [benefitSaving, setBenefitSaving] = useState<string | null>(null);
+  const [benefitEntries, setBenefitEntries] = useState<{ id: string; benefit_key: string; date: string }[]>([]);
+  const [deletingBenefitId, setDeletingBenefitId] = useState<string | null>(null);
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   // Bottom tab: 'logs' | 'requests'
   const [activeTab, setActiveTab] = useState<'logs' | 'requests'>('logs');
@@ -168,6 +170,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
         fetchRequests(enteredPin);
         if (normalized.thisMonth.monthKey) {
           fetchBenefitCounts(enteredPin, normalized.thisMonth.monthKey);
+          fetchBenefitEntries(enteredPin, normalized.thisMonth.monthKey);
         }
       } else if (res.status === 401 || res.status === 404) {
         setError('Nesprávný PIN. Zkuste to znovu.');
@@ -201,6 +204,49 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     } finally {
       setRequestsLoading(false);
     }
+  };
+
+  const fetchBenefitEntries = async (currentPin: string, month: string) => {
+    try {
+      const res = await fetch(`/api/public/benefit-entries?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(currentPin)}&month=${encodeURIComponent(month)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setBenefitEntries(json.entries ?? []);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const logBenefitToday = async (benefitKey: string) => {
+    if (!data?.thisMonth.monthKey) return;
+    setBenefitSaving(benefitKey);
+    try {
+      const res = await fetch('/api/public/benefit-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, pin, benefit_key: benefitKey }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.entry) setBenefitEntries((prev) => [json.entry, ...prev]);
+        setBenefitCounts((prev) => ({ ...prev, [benefitKey]: (prev[benefitKey] ?? 0) + 1 }));
+      }
+    } catch { /* ignore */ }
+    finally { setBenefitSaving(null); }
+  };
+
+  const deleteBenefitEntry = async (entryId: string, benefitKey: string) => {
+    setDeletingBenefitId(entryId);
+    try {
+      const res = await fetch(
+        `/api/public/benefit-entries?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pin)}&entryId=${encodeURIComponent(entryId)}`,
+        { method: 'DELETE' }
+      );
+      if (res.ok) {
+        setBenefitEntries((prev) => prev.filter((e) => e.id !== entryId));
+        setBenefitCounts((prev) => ({ ...prev, [benefitKey]: Math.max(0, (prev[benefitKey] ?? 1) - 1) }));
+      }
+    } catch { /* ignore */ }
+    finally { setDeletingBenefitId(null); }
   };
 
   const fetchBenefitCounts = async (currentPin: string, month: string) => {
@@ -247,6 +293,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     setError('');
     setRequests([]);
     setBenefitCounts({});
+    setBenefitEntries([]);
   };
 
   // Get current month name
@@ -327,56 +374,73 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
           {data.benefits && data.benefits.length > 0 && (
             <div className="px-4 sm:px-6 pb-3">
               {(() => {
-                const totalImpact = data.benefits!.reduce((sum, b) => {
-                  const count = benefitCounts[b.key] ?? 0;
-                  return sum + count * b.hoursPerUnit;
-                }, 0);
                 const BENEFIT_ICONS: Record<string, string> = { blood: '🩸', english: '🇬🇧', gym: '🏋️' };
+                const today = new Date().toISOString().slice(0, 10);
                 return (
                   <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-white">
+                    <div className="px-4 py-2.5 border-b border-slate-100 bg-white">
                       <span className="text-sm font-semibold text-slate-700">Aktivity tento měsíc</span>
-                      {totalImpact !== 0 && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${totalImpact < 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                          Dopad: {totalImpact > 0 ? '+' : ''}{totalImpact.toFixed(2)} h
-                        </span>
-                      )}
                     </div>
                     <div className="divide-y divide-slate-100">
                       {data.benefits!.map((b) => {
-                        const count = benefitCounts[b.key] ?? 0;
+                        const myEntries = benefitEntries.filter((e) => e.benefit_key === b.key);
+                        const count = myEntries.length;
                         const impact = count * b.hoursPerUnit;
                         const isSaving = benefitSaving === b.key;
                         const max = b.maxPerMonth ?? 99;
+                        const loggedToday = myEntries.some((e) => e.date === today);
+                        const canLog = !loggedToday && count < max;
                         return (
-                          <div key={b.key} className="flex items-center gap-3 px-4 py-3">
-                            <span className="text-xl shrink-0">{BENEFIT_ICONS[b.key] ?? '📌'}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800">{b.czLabel}</p>
-                              {count > 0 && (
-                                <p className={`text-xs font-semibold mt-0.5 ${impact < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                                  {count}× = {impact > 0 ? '+' : ''}{impact.toFixed(2)} h
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
+                          <div key={b.key} className="px-4 py-3 space-y-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl shrink-0">{BENEFIT_ICONS[b.key] ?? '📌'}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-800">{b.czLabel}</p>
+                                {count > 0 && (
+                                  <p className={`text-xs font-semibold mt-0.5 ${impact < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    {count}×{b.maxPerMonth ? ` / ${b.maxPerMonth}` : ''} = {impact > 0 ? '+' : ''}{impact.toFixed(2)} h
+                                  </p>
+                                )}
+                              </div>
                               <button
-                                onClick={() => count > 0 && saveBenefitCount(b.key, count - 1)}
-                                disabled={count === 0 || isSaving}
-                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-lg flex items-center justify-center hover:bg-red-50 hover:border-red-300 hover:text-red-600 disabled:opacity-30 transition-colors"
-                              >−</button>
-                              <span className="w-8 text-center text-sm font-bold text-slate-800">
-                                {isSaving ? <span className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : count}
-                              </span>
-                              <button
-                                onClick={() => count < max && saveBenefitCount(b.key, count + 1)}
-                                disabled={count >= max || isSaving}
-                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-lg flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-30 transition-colors"
-                              >+</button>
-                              {b.maxPerMonth && (
-                                <span className="text-xs text-slate-400 ml-1">/ {b.maxPerMonth}</span>
-                              )}
+                                onClick={() => canLog && logBenefitToday(b.key)}
+                                disabled={!canLog || isSaving}
+                                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                  loggedToday
+                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default'
+                                    : canLog
+                                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                }`}
+                              >
+                                {isSaving
+                                  ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  : loggedToday ? '✓ Dnes' : count >= max ? 'Max' : '+ Dnes'}
+                              </button>
                             </div>
+                            {myEntries.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pl-9">
+                                {myEntries.map((e) => {
+                                  const isToday = e.date === today;
+                                  const isDeleting = deletingBenefitId === e.id;
+                                  return (
+                                    <span key={e.id} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${isToday ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                                      {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit' })}
+                                      {isToday && (
+                                        <button
+                                          onClick={() => !isDeleting && deleteBenefitEntry(e.id, e.benefit_key)}
+                                          disabled={isDeleting}
+                                          className="ml-0.5 text-blue-400 hover:text-red-500 transition-colors disabled:opacity-40"
+                                          title="Zrušit dnešní záznam"
+                                        >
+                                          {isDeleting ? '…' : '×'}
+                                        </button>
+                                      )}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
