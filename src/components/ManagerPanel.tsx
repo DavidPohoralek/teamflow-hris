@@ -337,7 +337,7 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice' | 'benefits'>(initialTab ?? 'employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showTour, setShowTour] = useState(false);
@@ -361,7 +361,6 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
     ...(isAdmin ? [{ id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' }] : []),
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
     { id: 'homeoffice' as const, label: t('HomeOffice', 'Home Office'), icon: '🏠' },
-    { id: 'benefits' as const, label: t('Benefity', 'Benefits'), icon: '🏋️' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     ...(isAdmin ? [{ id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' }] : []),
   ];
@@ -458,7 +457,6 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
           {activeTab === 'work-types' && isAdmin && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
-          {activeTab === 'benefits' && <BenefitEntriesTab orgId={orgId} />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && isAdmin && <SettingsTab />}
         </div>

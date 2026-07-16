@@ -155,6 +155,7 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  const [activeView, setActiveView] = useState<'overview' | 'benefits'>('overview');
   const [month, setMonth] = useState(currentMonth);
   const [selectedDept, setSelectedDept] = useState('Prodejna');
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -321,6 +322,22 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
 
   return (
     <div className="w-full px-6 py-5 space-y-6">
+
+      {/* ── View tab switcher ── */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setActiveView('overview')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${activeView === 'overview' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          📊 Přehled
+        </button>
+        <button onClick={() => setActiveView('benefits')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${activeView === 'benefits' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          🏋️ Benefity
+        </button>
+      </div>
+
+      {activeView === 'benefits' && <BenefitEntriesView month={month} setMonth={setMonth} prevMonth={prevMonth} nextMonth={nextMonth} monthLabel={monthLabel} />}
+
+      {activeView === 'overview' && <>
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -838,6 +855,143 @@ export default function AnalyticsDashboard({ orgId }: { orgId: string }) {
           </div>
         </div>
       )}
+
+      </>}
+    </div>
+  );
+}
+
+// ─── Benefit Entries View ─────────────────────────────────────────────────────
+
+const BE_ICONS: Record<string, string> = { blood: '🩸', english: '🇬🇧', gym: '🏋️' };
+const BE_LABELS: Record<string, string> = { blood: 'Darování krve', english: 'Angličtina', gym: 'Cvičení' };
+
+interface BEntry {
+  id: string;
+  benefit_key: string;
+  date: string;
+  employees: { name: string; department: string | null } | null;
+}
+
+function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel }: {
+  month: string;
+  setMonth: (m: string) => void;
+  prevMonth: (m: string) => string;
+  nextMonth: (m: string) => string;
+  monthLabel: string;
+}) {
+  const [entries, setEntries] = useState<BEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [filterKey, setFilterKey] = useState('all');
+
+  const load = useCallback(async (m: string) => {
+    setLoading(true);
+    try {
+      const res = await managerFetch(`/api/manager/benefit-entries?month=${m}`);
+      if (res.ok) setEntries((await res.json()).entries ?? []);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(month); }, [month, load]);
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const res = await managerFetch(`/api/manager/benefit-entries?entryId=${id}`, { method: 'DELETE' });
+      if (res.ok) setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
+  };
+
+  const benefitKeys = Array.from(new Set(entries.map((e) => e.benefit_key))).sort();
+  const filtered = filterKey === 'all' ? entries : entries.filter((e) => e.benefit_key === filterKey);
+
+  const summary: Record<string, Record<string, number>> = {};
+  for (const e of entries) {
+    const name = e.employees?.name ?? '—';
+    if (!summary[name]) summary[name] = {};
+    summary[name][e.benefit_key] = (summary[name][e.benefit_key] ?? 0) + 1;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
+          <button onClick={() => setMonth(prevMonth(month))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+          </button>
+          <span className="text-sm font-semibold text-slate-800 min-w-[148px] text-center px-1">{monthLabel}</span>
+          <button onClick={() => setMonth(nextMonth(month))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+          </button>
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', ...benefitKeys].map((k) => (
+            <button key={k} onClick={() => setFilterKey(k)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
+              {k === 'all' ? 'Vše' : `${BE_ICONS[k] ?? ''} ${BE_LABELS[k] ?? k}`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {Object.keys(summary).length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {Object.entries(summary).sort(([a], [b]) => a.localeCompare(b, 'cs')).map(([name, counts]) => (
+            <div key={name} className="bg-white rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-semibold text-slate-700 truncate mb-1.5">{name}</p>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(counts).map(([k, n]) => (
+                  <span key={k} className="inline-flex items-center gap-0.5 text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                    {BE_ICONS[k] ?? ''} {n}×
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+          <span className="text-sm font-semibold text-slate-700">Záznamy návštěv</span>
+          <div className="flex items-center gap-3">
+            {loading && <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />}
+            <span className="text-xs text-slate-400">{filtered.length} záznamů</span>
+          </div>
+        </div>
+        {filtered.length === 0 && !loading ? (
+          <p className="text-sm text-slate-400 text-center py-10">Zatím žádné záznamy. Zaměstnanci je přidají přes Moje hodiny.</p>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {filtered.map((e) => (
+              <div key={e.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                <span className="text-lg shrink-0">{BE_ICONS[e.benefit_key] ?? '📌'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{e.employees?.name ?? '—'}</p>
+                  <p className="text-xs text-slate-400">{e.employees?.department ?? ''}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-medium text-slate-700">
+                    {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </p>
+                  <p className="text-xs text-slate-400">{BE_LABELS[e.benefit_key] ?? e.benefit_key}</p>
+                </div>
+                <button onClick={() => handleDelete(e.id)} disabled={deletingId === e.id}
+                  className="shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  title="Smazat záznam">
+                  {deletingId === e.id
+                    ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+                  }
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
