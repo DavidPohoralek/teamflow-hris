@@ -21,6 +21,7 @@ interface WorkPlanEntry {
   startTime: string | null;
   endTime: string | null;
   isEvening?: boolean;
+  note?: string | null;
 }
 
 interface ScheduleDayMeta {
@@ -733,6 +734,12 @@ function EntryChip({
   const parts = name.trim().split(/\s+/);
   const shortName = parts.length < 2 ? name : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
   const eveningMark = entry.isEvening ? ' 🌙' : '';
+  const noteText = entry.note?.trim() || null;
+
+  const baseTitle = canEdit && onEditEntry
+    ? t('Pravý klik = upravit', 'Right-click = edit')
+    : `${name} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`;
+  const chipTitle = noteText ? `${baseTitle}\n📝 ${noteText}` : baseTitle;
 
   return (
     <div
@@ -742,12 +749,13 @@ function EntryChip({
         backgroundColor: `${color}22`,
         color: '#1e293b',
       }}
-      title={canEdit && onEditEntry ? t('Pravý klik = upravit', 'Right-click = edit') : `${name} · ${entry.workTypeName ?? entry.workType ?? '—'}${timeLabel}`}
+      title={chipTitle}
       onContextMenu={canEdit && onEditEntry ? (e) => { e.preventDefault(); e.stopPropagation(); onEditEntry(entry); } : undefined}
     >
       <span className="truncate min-w-0">
         <span className="font-semibold">{shortName}{eveningMark}</span>
         {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
+        {noteText && <span className="ml-1 opacity-60" title={noteText}>📝</span>}
       </span>
       {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
         <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">

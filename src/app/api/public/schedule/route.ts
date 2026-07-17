@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
     startTime: row.start_time ?? null,
     endTime: row.end_time ?? null,
     isEvening: row.is_evening ?? false,
+    note: row.note ?? null,
   }));
 
   // Query schedule_days for draft='A'
