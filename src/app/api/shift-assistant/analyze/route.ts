@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       .gte('date', `${month}-01`)
       .lte('date', `${month}-31`),
     sb.from('work_plans')
-      .select('employee_id, date, work_type, start_time, end_time')
+      .select('employee_id, date, work_type, start_time, end_time, is_evening')
       .eq('organization_id', orgId)
       .eq('active', true)
       .gte('date', `${month}-01`)
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
   // Index confirmed (non-draft) shifts by date
   const confirmedByDate: Record<string, {
     count: number; employeeIds: string[];
-    shifts: { employeeId: string; workType: string; startTime: string; endTime: string }[];
+    shifts: { employeeId: string; workType: string; startTime: string; endTime: string; isEvening: boolean }[];
   }> = {};
   for (const wp of (wpRes.data ?? [])) {
     const d = String(wp.date ?? '').slice(0, 10);
@@ -103,6 +103,7 @@ export async function GET(req: NextRequest) {
       workType: String(wp.work_type ?? ''),
       startTime: String(wp.start_time ?? ''),
       endTime: String(wp.end_time ?? ''),
+      isEvening: Boolean(wp.is_evening),
     });
   }
 
@@ -170,7 +171,7 @@ interface DraftDayRecord {
   assignedEmployees: string[];
   assignedCount: number;
   totalAssignedCount: number;
-  confirmedShifts: { employeeId: string; workType: string; startTime: string; endTime: string }[];
+  confirmedShifts: { employeeId: string; workType: string; startTime: string; endTime: string; isEvening: boolean }[];
   eveningCoverage: {
     enabled: boolean; from: string; to: string; requiredStaff: number;
     assignedStaff: number; missingStaff: number;
@@ -477,7 +478,7 @@ function buildDraftDays(
   draftRows: Record<string, unknown>[],
   _draft: string,
   scheduleDays: Record<string, unknown>[],
-  confirmedByDate: Record<string, { count: number; employeeIds: string[]; shifts: { employeeId: string; workType: string; startTime: string; endTime: string }[] }>,
+  confirmedByDate: Record<string, { count: number; employeeIds: string[]; shifts: { employeeId: string; workType: string; startTime: string; endTime: string; isEvening: boolean }[] }>,
   orgSettings: Record<string, unknown> = {},
   employees: { id: string; labels: string[] }[] = [],
 ): DraftDayRecord[] {
@@ -576,9 +577,8 @@ function buildDraftDays(
 
     if (eveningEnabled && !isClosed) {
       const eveningCovered = allShifts.filter(s =>
-        isProdejnaType(s.workType) &&
-        s.startTime <= eveningStart &&
-        s.endTime >= eveningEnd
+        s.isEvening ||
+        (isProdejnaType(s.workType) && s.startTime <= eveningStart && s.endTime >= eveningEnd)
       ).length;
 
       const hasEveningLabel = (empId: string) => {
@@ -587,7 +587,7 @@ function buildDraftDays(
       };
 
       const candidates: EveningCandidate[] = allShifts
-        .filter(s => !isProdejnaType(s.workType))
+        .filter(s => !isProdejnaType(s.workType) && !s.isEvening)
         .filter(s =>
           (hasEveningLabel(s.employeeId) && s.endTime <= eveningStart) ||
           (s.endTime > eveningStart && s.endTime < eveningEnd)

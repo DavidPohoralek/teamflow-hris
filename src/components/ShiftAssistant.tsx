@@ -249,6 +249,8 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: { id: string; reason: string }[] } | null>(null);
+  const [savedDays, setSavedDays] = useState<Set<string>>(new Set());
+  const [savingDay, setSavingDay] = useState<string | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unconfirmedCount, setUnconfirmedCount] = useState(0);
@@ -267,9 +269,10 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
-        const parsed = JSON.parse(raw) as { result: AssistantResult; selected: string[] };
+        const parsed = JSON.parse(raw) as { result: AssistantResult; selected: string[]; savedDays?: string[] };
         setResult(parsed.result);
         setSelected(new Set(parsed.selected));
+        setSavedDays(new Set(parsed.savedDays ?? []));
       }
     } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,9 +281,9 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
   useEffect(() => {
     if (!result) return;
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ result, selected: Array.from(selected) }));
+      localStorage.setItem(storageKey, JSON.stringify({ result, selected: Array.from(selected), savedDays: Array.from(savedDays) }));
     } catch { /* ignore */ }
-  }, [result, selected, storageKey]);
+  }, [result, selected, savedDays, storageKey]);
 
   useEffect(() => {
     managerFetch('/api/shift-assistant/license')
@@ -294,6 +297,7 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
     setError(null);
     setResult(null);
     setSelected(new Set());
+    setSavedDays(new Set());
     setApplyResult(null);
     try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
     try {
@@ -350,6 +354,43 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const saveDay = async (date: string) => {
+    if (!result || savingDay) return;
+    const day = result.problemDays.find(d => d.date === date);
+    if (!day) return;
+    const dayIds = day.suggestions.filter(s => selected.has(s.id)).map(s => s.id);
+    if (dayIds.length === 0) return;
+
+    setSavingDay(date);
+    setError(null);
+    try {
+      const suggestionTimes: Record<string, { startTime: string; endTime: string }> = {};
+      for (const s of day.suggestions) {
+        if (!dayIds.includes(s.id)) continue;
+        if (s.partialAvailability) {
+          suggestionTimes[s.id] = { startTime: s.partialAvailability.from, endTime: s.partialAvailability.to };
+        } else {
+          const parts = s.timeLabel.split(/[–-]/).map((p: string) => p.trim());
+          if (parts.length === 2) suggestionTimes[s.id] = { startTime: parts[0], endTime: parts[1] };
+        }
+      }
+      const res = await managerFetch('/api/shift-assistant/apply', {
+        method: 'POST',
+        body: JSON.stringify({ month, draft, suggestionIds: dayIds, suggestionTimes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Chyba při ukládání');
+      if (data.applied > 0) {
+        setSavedDays(prev => { const next = new Set(prev); next.add(date); return next; });
+        setExpandedDay(null);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Neznámá chyba');
+    } finally {
+      setSavingDay(null);
     }
   };
 
@@ -543,11 +584,13 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
         {/* ── Problem day cards ── */}
         {result && result.problemDays.map((day, idx) => {
           const isOpen = expandedDay === day.date;
+          const isSaved = savedDays.has(day.date);
           const hasMissing = day.missingCount > 0;
           const hasEveningMissing = day.closingCoverage.enabled && day.closingCoverage.missingStaff > 0;
+          const daySelectedCount = day.suggestions.filter(s => selected.has(s.id)).length;
 
           return (
-            <div key={day.date} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div key={day.date} className={`bg-white border rounded-xl shadow-sm overflow-hidden ${isSaved ? 'border-emerald-200' : 'border-slate-200'}`}>
               {/* Day header */}
               <button
                 onClick={() => setExpandedDay(isOpen ? null : day.date)}
@@ -564,17 +607,26 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
 
                 {/* Badges */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {hasMissing && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full">
-                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="2"/></svg>
-                      {t('Chybí', 'Missing')} {day.missingCount}
+                  {isSaved ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full">
+                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      {t('Uloženo', 'Saved')}
                     </span>
-                  )}
-                  {hasEveningMissing && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-full">
-                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2"/></svg>
-                      {t('Večer', 'Eve')} -{day.closingCoverage.missingStaff}
-                    </span>
+                  ) : (
+                    <>
+                      {hasMissing && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full">
+                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="2"/></svg>
+                          {t('Chybí', 'Missing')} {day.missingCount}
+                        </span>
+                      )}
+                      {hasEveningMissing && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200 px-2.5 py-1 rounded-full">
+                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2"/></svg>
+                          {t('Večer', 'Eve')} -{day.closingCoverage.missingStaff}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -690,6 +742,20 @@ export default function ShiftAssistant({ orgId, month, onMonthChange, onOpenNoti
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                  {day.suggestions.length > 0 && !isSaved && (
+                    <div className="px-5 py-3 border-t border-slate-100 flex justify-end">
+                      <button
+                        onClick={e => { e.stopPropagation(); saveDay(day.date); }}
+                        disabled={savingDay === day.date || daySelectedCount === 0}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40 transition-colors"
+                      >
+                        {savingDay === day.date
+                          ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />{t('Ukládám…', 'Saving…')}</>
+                          : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{t('Zapsat tento den', 'Save this day')} ({daySelectedCount})</>
+                        }
+                      </button>
                     </div>
                   )}
                 </div>
