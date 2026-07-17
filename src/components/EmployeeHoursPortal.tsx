@@ -588,9 +588,20 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                             {req.note && (
                               <span className="text-xs text-slate-400 truncate">
                                 {(() => {
+                                  const fmtT = (iso: string) => {
+                                    try { return new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }); }
+                                    catch { return iso; }
+                                  };
                                   try {
                                     const p = JSON.parse(req.note!);
-                                    if (p.timeIn && p.timeOut) return `Příchod: ${p.timeIn} – Odchod: ${p.timeOut}${p.userNote ? ' · ' + p.userNote : ''}`;
+                                    if (p.timeIn || p.timeOut) {
+                                      const field = p.field ?? (p.timeIn && p.timeOut ? 'both' : p.timeIn ? 'check_in' : 'check_out');
+                                      let label = '';
+                                      if (field === 'check_in' && p.timeIn) label = `Oprava příchodu: ${fmtT(p.timeIn)}`;
+                                      else if (field === 'check_out' && p.timeOut) label = `Oprava odchodu: ${fmtT(p.timeOut)}`;
+                                      else label = [p.timeIn && `Příchod: ${fmtT(p.timeIn)}`, p.timeOut && `Odchod: ${fmtT(p.timeOut)}`].filter(Boolean).join(' · ');
+                                      return p.userNote ? `${label} · ${p.userNote}` : label;
+                                    }
                                   } catch { /* not JSON */ }
                                   return req.note;
                                 })()}
