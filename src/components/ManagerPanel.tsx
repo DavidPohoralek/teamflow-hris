@@ -272,8 +272,9 @@ interface WorkType {
   id: string;
   name: string;
   color: string;
-  category: 'shift' | 'presence' | 'absence';
+  category: 'shift' | 'presence' | 'absence' | 'activity';
   sort_order?: number;
+  benefit_key?: string | null;
 }
 
 interface Request {
@@ -304,6 +305,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   shift: 'bg-blue-100 text-blue-800',
   presence: 'bg-green-100 text-green-800',
   absence: 'bg-red-100 text-red-800',
+  activity: 'bg-purple-100 text-purple-800',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  shift: 'Směna',
+  presence: 'Docházka',
+  absence: 'Absence',
+  activity: 'Aktivita',
 };
 
 function fmtCorrectionTime(t: unknown): string | null {
@@ -1498,8 +1507,9 @@ function WorkTypesTab() {
                 <div className="flex-1 min-w-0">
                   <span className="font-medium text-gray-900 text-sm">{wt.name}</span>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[wt.category]}`}>
-                  {wt.category === 'shift' ? t('Směna', 'Shift') : wt.category === 'presence' ? t('Docházka', 'Attendance') : t('Absence', 'Absence')}
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[wt.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                  {wt.category === 'activity' ? '🎯 Aktivita' : (CATEGORY_LABELS[wt.category] ?? wt.category)}
+                  {wt.category === 'activity' && wt.benefit_key && ` · ${wt.benefit_key}`}
                 </span>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* Reorder buttons */}
@@ -1554,8 +1564,9 @@ function WorkTypeForm({ workType, onClose, onSaved }: WorkTypeFormProps) {
   const [form, setForm] = useState({
     name: workType?.name ?? '',
     color: workType?.color ?? '#3B82F6',
-    category: workType?.category ?? 'shift' as const,
+    category: (workType?.category ?? 'shift') as 'shift' | 'presence' | 'absence' | 'activity',
     sort_order: workType?.sort_order ?? 0,
+    benefit_key: workType?.benefit_key ?? '' as string,
   });
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState('');
@@ -1608,8 +1619,20 @@ function WorkTypeForm({ workType, onClose, onSaved }: WorkTypeFormProps) {
               <option value="shift">{t('Směna', 'Shift')}</option>
               <option value="presence">{t('Docházka', 'Attendance')}</option>
               <option value="absence">{t('Absence', 'Absence')}</option>
+              <option value="activity">🎯 {t('Aktivita', 'Activity')}</option>
             </select>
           </FormField>
+          {form.category === 'activity' && (
+            <FormField label={t('Napojit na benefit', 'Link to benefit')}>
+              <select className={inputCls()} value={form.benefit_key} onChange={(e) => set('benefit_key', e.target.value)}>
+                <option value="">{t('— žádný benefit —', '— no benefit —')}</option>
+                <option value="blood">🩸 {t('Darování krve', 'Blood donation')}</option>
+                <option value="english">🇬🇧 {t('Angličtina', 'English lessons')}</option>
+                <option value="gym">🏋️ {t('Cvičení', 'Gym')}</option>
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1">{t('Volitelné — umožní porovnat docházku s benefity v analytice.', 'Optional — enables attendance vs. benefit comparison in analytics.')}</p>
+            </FormField>
+          )}
           <FormField label={t('Pořadí', 'Order')}>
             <input className={inputCls()} type="number" min={0} value={form.sort_order} onChange={(e) => set('sort_order', Number(e.target.value))} />
           </FormField>

@@ -31,7 +31,7 @@ export async function PUT(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { name, color, icon, category, sort_order, active } = body as Record<string, unknown>;
+  const { name, color, icon, category, sort_order, active, benefit_key } = body as Record<string, unknown>;
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
     return NextResponse.json(
@@ -40,7 +40,7 @@ export async function PUT(
     );
   }
 
-  const validCategories = ['shift', 'presence', 'absence'];
+  const validCategories = ['shift', 'presence', 'absence', 'activity'];
   if (category !== undefined && category !== null && !validCategories.includes(category as string)) {
     return NextResponse.json(
       { error: `category must be one of: ${validCategories.join(', ')}` },
@@ -55,6 +55,7 @@ export async function PUT(
   if (category !== undefined) update.category = category ?? null;
   if (sort_order !== undefined) update.sort_order = typeof sort_order === 'number' ? sort_order : 0;
   if (active !== undefined) update.active = typeof active === 'boolean' ? active : true;
+  if (benefit_key !== undefined) update.benefit_key = typeof benefit_key === 'string' && benefit_key ? benefit_key : null;
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 422 });

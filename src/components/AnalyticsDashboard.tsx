@@ -885,6 +885,110 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
   );
 }
 
+// ─── Benefit comparison types ─────────────────────────────────────────────────
+
+interface ActivityType { name: string; benefit_key: string | null; color: string }
+interface EmpComparison {
+  employeeId: string;
+  name: string;
+  department: string | null;
+  activities: { name: string; benefit_key: string | null; color: string; attended: number; deducted: number | null; diff: number | null }[];
+}
+
+function BenefitComparisonView({ month, activityTypes, employees }: {
+  month: string;
+  activityTypes: ActivityType[];
+  employees: EmpComparison[];
+}) {
+  if (activityTypes.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
+        Žádné aktivity nejsou definovány. V Nastavení → Typ práce přidej typy s kategorií <strong>Aktivita</strong>.
+      </div>
+    );
+  }
+  if (employees.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
+        Za {month} žádné aktivitní docházky ani odpočty.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-100">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide min-w-[160px]">Zaměstnanec</th>
+            {activityTypes.map((at) => (
+              <th key={at.name} className="px-3 py-3 min-w-[130px]">
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-semibold text-slate-700 text-xs">{at.name}</span>
+                  {at.benefit_key && (
+                    <div className="flex gap-2 text-[10px] text-slate-400 font-normal">
+                      <span>Docházka</span>
+                      <span>Odečteno</span>
+                    </div>
+                  )}
+                  {!at.benefit_key && (
+                    <span className="text-[10px] text-slate-400 font-normal">Docházka</span>
+                  )}
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {employees.map((emp) => (
+            <tr key={emp.employeeId} className="hover:bg-slate-50 transition-colors">
+              <td className="px-4 py-3">
+                <p className="font-semibold text-slate-800 text-sm">{emp.name}</p>
+                {emp.department && <p className="text-xs text-slate-400">{emp.department}</p>}
+              </td>
+              {emp.activities.map((a) => {
+                const hasBenefit = a.benefit_key != null;
+                const mismatch = hasBenefit && a.diff != null && a.diff !== 0;
+                return (
+                  <td key={a.name} className="px-3 py-3 text-center">
+                    {hasBenefit ? (
+                      <div className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
+                        a.attended === 0 && (a.deducted ?? 0) === 0
+                          ? 'text-slate-300'
+                          : mismatch
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-green-50 text-green-700 border border-green-200'
+                      }`}>
+                        <span title="Docházka">{a.attended}×</span>
+                        {a.deducted != null && (
+                          <>
+                            <span className="text-slate-300">/</span>
+                            <span title="Odečteno">{a.deducted}×</span>
+                            {mismatch && <span title="Rozdíl">⚠️</span>}
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <span className={`text-xs font-semibold ${a.attended > 0 ? 'text-purple-600' : 'text-slate-300'}`}>
+                        {a.attended > 0 ? `${a.attended}×` : '—'}
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-400 flex items-center gap-4">
+        <span>Docházka = počet příchodů s daným typem aktivity</span>
+        <span>Odečteno = benefit záznamy v systému</span>
+        <span className="text-amber-500">⚠️ = neshoda</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Benefit Entries View ─────────────────────────────────────────────────────
 
 const BE_ICONS: Record<string, string> = { blood: '🩸', english: '🇬🇧', gym: '🏋️' };
@@ -904,10 +1008,13 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
   nextMonth: (m: string) => string;
   monthLabel: string;
 }) {
+  const [subTab, setSubTab] = useState<'entries' | 'comparison'>('entries');
   const [entries, setEntries] = useState<BEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filterKey, setFilterKey] = useState('all');
+  const [comparison, setComparison] = useState<{ activityTypes: ActivityType[]; employees: EmpComparison[] } | null>(null);
+  const [compLoading, setCompLoading] = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
@@ -918,7 +1025,20 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
     finally { setLoading(false); }
   }, []);
 
+  const loadComparison = useCallback(async (m: string) => {
+    setCompLoading(true);
+    try {
+      const res = await managerFetch(`/api/manager/benefit-comparison?month=${m}`);
+      if (res.ok) {
+        const d = await res.json();
+        setComparison({ activityTypes: d.activityTypes ?? [], employees: d.employees ?? [] });
+      }
+    } catch { /* ignore */ }
+    finally { setCompLoading(false); }
+  }, []);
+
   useEffect(() => { load(month); }, [month, load]);
+  useEffect(() => { if (subTab === 'comparison') loadComparison(month); }, [subTab, month, loadComparison]);
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
@@ -941,6 +1061,18 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
 
   return (
     <div className="space-y-5">
+      {/* Sub-tab switcher */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setSubTab('entries')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${subTab === 'entries' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          📋 Záznamy
+        </button>
+        <button onClick={() => setSubTab('comparison')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${subTab === 'comparison' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          📊 Plánováno vs. Odečteno
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
           <button onClick={() => setMonth(prevMonth(month))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
@@ -951,17 +1083,30 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
           </button>
         </div>
-        <div className="flex gap-1.5 flex-wrap">
-          {['all', ...benefitKeys].map((k) => (
-            <button key={k} onClick={() => setFilterKey(k)}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
-              {k === 'all' ? 'Vše' : `${BE_ICONS[k] ?? ''} ${BE_LABELS[k] ?? k}`}
-            </button>
-          ))}
-        </div>
+        {subTab === 'entries' && (
+          <div className="flex gap-1.5 flex-wrap">
+            {['all', ...benefitKeys].map((k) => (
+              <button key={k} onClick={() => setFilterKey(k)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
+                {k === 'all' ? 'Vše' : `${BE_ICONS[k] ?? ''} ${BE_LABELS[k] ?? k}`}
+              </button>
+            ))}
+          </div>
+        )}
+        {subTab === 'comparison' && compLoading && (
+          <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />
+        )}
       </div>
 
-      {Object.keys(summary).length > 0 && (
+      {subTab === 'comparison' && (
+        <BenefitComparisonView
+          month={month}
+          activityTypes={comparison?.activityTypes ?? []}
+          employees={comparison?.employees ?? []}
+        />
+      )}
+
+      {subTab === 'entries' && Object.keys(summary).length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {Object.entries(summary).sort(([a], [b]) => a.localeCompare(b, 'cs')).map(([name, counts]) => (
             <div key={name} className="bg-white rounded-xl border border-slate-200 p-3">
@@ -978,7 +1123,7 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {subTab === 'entries' && <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">Záznamy návštěv</span>
           <div className="flex items-center gap-3">
@@ -1015,7 +1160,7 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
             ))}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

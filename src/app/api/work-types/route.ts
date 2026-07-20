@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { name, color, icon, category, sort_order } = body as Record<string, unknown>;
+  const { name, color, icon, category, sort_order, benefit_key } = body as Record<string, unknown>;
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     return NextResponse.json(
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const validCategories = ['shift', 'presence', 'absence'];
+  const validCategories = ['shift', 'presence', 'absence', 'activity'];
   if (category !== undefined && !validCategories.includes(category as string)) {
     return NextResponse.json(
       { error: `category must be one of: ${validCategories.join(', ')}` },
@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     icon: typeof icon === 'string' ? icon.trim() || null : null,
     category: typeof category === 'string' ? category : null,
     sort_order: typeof sort_order === 'number' ? sort_order : 0,
+    benefit_key: typeof benefit_key === 'string' && benefit_key ? benefit_key : null,
     active: true,
   };
 

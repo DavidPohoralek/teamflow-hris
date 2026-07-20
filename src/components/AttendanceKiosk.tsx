@@ -10,6 +10,7 @@ interface WorkType {
   color?: string;
   icon?: string;
   category: string;
+  benefit_key?: string | null;
 }
 
 interface PresenceRecord {
@@ -160,7 +161,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       .then((r) => r.json())
       .then((json: { workTypes?: WorkType[] } | WorkType[]) => {
         const list = Array.isArray(json) ? json : (json.workTypes ?? []);
-        setWorkTypes(list.filter((wt) => wt.category === 'shift' || wt.category === 'presence'));
+        setWorkTypes(list.filter((wt) => wt.category === 'shift' || wt.category === 'presence' || wt.category === 'activity'));
       })
       .catch(() => {});
     fetch(`/api/public/company-settings?orgId=${orgId}`)
@@ -617,7 +618,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           {/* Work type selection */}
           {(() => {
             const hoWorkTypes = workTypes.filter((wt) => isHomeOffice(wt.name));
-            const regularTypes = workTypes.filter((wt) => !isHomeOffice(wt.name));
+            const activityTypes = workTypes.filter((wt) => wt.category === 'activity');
+            const regularTypes = workTypes.filter((wt) => !isHomeOffice(wt.name) && wt.category !== 'activity');
             const primaryWt = employeeDepartment
               ? regularTypes.find((wt) => wt.name.toLowerCase() === employeeDepartment.toLowerCase())
               : null;
@@ -654,12 +656,12 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                   </div>
                 )}
 
-                {/* Regular work types */}
+                {/* Regular work types — "Typ práce" */}
                 {visibleRegular.length > 0 && (
                   <>
-                    {hoWorkTypes.length > 0 && (
-                      <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">{t('Přítomnost na pracovišti', 'On-site attendance')}</p>
-                    )}
+                    <p className="text-xs text-slate-500 uppercase tracking-widest mt-1 self-start">
+                      {t('Typ práce', 'Work type')}
+                    </p>
                     {/* Mobile list */}
                     <div className="flex flex-col gap-2 sm:hidden w-full">
                       {visibleRegular.map((wt, idx) => {
@@ -702,6 +704,44 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                         {t('Více možností', 'More options')}
                       </button>
                     )}
+                  </>
+                )}
+
+                {/* Activity types — "Aktivity" */}
+                {activityTypes.length > 0 && (
+                  <>
+                    <div className="w-full border-t border-slate-700/50 pt-3">
+                      <p className="text-xs text-purple-400 uppercase tracking-widest mb-3">🎯 {t('Aktivity', 'Activities')}</p>
+                      {/* Mobile list */}
+                      <div className="flex flex-col gap-2 sm:hidden">
+                        {activityTypes.map((wt) => {
+                          const isSelected = selectedWorkType?.id === wt.id;
+                          return (
+                            <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full font-semibold text-base transition-all duration-150 active:scale-[0.98] border ${isSelected ? 'bg-purple-600 border-purple-400 text-white ring-2 ring-white ring-offset-1 ring-offset-[#1e293b]' : 'bg-purple-900/30 border-purple-700/50 text-purple-200 hover:bg-purple-800/40'}`}
+                            >
+                              <span className="text-2xl shrink-0">{wt.icon ?? '🎯'}</span>
+                              <span className="flex-1 text-left">{wt.name}</span>
+                              {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Desktop grid */}
+                      <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {activityTypes.map((wt) => {
+                          const isSelected = selectedWorkType?.id === wt.id;
+                          return (
+                            <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
+                              className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl min-h-[100px] font-semibold text-lg transition-all duration-150 active:scale-95 border ${isSelected ? 'bg-purple-600 border-purple-400 text-white ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : 'bg-purple-900/30 border-purple-700/50 text-purple-200 hover:bg-purple-800/40'}`}
+                            >
+                              <span className="text-3xl">{wt.icon ?? '🎯'}</span>
+                              <span className="text-sm">{wt.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
