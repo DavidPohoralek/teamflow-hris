@@ -173,6 +173,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
   const [exportColKeys, setExportColKeys] = useState<Set<string>>(new Set<string>(EXPORT_COLS.map((c) => c.key)));
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
   const [exportDeptFilter, setExportDeptFilter] = useState<string>('');
+  const [exportAllStats, setExportAllStats] = useState<EmployeeStat[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [nameSearch, setNameSearch] = useState('');
   // allDepts: fetched once at mount from unfiltered response so dropdown always shows all options
@@ -296,11 +297,18 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
   const [y, mo] = month.split('-').map(Number);
   const monthLabel = `${CZ_MONTHS[mo - 1]} ${y}`;
 
-  const openExportModal = () => {
-    setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)));
+  const openExportModal = async () => {
     setExportColKeys(new Set<string>(EXPORT_COLS.map((c) => c.key)));
     setExportDeptFilter('');
     setShowExportModal(true);
+    try {
+      const res = await managerFetch(`/api/analytics?month=${month}`);
+      if (res.ok) {
+        const d: AnalyticsData = await res.json();
+        setExportAllStats(d.stats);
+        setExportEmpIds(new Set(d.stats.map((s) => s.id)));
+      }
+    } catch { /* ignore */ }
   };
 
   const handleExport = async (fmt: 'csv' | 'xlsx') => {
@@ -403,7 +411,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Export CSV
+            Export
           </button>
         )}
       </div>
@@ -781,25 +789,28 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-700">Zaměstnanci</span>
                   <div className="flex items-center gap-2 text-xs">
-                    <button onClick={() => setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)))} className="text-blue-600 hover:underline">Vše</button>
+                    <button
+                      onClick={() => setExportEmpIds(new Set(
+                        exportAllStats.filter((s) => !exportDeptFilter || s.department === exportDeptFilter).map((s) => s.id)
+                      ))}
+                      className="text-blue-600 hover:underline"
+                    >Vše</button>
                     <span className="text-slate-300">|</span>
                     <button onClick={() => setExportEmpIds(new Set())} className="text-slate-400 hover:underline">Žádný</button>
                   </div>
                 </div>
                 {/* Dept filter inside export modal */}
                 {(() => {
-                  const depts = Array.from(new Set((data?.stats ?? []).map((s) => s.department).filter(Boolean))).sort() as string[];
+                  const depts = Array.from(new Set(exportAllStats.map((s) => s.department).filter(Boolean))).sort() as string[];
                   return depts.length > 1 ? (
                     <select
                       value={exportDeptFilter}
                       onChange={(e) => {
                         const dept = e.target.value;
                         setExportDeptFilter(dept);
-                        if (dept) {
-                          setExportEmpIds(new Set((data?.stats ?? []).filter((s) => s.department === dept).map((s) => s.id)));
-                        } else {
-                          setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)));
-                        }
+                        setExportEmpIds(new Set(
+                          exportAllStats.filter((s) => !dept || s.department === dept).map((s) => s.id)
+                        ));
                       }}
                       className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
                     >
@@ -809,7 +820,10 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                   ) : null;
                 })()}
                 <div className="border border-slate-200 rounded-xl overflow-auto max-h-64 divide-y divide-slate-50">
-                  {(data?.stats ?? [])
+                  {exportAllStats.length === 0 && (
+                    <div className="px-3 py-4 text-xs text-slate-400 text-center">Načítám…</div>
+                  )}
+                  {exportAllStats
                     .filter((emp) => !exportDeptFilter || emp.department === exportDeptFilter)
                     .map((emp) => (
                       <label key={emp.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer select-none">
@@ -828,7 +842,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                       </label>
                     ))}
                 </div>
-                <span className="text-xs text-slate-400">{exportEmpIds.size} / {(data?.stats ?? []).length} vybráno</span>
+                <span className="text-xs text-slate-400">{exportEmpIds.size} / {exportAllStats.length} vybráno</span>
               </div>
 
               {/* Columns */}
