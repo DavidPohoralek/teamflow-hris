@@ -1093,6 +1093,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
     target_hours: employee?.target_hours ?? 160,
     vacation_days_per_year: employee?.vacation_days_per_year ?? 20,
     vacation_hours_offset: Number((employee as unknown as Record<string, unknown>)?.vacation_hours_offset ?? 0),
+    hourly_rate: (employee as unknown as Record<string, unknown>)?.hourly_rate != null ? Number((employee as unknown as Record<string, unknown>).hourly_rate) : null as number | null,
     employment_type: (employee?.employment_type ? (LEGACY_LABELS[employee.employment_type] ?? employee.employment_type) : empTypes[0] ?? 'HPP') as EmploymentType,
     tier: employee?.tier ?? 0,
     can_saturday: employee?.can_saturday ?? false,
@@ -1103,6 +1104,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showHourlyRate, setShowHourlyRate] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -1130,6 +1132,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
         tier: form.tier,
         can_saturday: form.can_saturday,
         max_saturdays: form.max_saturdays,
+        ...(isAdmin ? { hourly_rate: form.hourly_rate } : {}),
       };
 
       const url = employee ? `/api/employees/${employee.id}` : '/api/employees';
@@ -1303,6 +1306,40 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
               </FormField>
             </div>
           </div>
+
+          {/* Hourly rate — admin only */}
+          {isAdmin && (
+            <div className="border-t pt-4 space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('Mzdové nastavení (Admin)', 'Payroll settings (Admin)')}</p>
+              <FormField label={t('Hodinová sazba (Kč)', 'Hourly rate (CZK)')}>
+                <div className="flex items-center gap-2">
+                  {showHourlyRate ? (
+                    <input
+                      className={inputCls()}
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={form.hourly_rate ?? ''}
+                      onChange={(e) => set('hourly_rate', e.target.value === '' ? null : Number(e.target.value))}
+                      placeholder="0"
+                    />
+                  ) : (
+                    <div className="flex-1 px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-400 text-sm tracking-[0.3em] select-none">
+                      ••••••
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowHourlyRate((v) => !v)}
+                    className="shrink-0 px-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-100 transition"
+                    title={showHourlyRate ? t('Skrýt', 'Hide') : t('Zobrazit', 'Reveal')}
+                  >
+                    {showHourlyRate ? t('Skrýt', 'Hide') : t('Zobrazit', 'Reveal')}
+                  </button>
+                </div>
+              </FormField>
+            </div>
+          )}
 
           {/* RBAC — only admin can grant manager access */}
           {isAdmin && (

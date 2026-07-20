@@ -441,7 +441,7 @@ export default function HomePage() {
 
         {activeTab === 'analytics' && isManagerMode && (
           <div className="flex-1 overflow-auto">
-            <AnalyticsDashboard orgId={orgId} />
+            <AnalyticsDashboard orgId={orgId} isAdmin={managerScope?.isAdmin !== false} />
           </div>
         )}
 

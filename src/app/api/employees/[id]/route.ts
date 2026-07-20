@@ -73,6 +73,7 @@ export async function PUT(
     is_manager,
     managed_departments,
     manager_permissions,
+    hourly_rate,
   } = body as Record<string, unknown>;
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
@@ -108,13 +109,15 @@ export async function PUT(
   if (employment_type !== undefined)
     update.employment_type = typeof employment_type === 'string' ? employment_type : 'hpp';
 
-  // RBAC fields — only admin can change manager permissions
+  // RBAC fields + hourly_rate — only admin can change these
   if (isAdmin) {
     if (is_manager !== undefined) update.is_manager = typeof is_manager === 'boolean' ? is_manager : false;
     if (managed_departments !== undefined)
       update.managed_departments = Array.isArray(managed_departments) ? managed_departments : null;
     if (manager_permissions !== undefined)
       update.manager_permissions = Array.isArray(manager_permissions) ? manager_permissions : [];
+    if (hourly_rate !== undefined)
+      update.hourly_rate = hourly_rate === null ? null : (typeof hourly_rate === 'number' ? hourly_rate : null);
   }
 
   if (Object.keys(update).length === 0) {

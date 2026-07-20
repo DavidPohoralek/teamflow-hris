@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
     is_manager,
     managed_departments,
     manager_permissions,
+    hourly_rate,
   } = body as Record<string, unknown>;
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
     is_manager: typeof is_manager === 'boolean' ? is_manager : false,
     managed_departments: Array.isArray(managed_departments) ? (managed_departments as string[]) : null,
     manager_permissions: Array.isArray(manager_permissions) ? (manager_permissions as string[]) : [],
+    hourly_rate: typeof hourly_rate === 'number' ? hourly_rate : null,
     active: true,
   };
 

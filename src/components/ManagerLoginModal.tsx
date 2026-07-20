@@ -11,9 +11,9 @@ interface ManagerLoginModalProps {
 
 const MANAGER_SESSION_KEY = 'hris_manager_session';
 
-// ── Admin (password) tab ──────────────────────────────────────────────────────
+// ── Admin (password) form ─────────────────────────────────────────────────────
 
-function AdminTab({ orgId, onSuccess }: { orgId: string; onSuccess: () => void }) {
+function AdminForm({ orgId, onSuccess, onBack }: { orgId: string; onSuccess: () => void; onBack: () => void }) {
   const t = useT();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -44,13 +44,21 @@ function AdminTab({ orgId, onSuccess }: { orgId: string; onSuccess: () => void }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="manager-password" className="block text-sm font-medium text-gray-700 mb-1">
-          {t('Heslo', 'Password')}
-        </label>
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+      >
+        ← {t('Zpět na Manažer', 'Back to Manager')}
+      </button>
+      <div className="text-center py-1">
+        <div className="text-2xl mb-1">🔐</div>
+        <p className="text-sm font-medium text-gray-700">{t('Přihlášení Admina', 'Admin login')}</p>
+        <p className="text-xs text-slate-400 mt-0.5">{t('Heslo ze Nastavení', 'Password from Settings')}</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
         <input
-          id="manager-password"
           type="password"
           value={password}
           onChange={(e) => { setPassword(e.target.value); setError(''); }}
@@ -58,30 +66,30 @@ function AdminTab({ orgId, onSuccess }: { orgId: string; onSuccess: () => void }
           autoFocus
           className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
         />
-      </div>
-      {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
-      <button
-        type="submit"
-        disabled={loading || !password}
-        className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition"
-      >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-            </svg>
-            {t('Přihlašuji…', 'Logging in…')}
-          </span>
-        ) : t('Přihlásit se', 'Log in')}
-      </button>
-    </form>
+        {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading || !password}
+          className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              {t('Přihlašuji…', 'Logging in…')}
+            </span>
+          ) : t('Přihlásit se', 'Log in')}
+        </button>
+      </form>
+    </div>
   );
 }
 
-// ── Manager (PIN numpad) tab ──────────────────────────────────────────────────
+// ── Manager (PIN numpad) form ─────────────────────────────────────────────────
 
-function ManagerPinTab({ orgId, onSuccess }: { orgId: string; onSuccess: () => void }) {
+function ManagerPinForm({ orgId, onSuccess }: { orgId: string; onSuccess: () => void }) {
   const t = useT();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -194,49 +202,37 @@ function ManagerPinTab({ orgId, onSuccess }: { orgId: string; onSuccess: () => v
 
 export default function ManagerLoginModal({ orgId, onSuccess, onClose }: ManagerLoginModalProps) {
   const t = useT();
-  const [tab, setTab] = useState<'admin' | 'manager'>('admin');
+  const [showAdmin, setShowAdmin] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-xl font-semibold text-gray-900">{t('Přihlášení', 'Login')}</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {showAdmin ? t('Admin', 'Admin') : t('Přihlášení manažera', 'Manager login')}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mx-6 mb-4 p-1 bg-slate-100 rounded-xl">
-          <button
-            onClick={() => setTab('admin')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'admin' ? 'bg-white shadow text-gray-900' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            🔐 {t('Admin', 'Admin')}
-          </button>
-          <button
-            onClick={() => setTab('manager')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'manager' ? 'bg-white shadow text-gray-900' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            👤 {t('Manažer', 'Manager')}
-          </button>
-        </div>
-
-        {/* Tab description */}
-        <p className="text-xs text-slate-400 text-center px-6 mb-4">
-          {tab === 'admin'
-            ? t('Plný přístup — heslo ze Nastavení', 'Full access — password from Settings')
-            : t('Přihlášení PINem — omezený přístup dle nastavení', 'PIN login — access scoped per settings')}
-        </p>
-
         {/* Content */}
-        <div className="px-6 pb-6">
-          {tab === 'admin'
-            ? <AdminTab orgId={orgId} onSuccess={onSuccess} />
-            : <ManagerPinTab orgId={orgId} onSuccess={onSuccess} />}
+        <div className="px-6 pb-4">
+          {showAdmin
+            ? <AdminForm orgId={orgId} onSuccess={onSuccess} onBack={() => setShowAdmin(false)} />
+            : <ManagerPinForm orgId={orgId} onSuccess={onSuccess} />}
         </div>
 
-        {/* Cancel */}
-        <div className="px-6 pb-6 -mt-2">
+        {/* Footer */}
+        <div className="px-6 pb-6 space-y-2">
+          {!showAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowAdmin(true)}
+              className="w-full px-4 py-2 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              🔐 {t('Přihlásit jako Admin', 'Log in as Admin')}
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
