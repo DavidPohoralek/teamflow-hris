@@ -55,18 +55,26 @@ export async function GET(req: NextRequest) {
     const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
     const empPlans = plans.filter((p) => p.employee_id === emp.id);
 
-    // Saturday bonus eligibility
-    const empDept = emp.department ?? '';
-    const satEligible = satBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept));
-
     // Worked hours (total + saturday split)
+    // Saturday bonus: per-shift — eligible if work_type_name OR emp.department is in satBonusDepts
+    const empDept = emp.department ?? '';
     let workedMinutes = 0;
     let satWorkedMinutes = 0;
+    let satBonusMinutes = 0;
     for (const l of empLogs) {
       const diff = new Date(l.check_out!).getTime() - new Date(l.check_in!).getTime();
       const mins = Math.round(diff / 60000);
       workedMinutes += mins;
-      if (isSat(l.date)) satWorkedMinutes += mins;
+      if (isSat(l.date)) {
+        satWorkedMinutes += mins;
+        if (satBonusPct > 0) {
+          const logType = l.work_type_name ?? '';
+          const eligible = satBonusDepts.length === 0
+            || satBonusDepts.includes(empDept)
+            || satBonusDepts.includes(logType);
+          if (eligible) satBonusMinutes += mins;
+        }
+      }
     }
     const workedHours = workedMinutes / 60;
 
@@ -134,7 +142,7 @@ export async function GET(req: NextRequest) {
 
     const targetHours = emp.target_hours ?? 160;
     const satHours = Math.round((satWorkedMinutes / 60) * 10) / 10;
-    const satBonusHours = satEligible ? Math.round(satHours * (satBonusPct / 100) * 10) / 10 : 0;
+    const satBonusHours = Math.round((satBonusMinutes / 60) * (satBonusPct / 100) * 10) / 10;
 
     return {
       id: emp.id,
