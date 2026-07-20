@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useT } from '@/lib/i18n';
 
 interface ManagerLoginModalProps {
@@ -95,15 +95,6 @@ function ManagerPinForm({ orgId, onSuccess }: { orgId: string; onSuccess: () => 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleDigit = (d: string) => {
-    if (loading) return;
-    setError('');
-    setPin((p) => p.length < 8 ? p + d : p);
-  };
-
-  const handleBackspace = () => { setError(''); setPin((p) => p.slice(0, -1)); };
-  const handleClear = () => { setError(''); setPin(''); };
-
   const handleSubmit = async () => {
     if (!pin || loading) return;
     setError('');
@@ -130,6 +121,38 @@ function ManagerPinForm({ orgId, onSuccess }: { orgId: string; onSuccess: () => 
       setLoading(false);
     }
   };
+
+  const handleDigit = (d: string) => {
+    if (loading) return;
+    setError('');
+    setPin((p) => p.length < 8 ? p + d : p);
+  };
+
+  const handleBackspace = () => { setError(''); setPin((p) => p.slice(0, -1)); };
+  const handleClear = () => { setError(''); setPin(''); };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (loading) return;
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        setError('');
+        setPin((p) => p.length < 8 ? p + e.key : p);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setError('');
+        setPin((p) => p.slice(0, -1));
+      } else if (e.key === 'Escape') {
+        setPin('');
+        setError('');
+      } else if (e.key === 'Enter') {
+        handleSubmit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, pin]);
 
   const dots = Array.from({ length: Math.max(pin.length, 4) }, (_, i) => i < pin.length);
 
