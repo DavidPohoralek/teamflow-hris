@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import * as XLSX from 'xlsx';
 
-// GET /api/analytics/export?month=YYYY-MM&lang=cs|en
+// GET /api/analytics/export?month=YYYY-MM&lang=cs|en&format=csv|xlsx
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
-  const { orgId, supabase, departments } = resolved;
+  const { orgId, supabase, departments, isAdmin } = resolved;
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
   const lang = (searchParams.get('lang') ?? 'cs') as 'cs' | 'en';
+  const format = (searchParams.get('format') ?? 'csv') as 'csv' | 'xlsx';
   const allowedEmpIds = searchParams.get('employees')
     ? new Set(searchParams.get('employees')!.split(',').filter(Boolean))
     : null;
@@ -49,7 +51,13 @@ export async function GET(req: NextRequest) {
     hoursPerUnit: Number(extra[b.hoursKey]),
   }));
 
-  let empQuery = sb.from('employees').select('id, name, department, target_hours, employment_type, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
+  // hourly_rate only fetched when admin and column selected
+  const includeRate = isAdmin && col('hourlyRate');
+  let empQuery = sb.from('employees')
+    .select(`id, name, department, target_hours, employment_type, vacation_days_per_year${includeRate ? ', hourly_rate' : ''}`)
+    .eq('organization_id', orgId)
+    .eq('active', true)
+    .order('name');
   if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
 
   const [empRes, logsRes, plansRes, vacRes, benefitLogsRes] = await Promise.all([
@@ -62,7 +70,7 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] }),
   ]);
 
-  const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number }[] = empRes.data ?? [];
+  const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number; hourly_rate?: number | null }[] = empRes.data ?? [];
   const logs: { employee_id: string; check_in: string; check_out: string; date: string }[] = logsRes.data ?? [];
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
@@ -83,15 +91,14 @@ export async function GET(req: NextRequest) {
     ? employees.filter((e) => allowedEmpIds.has(e.id))
     : employees;
 
+  const LEGACY: Record<string, string> = { hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO' };
+
   const rows = filteredEmployees.map((emp) => {
     const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
-    const empPlans = plans.filter((p) => p.employee_id === emp.id);
     const hasAttendance = empLogs.length > 0;
 
-    // Only actual check-ins count — matches the "Odpracováno" column in the dashboard
     let workedMinutes = 0;
     let saturdayMinutes = 0;
-
     for (const l of empLogs) {
       const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
       workedMinutes += mins;
@@ -101,7 +108,6 @@ export async function GET(req: NextRequest) {
     const workedHours = workedMinutes / 60;
     const saturdayHours = saturdayMinutes / 60;
 
-    // Bonus calculation (saturday only for eligible departments)
     const empDept = emp.department ?? '';
     const satEligible = saturdayBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept));
     const satBonusHours = satEligible ? saturdayHours * (saturdayBonusPct / 100) : 0;
@@ -111,7 +117,6 @@ export async function GET(req: NextRequest) {
     }
     const targetHours = emp.target_hours ?? 160;
 
-    // Benefit hours for this employee this month
     const empBenefitLogs = benefitLogs.filter((bl) => bl.employee_id === emp.id);
     const benefitHours: Record<string, number> = {};
     let totalBenefitHours = 0;
@@ -124,20 +129,21 @@ export async function GET(req: NextRequest) {
     totalBenefitHours = Math.round(totalBenefitHours * 100) / 100;
 
     const totalBonusHours = Math.round((satBonusHours + otBonusHours + totalBenefitHours) * 100) / 100;
-
-    // Final billable total: worked + bonuses + blood − gym − english
     const finalHours = Math.round((
-      workedHours
-      + satBonusHours
-      + otBonusHours
+      workedHours + satBonusHours + otBonusHours
       + (benefitHours['blood'] ?? 0)
       - (benefitHours['gym'] ?? 0)
       - (benefitHours['english'] ?? 0)
     ) * 100) / 100;
 
+    const hourlyRate = includeRate ? (emp.hourly_rate ?? null) : null;
+    const billableTotal = hourlyRate != null
+      ? Math.round(finalHours * hourlyRate * 100) / 100
+      : null;
+
     return {
       name: emp.name,
-      employmentType: emp.employment_type ?? '',
+      employmentType: LEGACY[emp.employment_type ?? ''] ?? (emp.employment_type ?? ''),
       source: hasAttendance ? (lang === 'en' ? 'attendance' : 'docházka') : (lang === 'en' ? 'no data' : 'bez dat'),
       workedHours: Math.round(workedHours * 100) / 100,
       saturdayHours: Math.round(saturdayHours * 100) / 100,
@@ -150,61 +156,90 @@ export async function GET(req: NextRequest) {
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
       vacDays: countVacDays(emp.id),
+      hourlyRate,
+      billableTotal,
     };
   });
 
   const isEn = lang === 'en';
-  const BOM = '﻿';
-
-  const LEGACY: Record<string, string> = { hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO' };
-  const fmt = (n: number) => n.toFixed(2);
-
   const includeBenefits = col('benefits') && activeBenefits.length > 0;
-  const benefitHeaders = includeBenefits
-    ? activeBenefits.map((b) => isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)`)
-    : [];
 
-  const header = [
+  // ── Build header/row arrays (shared for CSV and XLSX) ────────────────────────
+  type CellValue = string | number | null;
+
+  const headers: string[] = [
     isEn ? 'Name' : 'Jméno',
     ...(col('employmentType') ? [isEn ? 'Employment type' : 'Pracovní poměr'] : []),
-    ...(col('source')         ? [isEn ? 'Data source'     : 'Zdroj dat']       : []),
-    ...(col('workedHours')    ? [isEn ? 'Hours worked'    : 'Odpracováno (h)']  : []),
+    ...(col('source')         ? [isEn ? 'Data source'     : 'Zdroj dat']      : []),
+    ...(col('workedHours')    ? [isEn ? 'Hours worked'    : 'Odpracováno (h)'] : []),
     ...(col('saturdayHours')  ? [isEn ? 'Of which Saturday' : 'Z toho soboty (h)'] : []),
     ...(col('satBonusHours')  ? [isEn ? 'Saturday bonus (h)' : 'Bonus soboty (h)'] : []),
     ...(col('otBonusHours')   ? [isEn ? 'Overtime bonus (h)' : 'Bonus přesčas (h)'] : []),
-    ...benefitHeaders,
+    ...(includeBenefits ? activeBenefits.map((b) => isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)`) : []),
     ...(col('totalBonusHours') ? [isEn ? 'Total bonus (h)' : 'Bonus celkem (h)'] : []),
-    ...(col('finalHours')     ? [isEn ? 'Final total (h)' : 'Výsledek (h)']     : []),
-    ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']   : []),
-    ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']       : []),
+    ...(col('finalHours')     ? [isEn ? 'Final total (h)' : 'Výsledek (h)']    : []),
+    ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']  : []),
+    ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']      : []),
     ...(col('vacDays')        ? [isEn ? 'Vacation days used' : 'Dovolená čerpáno (dní)'] : []),
-  ].join(';');
+    ...(includeRate           ? [isEn ? 'Hourly rate (CZK)' : 'Sazba (Kč/h)']  : []),
+    ...(includeRate           ? [isEn ? 'Billable total (CZK)' : 'Mzdový náklad (Kč)'] : []),
+  ];
 
-  const csvRows = rows.map((r) =>
-    [
-      r.name,
-      ...(col('employmentType') ? [LEGACY[r.employmentType] ?? r.employmentType] : []),
-      ...(col('source')         ? [r.source]               : []),
-      ...(col('workedHours')    ? [fmt(r.workedHours)]      : []),
-      ...(col('saturdayHours')  ? [fmt(r.saturdayHours)]    : []),
-      ...(col('satBonusHours')  ? [fmt(r.satBonusHours)]    : []),
-      ...(col('otBonusHours')   ? [fmt(r.otBonusHours)]     : []),
-      ...(includeBenefits ? activeBenefits.map((b) => fmt(r.benefitHours[b.key] ?? 0)) : []),
-      ...(col('totalBonusHours') ? [fmt(r.totalBonusHours)] : []),
-      ...(col('finalHours')     ? [fmt(r.finalHours)]       : []),
-      ...(col('targetHours')    ? [fmt(r.targetHours)]      : []),
-      ...(col('delta')          ? [fmt(r.delta)]            : []),
-      ...(col('vacDays')        ? [String(r.vacDays)]       : []),
-    ].join(';')
-  );
+  const dataRows: CellValue[][] = rows.map((r) => [
+    r.name,
+    ...(col('employmentType') ? [r.employmentType]        : []),
+    ...(col('source')         ? [r.source]                : []),
+    ...(col('workedHours')    ? [r.workedHours]            : []),
+    ...(col('saturdayHours')  ? [r.saturdayHours]          : []),
+    ...(col('satBonusHours')  ? [r.satBonusHours]          : []),
+    ...(col('otBonusHours')   ? [r.otBonusHours]           : []),
+    ...(includeBenefits ? activeBenefits.map((b) => r.benefitHours[b.key] ?? 0) : []),
+    ...(col('totalBonusHours') ? [r.totalBonusHours]       : []),
+    ...(col('finalHours')     ? [r.finalHours]             : []),
+    ...(col('targetHours')    ? [r.targetHours]            : []),
+    ...(col('delta')          ? [r.delta]                  : []),
+    ...(col('vacDays')        ? [r.vacDays]                : []),
+    ...(includeRate           ? [r.hourlyRate]             : []),
+    ...(includeRate           ? [r.billableTotal]          : []),
+  ]);
 
-  const csv = BOM + [header, ...csvRows].join('\r\n');
+  const baseName = `export-${month}${isEn ? '-en' : ''}`;
+
+  // ── Excel ────────────────────────────────────────────────────────────────────
+  if (format === 'xlsx') {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+
+    // Column widths
+    ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 12) }));
+
+    XLSX.utils.book_append_sheet(wb, ws, isEn ? 'Export' : 'Export');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    return new NextResponse(buf, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${baseName}.xlsx"`,
+      },
+    });
+  }
+
+  // ── CSV ──────────────────────────────────────────────────────────────────────
+  const BOM = '﻿';
+  const fmt = (v: CellValue) => v == null ? '' : typeof v === 'number' ? v.toFixed(2) : v;
+
+  const csvLines = [
+    headers.join(';'),
+    ...dataRows.map((row) => row.map(fmt).join(';')),
+  ];
+  const csv = BOM + csvLines.join('\r\n');
 
   return new NextResponse(csv, {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="export-${month}${isEn ? '-en' : ''}.csv"`,
+      'Content-Disposition': `attachment; filename="${baseName}.csv"`,
     },
   });
 }

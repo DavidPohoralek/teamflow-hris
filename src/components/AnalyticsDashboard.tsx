@@ -129,6 +129,7 @@ const EXPORT_COLS = [
   { key: 'targetHours',   label: 'Fond hodin (h)' },
   { key: 'delta',         label: 'Rozdíl (h)' },
   { key: 'vacDays',       label: 'Dovolená čerpáno (dní)' },
+  { key: 'hourlyRate',    label: 'Sazba (Kč/h) + náklad 🔐' },
 ] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,6 +171,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportEmpIds, setExportEmpIds] = useState<Set<string>>(new Set());
   const [exportColKeys, setExportColKeys] = useState<Set<string>>(new Set<string>(EXPORT_COLS.map((c) => c.key)));
+  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [nameSearch, setNameSearch] = useState('');
   // allDepts: fetched once at mount from unfiltered response so dropdown always shows all options
@@ -299,12 +301,12 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
     setShowExportModal(true);
   };
 
-  const handleExport = async () => {
+  const handleExport = async (fmt: 'csv' | 'xlsx') => {
     setExportLoading(true);
     try {
       const emps = Array.from(exportEmpIds).join(',');
       const cols = Array.from(exportColKeys).join(',');
-      const params = new URLSearchParams({ month, lang });
+      const params = new URLSearchParams({ month, lang, format: fmt });
       if (emps) params.set('employees', emps);
       if (cols) params.set('cols', cols);
       const res = await managerFetch(`/api/analytics/export?${params.toString()}`);
@@ -312,7 +314,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `export-${month}${lang === 'en' ? '-en' : ''}.csv`;
+      a.download = `export-${month}${lang === 'en' ? '-en' : ''}.${fmt}`;
       a.click();
       URL.revokeObjectURL(url);
       setShowExportModal(false);
@@ -762,7 +764,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-base font-semibold text-slate-800">Export CSV</h2>
+              <h2 className="text-base font-semibold text-slate-800">Export</h2>
               <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-700 transition-colors">
                 <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -835,24 +837,44 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
-                Zrušit
-              </button>
-              <button
-                onClick={handleExport}
-                disabled={exportLoading || exportEmpIds.size === 0 || exportColKeys.size === 0}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
-              >
-                {exportLoading ? (
-                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                )}
-                {exportLoading ? 'Generuji…' : 'Exportovat CSV'}
-              </button>
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 flex-wrap">
+              {/* Format toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => setExportFormat('xlsx')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${exportFormat === 'xlsx' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  📊 Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportFormat('csv')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${exportFormat === 'csv' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  📄 CSV
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
+                  Zrušit
+                </button>
+                <button
+                  onClick={() => handleExport(exportFormat)}
+                  disabled={exportLoading || exportEmpIds.size === 0 || exportColKeys.size === 0}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
+                >
+                  {exportLoading ? (
+                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  )}
+                  {exportLoading ? 'Generuji…' : `Stáhnout ${exportFormat.toUpperCase()}`}
+                </button>
+              </div>
             </div>
           </div>
         </div>
