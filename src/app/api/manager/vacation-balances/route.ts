@@ -52,8 +52,10 @@ export async function GET(req: NextRequest) {
     const empType = emp.employment_type ?? '';
     const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
     const totalDays = emp.vacation_days_per_year ?? defaultVacationDays;
-    const offsetDays = Number(emp.vacation_hours_offset ?? 0) / hoursPerDay;
+    const offsetHours = Number(emp.vacation_hours_offset ?? 0);
+    const effectiveStartDays = offsetHours > 0 ? offsetHours / hoursPerDay : totalDays;
     const { usedDays = 0, pendingDays = 0 } = byEmployee[emp.id] ?? {};
+    const remainingDays = Math.max(0, effectiveStartDays - usedDays);
     return {
       employeeId: emp.id,
       employeeName: emp.name,
@@ -61,8 +63,8 @@ export async function GET(req: NextRequest) {
       totalDays,
       usedDays,
       pendingDays,
-      remainingDays: Math.max(0, totalDays - usedDays - offsetDays),
-      remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays - offsetDays),
+      remainingDays,
+      remainingAfterPendingDays: Math.max(0, effectiveStartDays - usedDays - pendingDays),
     };
   });
 

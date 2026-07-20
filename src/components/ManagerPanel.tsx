@@ -1227,13 +1227,14 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
                 <input className={inputCls()} type="number" min={0} max={365} value={form.vacation_days_per_year} onChange={(e) => set('vacation_days_per_year', Number(e.target.value))} />
               </FormField>
               <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[11px] text-slate-400 shrink-0">↳ {t('Přeneseno mimo systém:', 'Pre-system used:')}</span>
+                <span className="text-[11px] text-slate-400 shrink-0">↳ {t('Zbývá mimo systém:', 'Balance outside system:')}</span>
                 <input
                   type="number"
                   min={0}
                   value={form.vacation_hours_offset}
                   onChange={(e) => set('vacation_hours_offset', Number(e.target.value))}
                   className="w-14 text-xs border border-slate-200 rounded px-1.5 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  title={t('Kolik hodin dovolené zaměstnanci zbývá ke dni, kdy začal být sledován v systému. 0 = nenastaveno.', 'How many vacation hours the employee had remaining when system tracking began. 0 = not set.')}
                 />
                 <span className="text-[11px] text-slate-400">h</span>
               </div>

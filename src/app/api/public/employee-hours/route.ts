@@ -224,8 +224,9 @@ export async function GET(req: NextRequest) {
       }
     }
     const vacationTotal = (employee as { vacation_days_per_year?: number }).vacation_days_per_year ?? 20
-    const vacationOffsetDays = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0) / 8
-    const vacationRemaining = Math.max(0, vacationTotal - vacationUsed - vacationOffsetDays)
+    const vacationOffsetHours = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0)
+    const effectiveStartDays = vacationOffsetHours > 0 ? vacationOffsetHours / 8 : vacationTotal
+    const vacationRemaining = Math.max(0, effectiveStartDays - vacationUsed)
 
     const BENEFIT_DEFS = [
       { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',   hoursKey: 'benefit_blood_hours',   maxKey: 'benefit_blood_max' },

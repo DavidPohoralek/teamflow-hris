@@ -78,8 +78,11 @@ export async function GET(req: NextRequest) {
   const totalDays = employee.vacation_days_per_year ?? defaultVacationDays;
   const hoursPerDay = 8;
   const totalHours = totalDays * hoursPerDay;
+  // vacation_hours_offset = employee's REMAINING vacation hours as a starting balance
+  // (hours they still had left when we started tracking in the system).
+  // 0 = not set → use full totalDays as starting balance.
   const offsetHours = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0);
-  const offsetDays = offsetHours / hoursPerDay;
+  const effectiveStartDays = offsetHours > 0 ? offsetHours / hoursPerDay : totalDays;
   const currentYear = new Date().getFullYear();
 
   // Load vacation requests for current year
@@ -122,10 +125,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Offset represents hours consumed outside the system — add to consumedDays for display
-  const displayConsumedDays = consumedDays + offsetDays;
+  // effectiveStartDays is the starting balance → remaining = start - used in system
+  const remainingDays = Math.max(0, effectiveStartDays - consumedDays - futurePlannedDays);
+  // consumed outside system = totalDays - effectiveStartDays (what was used before we started tracking)
+  const consumedOutsideDays = Math.max(0, totalDays - effectiveStartDays);
+  const displayConsumedDays = consumedOutsideDays + consumedDays;
   const usedDays = displayConsumedDays + futurePlannedDays;
-  const remainingDays = Math.max(0, totalDays - usedDays);
 
   return NextResponse.json({
     hasPaidVacation: true,
