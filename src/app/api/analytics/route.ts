@@ -136,9 +136,9 @@ export async function GET(req: NextRequest) {
     const workTypes = Array.from(wtMins.entries()).map(([name, mins]) => ({ name, hours: Math.round(mins / 6) / 10 }));
 
     // Vacation used this year (in days)
-    const vacUsedDays = vacRequests
+    const vacUsedHours = vacRequests
       .filter((r) => r.employee_id === emp.id)
-      .reduce((sum, r) => sum + countDays(r.date_from, r.date_to), 0);
+      .reduce((sum, r) => sum + countDays(r.date_from, r.date_to), 0) * 8;
 
     const targetHours = emp.target_hours ?? 160;
     const satHours = Math.round((satWorkedMinutes / 60) * 10) / 10;
@@ -158,9 +158,9 @@ export async function GET(req: NextRequest) {
       // Per-shift overtime/debt: check_out vs planned end_time
       overtimeHours: Math.round(overtimeMinutes / 6) / 10,
       debtHours: Math.round(debtMinutes / 6) / 10,
-      vacationDaysTotal: emp.vacation_days_per_year ?? 20,
-      vacationDaysUsed: vacUsedDays,
-      vacationDaysRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) - vacUsedDays),
+      vacationHoursTotal: (emp.vacation_days_per_year ?? 20) * 8,
+      vacationHoursUsed: vacUsedHours,
+      vacationHoursRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) * 8 - vacUsedHours),
       saturdayHours: satHours,
       saturdayBonusHours: satBonusHours,
       workTypes,

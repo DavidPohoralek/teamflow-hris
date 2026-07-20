@@ -22,9 +22,9 @@ interface EmployeeStat {
   avgPunctualityMin: number | null;
   overtimeHours: number;
   debtHours: number;
-  vacationDaysTotal: number;
-  vacationDaysUsed: number;
-  vacationDaysRemaining: number;
+  vacationHoursTotal: number;
+  vacationHoursUsed: number;
+  vacationHoursRemaining: number;
   saturdayHours?: number;
   saturdayBonusHours?: number;
   workTypes?: WorkTypeBreakdown[];
@@ -128,7 +128,7 @@ const EXPORT_COLS = [
   { key: 'finalHours',    label: 'Výsledek (h)' },
   { key: 'targetHours',   label: 'Fond hodin (h)' },
   { key: 'delta',         label: 'Rozdíl (h)' },
-  { key: 'vacDays',       label: 'Dovolená čerpáno (dní)' },
+  { key: 'vacDays',       label: 'Dovolená čerpáno (h)' },
   { key: 'hourlyRate',    label: 'Sazba (Kč/h) + náklad 🔐' },
 ] as const;
 
@@ -172,6 +172,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
   const [exportEmpIds, setExportEmpIds] = useState<Set<string>>(new Set());
   const [exportColKeys, setExportColKeys] = useState<Set<string>>(new Set<string>(EXPORT_COLS.map((c) => c.key)));
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
+  const [exportDeptFilter, setExportDeptFilter] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [nameSearch, setNameSearch] = useState('');
   // allDepts: fetched once at mount from unfiltered response so dropdown always shows all options
@@ -298,6 +299,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
   const openExportModal = () => {
     setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)));
     setExportColKeys(new Set<string>(EXPORT_COLS.map((c) => c.key)));
+    setExportDeptFilter('');
     setShowExportModal(true);
   };
 
@@ -704,11 +706,11 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                           <PunctualityBadge min={emp.avgPunctualityMin} />
                         </td>
                         <td className="px-4 py-3.5 text-right">
-                          <span className="text-xs text-slate-600">{emp.vacationDaysUsed}/{emp.vacationDaysTotal} dní</span>
+                          <span className="text-xs text-slate-600">{emp.vacationHoursUsed}/{emp.vacationHoursTotal} h</span>
                           <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1 ml-auto">
                             <div
                               className="h-full bg-violet-400 rounded-full"
-                              style={{ width: `${Math.min(100, (emp.vacationDaysUsed / emp.vacationDaysTotal) * 100)}%` }}
+                              style={{ width: `${Math.min(100, (emp.vacationHoursUsed / emp.vacationHoursTotal) * 100)}%` }}
                             />
                           </div>
                         </td>
@@ -784,23 +786,47 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                     <button onClick={() => setExportEmpIds(new Set())} className="text-slate-400 hover:underline">Žádný</button>
                   </div>
                 </div>
+                {/* Dept filter inside export modal */}
+                {(() => {
+                  const depts = Array.from(new Set((data?.stats ?? []).map((s) => s.department).filter(Boolean))).sort() as string[];
+                  return depts.length > 1 ? (
+                    <select
+                      value={exportDeptFilter}
+                      onChange={(e) => {
+                        const dept = e.target.value;
+                        setExportDeptFilter(dept);
+                        if (dept) {
+                          setExportEmpIds(new Set((data?.stats ?? []).filter((s) => s.department === dept).map((s) => s.id)));
+                        } else {
+                          setExportEmpIds(new Set((data?.stats ?? []).map((s) => s.id)));
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      <option value="">Všechna oddělení</option>
+                      {depts.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  ) : null;
+                })()}
                 <div className="border border-slate-200 rounded-xl overflow-auto max-h-64 divide-y divide-slate-50">
-                  {(data?.stats ?? []).map((emp) => (
-                    <label key={emp.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={exportEmpIds.has(emp.id)}
-                        onChange={(e) => {
-                          const next = new Set(exportEmpIds);
-                          if (e.target.checked) next.add(emp.id); else next.delete(emp.id);
-                          setExportEmpIds(next);
-                        }}
-                        className="accent-blue-600 w-4 h-4 shrink-0"
-                      />
-                      <span className="text-sm text-slate-700 truncate">{emp.name}</span>
-                      {emp.department && <span className="text-xs text-slate-400 ml-auto shrink-0">{emp.department}</span>}
-                    </label>
-                  ))}
+                  {(data?.stats ?? [])
+                    .filter((emp) => !exportDeptFilter || emp.department === exportDeptFilter)
+                    .map((emp) => (
+                      <label key={emp.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={exportEmpIds.has(emp.id)}
+                          onChange={(e) => {
+                            const next = new Set(exportEmpIds);
+                            if (e.target.checked) next.add(emp.id); else next.delete(emp.id);
+                            setExportEmpIds(next);
+                          }}
+                          className="accent-blue-600 w-4 h-4 shrink-0"
+                        />
+                        <span className="text-sm text-slate-700 truncate">{emp.name}</span>
+                        {emp.department && <span className="text-xs text-slate-400 ml-auto shrink-0">{emp.department}</span>}
+                      </label>
+                    ))}
                 </div>
                 <span className="text-xs text-slate-400">{exportEmpIds.size} / {(data?.stats ?? []).length} vybráno</span>
               </div>

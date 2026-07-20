@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
   const [empRes, logsRes, plansRes, vacRes, benefitLogsRes] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs').select('employee_id, check_in, check_out, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
+    sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
     sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
     sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
     activeBenefits.length > 0
@@ -71,20 +71,21 @@ export async function GET(req: NextRequest) {
   ]);
 
   const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number; hourly_rate?: number | null }[] = empRes.data ?? [];
-  const logs: { employee_id: string; check_in: string; check_out: string; date: string }[] = logsRes.data ?? [];
+  const logs: { employee_id: string; check_in: string; check_out: string; date: string; work_type_name?: string | null }[] = logsRes.data ?? [];
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
   const benefitLogs: { employee_id: string; benefit_key: string; count: number }[] = benefitLogsRes.data ?? [];
 
   function isSat(dateStr: string) { return new Date(dateStr + 'T00:00:00').getDay() === 6; }
 
-  function countVacDays(empId: string): number {
-    return vacReqs.filter((r) => r.employee_id === empId).reduce((sum, r) => {
+  function countVacHours(empId: string): number {
+    const days = vacReqs.filter((r) => r.employee_id === empId).reduce((sum, r) => {
       if (!r.date_to) return sum + 1;
       const d1 = new Date(r.date_from + 'T00:00:00');
       const d2 = new Date(r.date_to + 'T00:00:00');
       return sum + Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1);
     }, 0);
+    return days * 8;
   }
 
   const filteredEmployees = allowedEmpIds
@@ -97,20 +98,28 @@ export async function GET(req: NextRequest) {
     const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
     const hasAttendance = empLogs.length > 0;
 
+    const empDept = emp.department ?? '';
     let workedMinutes = 0;
     let saturdayMinutes = 0;
+    let satBonusMinutes = 0;
     for (const l of empLogs) {
       const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
       workedMinutes += mins;
-      if (isSat(l.date)) saturdayMinutes += mins;
+      if (isSat(l.date)) {
+        saturdayMinutes += mins;
+        if (saturdayBonusPct > 0) {
+          const logType = l.work_type_name ?? '';
+          const eligible = satBonusDepts.length === 0
+            || satBonusDepts.includes(empDept)
+            || satBonusDepts.includes(logType);
+          if (eligible) satBonusMinutes += mins;
+        }
+      }
     }
 
     const workedHours = workedMinutes / 60;
     const saturdayHours = saturdayMinutes / 60;
-
-    const empDept = emp.department ?? '';
-    const satEligible = saturdayBonusPct > 0 && (satBonusDepts.length === 0 || satBonusDepts.includes(empDept));
-    const satBonusHours = satEligible ? saturdayHours * (saturdayBonusPct / 100) : 0;
+    const satBonusHours = satBonusMinutes / 60 * (saturdayBonusPct / 100);
     let otBonusHours = 0;
     if (overtimeThreshold > 0 && workedHours > overtimeThreshold) {
       otBonusHours = (workedHours - overtimeThreshold) * (overtimeBonusPct / 100);
@@ -155,7 +164,7 @@ export async function GET(req: NextRequest) {
       finalHours,
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
-      vacDays: countVacDays(emp.id),
+      vacHours: countVacHours(emp.id),
       hourlyRate,
       billableTotal,
     };
@@ -180,7 +189,7 @@ export async function GET(req: NextRequest) {
     ...(col('finalHours')     ? [isEn ? 'Final total (h)' : 'Výsledek (h)']    : []),
     ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']  : []),
     ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']      : []),
-    ...(col('vacDays')        ? [isEn ? 'Vacation days used' : 'Dovolená čerpáno (dní)'] : []),
+    ...(col('vacDays')        ? [isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)'] : []),
     ...(includeRate           ? [isEn ? 'Hourly rate (CZK)' : 'Sazba (Kč/h)']  : []),
     ...(includeRate           ? [isEn ? 'Billable total (CZK)' : 'Mzdový náklad (Kč)'] : []),
   ];
@@ -198,7 +207,7 @@ export async function GET(req: NextRequest) {
     ...(col('finalHours')     ? [r.finalHours]             : []),
     ...(col('targetHours')    ? [r.targetHours]            : []),
     ...(col('delta')          ? [r.delta]                  : []),
-    ...(col('vacDays')        ? [r.vacDays]                : []),
+    ...(col('vacDays')        ? [r.vacHours]               : []),
     ...(includeRate           ? [r.hourlyRate]             : []),
     ...(includeRate           ? [r.billableTotal]          : []),
   ]);
