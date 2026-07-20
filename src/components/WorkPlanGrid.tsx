@@ -1188,9 +1188,15 @@ export default function WorkPlanGrid({
   const [myVacation, setMyVacation] = useState(false);
   const [vacationDates, setVacationDates] = useState<Set<string>>(new Set());
 
-  // Shift-type filter (pills show unique work type names from current month's schedule)
-  const [deptFilter, setDeptFilter] = useState<string | null>(null);
+  // Shift-type filter: multi-select dropdown for regular work types
+  const [deptFilters, setDeptFilters] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
+  const [activityDepts, setActivityDepts] = useState<string[]>([]);
+  const [activityFilter, setActivityFilter] = useState(false);
+  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const deptDropdownRef = useRef<HTMLDivElement>(null);
+  // Name search
+  const [nameSearch, setNameSearch] = useState('');
   // Evening-only filter — show only shifts marked as is_evening
   const [eveningFilter, setEveningFilter] = useState(false);
 
@@ -1258,15 +1264,31 @@ export default function WorkPlanGrid({
     fetchWorkTypes();
   }, [fetchWorkTypes]);
 
-  // Build pill list from unique work type names in the current month's schedule
+  // Build filter lists from current month's schedule, split by work type category
   useEffect(() => {
     if (!data) return;
-    const depts = new Set<string>();
+    const activityNames = new Set(workTypes.filter((w) => w.category === 'activity').map((w) => w.name));
+    const regular = new Set<string>();
+    const activity = new Set<string>();
     for (const entry of data.workPlans) {
-      if (entry.workTypeName) depts.add(entry.workTypeName);
+      if (!entry.workTypeName) continue;
+      if (activityNames.has(entry.workTypeName)) activity.add(entry.workTypeName);
+      else regular.add(entry.workTypeName);
     }
-    setDepartments(Array.from(depts).sort());
-  }, [data]);
+    setDepartments(Array.from(regular).sort());
+    setActivityDepts(Array.from(activity).sort());
+  }, [data, workTypes]);
+
+  // Close dept dropdown on outside click
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target as Node)) {
+        setDeptDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, []);
 
   // Employee targets — fetch once per manager session to show planned vs target
   const [employeeTargets, setEmployeeTargets] = useState<Map<string, { name: string; target: number }>>(new Map());
@@ -1707,8 +1729,10 @@ export default function WorkPlanGrid({
                 let es = myShiftsOnly && sessionEmployee
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
-                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                if (deptFilters.length > 0) es = es.filter((e) => deptFilters.includes(e.workTypeName ?? ''));
+                if (activityFilter) es = es.filter((e) => activityDepts.includes(e.workTypeName ?? ''));
                 if (eveningFilter) es = es.filter((e) => e.isEvening === true);
+                if (nameSearch.trim()) es = es.filter((e) => (e.employeeName ?? '').toLowerCase().includes(nameSearch.trim().toLowerCase()));
                 return es;
               })();
               const dayLong = DAY_NAMES_LONG[wd];
@@ -1857,32 +1881,91 @@ export default function WorkPlanGrid({
           </button>
         </div>
 
-        {/* Department filter pills */}
-        {departments.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setDeptFilter(null)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilter === null ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
-            >
-              {t('Vše', 'All')}
-            </button>
-            {departments.map((dept) => (
+        {/* Filter bar: Vše | Typ práce dropdown | Aktivity | Večerní | Hledat */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Vše */}
+          <button
+            onClick={() => { setDeptFilters([]); setActivityFilter(false); setEveningFilter(false); setNameSearch(''); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilters.length === 0 && !activityFilter && !eveningFilter && !nameSearch ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+          >
+            {t('Vše', 'All')}
+          </button>
+
+          {/* Typ práce multi-select dropdown */}
+          {departments.length > 0 && (
+            <div className="relative" ref={deptDropdownRef}>
               <button
-                key={dept}
-                onClick={() => setDeptFilter(deptFilter === dept ? null : dept)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilter === dept ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+                onClick={() => setDeptDropdownOpen((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilters.length > 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
               >
-                {dept}
+                {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
+                <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
               </button>
-            ))}
+              {deptDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
+                  {departments.map((dept) => (
+                    <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={deptFilters.includes(dept)}
+                        onChange={() => setDeptFilters((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept])}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                      />
+                      <span className="text-xs font-medium text-slate-700">{dept}</span>
+                    </label>
+                  ))}
+                  {deptFilters.length > 0 && (
+                    <button
+                      onClick={() => { setDeptFilters([]); setDeptDropdownOpen(false); }}
+                      className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-red-500 text-left border-t border-slate-100 mt-1 transition-colors"
+                    >
+                      {t('Zrušit výběr', 'Clear')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Aktivity toggle */}
+          {activityDepts.length > 0 && (
             <button
-              onClick={() => setEveningFilter(v => !v)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+              onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${activityFilter ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'}`}
             >
-              🌙 {t('Večerní', 'Evening')}
+              🎯 {t('Aktivity', 'Activities')}
             </button>
+          )}
+
+          {/* Večerní toggle */}
+          <button
+            onClick={() => setEveningFilter((v) => !v)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+          >
+            🌙 {t('Večerní', 'Evening')}
+          </button>
+
+          {/* Name search */}
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              value={nameSearch}
+              onChange={(e) => setNameSearch(e.target.value)}
+              placeholder={t('Hledat zaměstnance…', 'Search employee…')}
+              className="pl-7 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-44"
+            />
+            {nameSearch && (
+              <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                ✕
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Right side: PIN session + add button */}
         <div className="flex items-center gap-2">
@@ -2136,8 +2219,10 @@ export default function WorkPlanGrid({
                 let es = myShiftsOnly && sessionEmployee
                   ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                   : allEntries;
-                if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                if (deptFilters.length > 0) es = es.filter((e) => deptFilters.includes(e.workTypeName ?? ''));
+                if (activityFilter) es = es.filter((e) => activityDepts.includes(e.workTypeName ?? ''));
                 if (eveningFilter) es = es.filter((e) => e.isEvening === true);
+                if (nameSearch.trim()) es = es.filter((e) => (e.employeeName ?? '').toLowerCase().includes(nameSearch.trim().toLowerCase()));
                 return es;
               })();
               return (
@@ -2211,8 +2296,10 @@ export default function WorkPlanGrid({
                       let es = myShiftsOnly && sessionEmployee
                         ? allEntries.filter((e) => e.employeeId === sessionEmployee.id)
                         : allEntries;
-                      if (deptFilter) es = es.filter((e) => e.workTypeName === deptFilter);
+                      if (deptFilters.length > 0) es = es.filter((e) => deptFilters.includes(e.workTypeName ?? ''));
+                      if (activityFilter) es = es.filter((e) => activityDepts.includes(e.workTypeName ?? ''));
                       if (eveningFilter) es = es.filter((e) => e.isEvening === true);
+                      if (nameSearch.trim()) es = es.filter((e) => (e.employeeName ?? '').toLowerCase().includes(nameSearch.trim().toLowerCase()));
                       return es;
                     })();
                     return (
