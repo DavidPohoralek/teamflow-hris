@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     // Lookup employee by PIN + org (active only — .single() fails if multiple rows match)
     const { data: employee, error: empError } = await supabase
       .from('employees')
-      .select('id, name, active, department, vacation_days_per_year')
+      .select('id, name, active, department, vacation_days_per_year, vacation_hours_offset')
       .eq('organization_id', orgId)
       .eq('active', true)
       .eq('pin_code', pin)
@@ -224,7 +224,8 @@ export async function GET(req: NextRequest) {
       }
     }
     const vacationTotal = (employee as { vacation_days_per_year?: number }).vacation_days_per_year ?? 20
-    const vacationRemaining = Math.max(0, vacationTotal - vacationUsed)
+    const vacationOffsetDays = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0) / 8
+    const vacationRemaining = Math.max(0, vacationTotal - vacationUsed - vacationOffsetDays)
 
     const BENEFIT_DEFS = [
       { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',   hoursKey: 'benefit_blood_hours',   maxKey: 'benefit_blood_max' },

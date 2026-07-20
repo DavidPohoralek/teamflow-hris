@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   // Find employee
   const { data: employee } = await supabase
     .from('employees')
-    .select('id, name, vacation_days_per_year, employment_type')
+    .select('id, name, vacation_days_per_year, vacation_hours_offset, employment_type')
     .eq('organization_id', orgId)
     .eq('active', true)
     .eq('pin_code', pin)
@@ -78,6 +78,8 @@ export async function GET(req: NextRequest) {
   const totalDays = employee.vacation_days_per_year ?? defaultVacationDays;
   const hoursPerDay = 8;
   const totalHours = totalDays * hoursPerDay;
+  const offsetHours = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0);
+  const offsetDays = offsetHours / hoursPerDay;
   const currentYear = new Date().getFullYear();
 
   // Load vacation requests for current year
@@ -121,7 +123,7 @@ export async function GET(req: NextRequest) {
   }
 
   const usedDays = consumedDays + futurePlannedDays; // all approved (for "zbývá" = not yet planned)
-  const remainingDays = Math.max(0, totalDays - usedDays);
+  const remainingDays = Math.max(0, totalDays - usedDays - offsetDays);
 
   return NextResponse.json({
     hasPaidVacation: true,
@@ -137,7 +139,7 @@ export async function GET(req: NextRequest) {
     pendingHours: pendingDays * hoursPerDay,
     remainingDays,
     remainingHours: remainingDays * hoursPerDay,
-    remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays),
-    remainingAfterPendingHours: Math.max(0, totalDays - usedDays - pendingDays) * hoursPerDay,
+    remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays - offsetDays),
+    remainingAfterPendingHours: Math.max(0, totalDays - usedDays - pendingDays - offsetDays) * hoursPerDay,
   });
 }

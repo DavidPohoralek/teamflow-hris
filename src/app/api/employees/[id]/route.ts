@@ -68,6 +68,7 @@ export async function PUT(
     profile_id,
     pin,
     vacation_days_per_year,
+    vacation_hours_offset,
     employment_type,
     is_manager,
     managed_departments,
@@ -102,6 +103,8 @@ export async function PUT(
   }
   if (vacation_days_per_year !== undefined)
     update.vacation_days_per_year = typeof vacation_days_per_year === 'number' ? vacation_days_per_year : 20;
+  if (vacation_hours_offset !== undefined)
+    update.vacation_hours_offset = typeof vacation_hours_offset === 'number' ? Math.max(0, vacation_hours_offset) : 0;
   if (employment_type !== undefined)
     update.employment_type = typeof employment_type === 'string' ? employment_type : 'hpp';
 

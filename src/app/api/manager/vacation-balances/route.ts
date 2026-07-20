@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const currentYear = new Date().getFullYear();
 
   const [empsRes, requestsRes, settingsRes] = await Promise.all([
-    sb.from('employees').select('id, name, vacation_days_per_year, employment_type').eq('organization_id', orgId).eq('active', true).order('name'),
+    sb.from('employees').select('id, name, vacation_days_per_year, vacation_hours_offset, employment_type').eq('organization_id', orgId).eq('active', true).order('name'),
     sb.from('requests').select('employee_id, date_from, date_to, status').eq('organization_id', orgId).eq('type', 'vacation').gte('date_from', `${currentYear}-01-01`).lte('date_from', `${currentYear}-12-31`),
     sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
@@ -47,10 +47,12 @@ export async function GET(req: NextRequest) {
     else if (req.status === 'pending') byEmployee[req.employee_id].pendingDays += days;
   }
 
-  const balances = (empsRes.data ?? []).map((emp: { id: string; name: string; vacation_days_per_year?: number; employment_type?: string }) => {
+  const hoursPerDay = 8;
+  const balances = (empsRes.data ?? []).map((emp: { id: string; name: string; vacation_days_per_year?: number; vacation_hours_offset?: number; employment_type?: string }) => {
     const empType = emp.employment_type ?? '';
     const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
     const totalDays = emp.vacation_days_per_year ?? defaultVacationDays;
+    const offsetDays = Number(emp.vacation_hours_offset ?? 0) / hoursPerDay;
     const { usedDays = 0, pendingDays = 0 } = byEmployee[emp.id] ?? {};
     return {
       employeeId: emp.id,
@@ -59,8 +61,8 @@ export async function GET(req: NextRequest) {
       totalDays,
       usedDays,
       pendingDays,
-      remainingDays: Math.max(0, totalDays - usedDays),
-      remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays),
+      remainingDays: Math.max(0, totalDays - usedDays - offsetDays),
+      remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays - offsetDays),
     };
   });
 

@@ -1092,6 +1092,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
     labels: employee?.labels ?? [],
     target_hours: employee?.target_hours ?? 160,
     vacation_days_per_year: employee?.vacation_days_per_year ?? 20,
+    vacation_hours_offset: Number((employee as unknown as Record<string, unknown>)?.vacation_hours_offset ?? 0),
     employment_type: (employee?.employment_type ? (LEGACY_LABELS[employee.employment_type] ?? employee.employment_type) : empTypes[0] ?? 'HPP') as EmploymentType,
     tier: employee?.tier ?? 0,
     can_saturday: employee?.can_saturday ?? false,
@@ -1221,9 +1222,22 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
             <FormField label={t('Cílové hodiny / měsíc', 'Target hours / month')}>
               <input className={inputCls()} type="number" min={0} value={form.target_hours} onChange={(e) => set('target_hours', Number(e.target.value))} />
             </FormField>
-            <FormField label={t('Dovolená / rok (dní)', 'Vacation / year (days)')}>
-              <input className={inputCls()} type="number" min={0} max={365} value={form.vacation_days_per_year} onChange={(e) => set('vacation_days_per_year', Number(e.target.value))} />
-            </FormField>
+            <div>
+              <FormField label={t('Dovolená / rok (dní)', 'Vacation / year (days)')}>
+                <input className={inputCls()} type="number" min={0} max={365} value={form.vacation_days_per_year} onChange={(e) => set('vacation_days_per_year', Number(e.target.value))} />
+              </FormField>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-[11px] text-slate-400 shrink-0">↳ {t('Přeneseno mimo systém:', 'Pre-system used:')}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.vacation_hours_offset}
+                  onChange={(e) => set('vacation_hours_offset', Number(e.target.value))}
+                  className="w-14 text-xs border border-slate-200 rounded px-1.5 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                />
+                <span className="text-[11px] text-slate-400">h</span>
+              </div>
+            </div>
           </div>
           {/* Tier + Soboty */}
           <div className="border-t pt-4 space-y-3">
