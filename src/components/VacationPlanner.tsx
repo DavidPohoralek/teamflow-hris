@@ -769,15 +769,15 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   <div className="flex flex-col min-w-0">
                     <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
                     {vacBalance && vacBalance.totalDays > 0 && (() => {
-                      const pct = Math.min(100, (vacBalance.consumedDays / vacBalance.totalDays) * 100);
-                      const barColor = pct >= 90 ? 'bg-red-400' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500';
+                      const usedPct = Math.min(100, ((vacBalance.totalDays - vacBalance.remainingDays) / vacBalance.totalDays) * 100);
+                      const barColor = usedPct >= 90 ? 'bg-red-400' : usedPct >= 70 ? 'bg-amber-400' : 'bg-emerald-500';
                       return (
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <div className="w-20 h-1.5 bg-emerald-200 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${usedPct}%` }} />
                           </div>
                           <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
-                            {vacBalance.consumedDays} / {vacBalance.totalDays} dní
+                            {vacBalance.remainingDays} / {vacBalance.totalDays} dní
                           </span>
                         </div>
                       );
@@ -953,9 +953,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
             <span className="text-xs text-slate-400">{new Date().getFullYear()}</span>
           </div>
           {(() => {
-            const pct = Math.min(100, (vacBalance.consumedDays / vacBalance.totalDays) * 100);
-            const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : pct >= 40 ? 'bg-blue-500' : 'bg-emerald-500';
-            const remainColor = pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-amber-600' : pct >= 40 ? 'text-blue-600' : 'text-emerald-700';
+            const usedPct = Math.min(100, ((vacBalance.totalDays - vacBalance.remainingDays) / vacBalance.totalDays) * 100);
+            const barColor = usedPct >= 90 ? 'bg-red-500' : usedPct >= 70 ? 'bg-amber-400' : usedPct >= 40 ? 'bg-blue-500' : 'bg-emerald-500';
+            const remainColor = usedPct >= 90 ? 'text-red-600' : usedPct >= 70 ? 'text-amber-600' : usedPct >= 40 ? 'text-blue-600' : 'text-emerald-700';
             return (
               <>
                 <div className="flex items-center justify-between mb-1.5">
@@ -963,7 +963,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   <span className={`text-xs font-bold ${remainColor}`}>{vacBalance.remainingDays} {t('dní zbývá', 'days remaining')}</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
-                  <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${usedPct}%` }} />
                 </div>
               </>
             );

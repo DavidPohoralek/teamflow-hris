@@ -122,24 +122,26 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const usedDays = consumedDays + futurePlannedDays; // all approved (for "zbývá" = not yet planned)
-  const remainingDays = Math.max(0, totalDays - usedDays - offsetDays);
+  // Offset represents hours consumed outside the system — add to consumedDays for display
+  const displayConsumedDays = consumedDays + offsetDays;
+  const usedDays = displayConsumedDays + futurePlannedDays;
+  const remainingDays = Math.max(0, totalDays - usedDays);
 
   return NextResponse.json({
     hasPaidVacation: true,
     totalDays,
     totalHours,
-    consumedDays,
-    consumedHours: consumedDays * hoursPerDay,
+    consumedDays: displayConsumedDays,
+    consumedHours: displayConsumedDays * hoursPerDay,
     futurePlannedDays,
     futurePlannedHours: futurePlannedDays * hoursPerDay,
-    usedDays,   // all approved = consumedDays + futurePlannedDays (kept for backwards compat)
+    usedDays,
     usedHours: usedDays * hoursPerDay,
     pendingDays,
     pendingHours: pendingDays * hoursPerDay,
     remainingDays,
     remainingHours: remainingDays * hoursPerDay,
-    remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays - offsetDays),
-    remainingAfterPendingHours: Math.max(0, totalDays - usedDays - pendingDays - offsetDays) * hoursPerDay,
+    remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays),
+    remainingAfterPendingHours: Math.max(0, totalDays - usedDays - pendingDays) * hoursPerDay,
   });
 }
