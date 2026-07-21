@@ -352,6 +352,155 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
   );
 }
 
+// ─── BulkShiftModal ───────────────────────────────────────────────────────────
+
+interface BulkShiftModalProps {
+  orgId: string;
+  month: string;
+  workTypes: WorkType[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const WEEKDAY_LABELS_CS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+
+function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShiftModalProps) {
+  const t = useT();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [workTypeId, setWorkTypeId] = useState(workTypes[0]?.id ?? '');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [isEvening, setIsEvening] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set([0, 1, 2, 3, 4]));
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    managerFetch('/api/employees')
+      .then((r) => r.json())
+      .then((d: { employees?: Employee[] } | Employee[]) => {
+        const list = Array.isArray(d) ? d : (d as { employees?: Employee[] }).employees ?? [];
+        setEmployees(list);
+        if (list[0]) setSelectedEmployeeId(list[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
+  const targetDays = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const days: string[] = [];
+    const daysInMonth = new Date(y, m, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(y, m - 1, d);
+      const wd = (date.getDay() + 6) % 7;
+      if (selectedDays.has(wd)) days.push(`${month}-${String(d).padStart(2, '0')}`);
+    }
+    return days;
+  }, [month, selectedDays]);
+
+  const toggleDay = (wd: number) => {
+    setSelectedDays((prev) => { const next = new Set(prev); next.has(wd) ? next.delete(wd) : next.add(wd); return next; });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployeeId || !workTypeId || targetDays.length === 0) return;
+    setProgress(t('Ukládám…', 'Saving…'));
+    setError(null);
+    let ok = 0, fail = 0;
+    for (const date of targetDays) {
+      try {
+        const res = await managerFetch('/api/public/work-plans', {
+          method: 'POST',
+          body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, isEvening }),
+        });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
+      setProgress(`${ok + fail} / ${targetDays.length}…`);
+    }
+    if (fail > 0) setError(t(`${fail} dnů se nepodařilo uložit.`, `${fail} days failed.`));
+    else { onSuccess(); onClose(); }
+    setProgress(null);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold text-gray-800">⚡ {t('Plošné zadání směn', 'Bulk shift assignment')}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
+            <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
+              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
+            <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+            <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
+          </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('Dny v týdnu', 'Days of week')}</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {WEEKDAY_LABELS_CS.map((label, wd) => (
+                <button key={wd} type="button" onClick={() => toggleDay(wd)}
+                  className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${selectedDays.has(wd) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {targetDays.length > 0 && (
+            <div className="text-sm text-blue-700 bg-blue-50 rounded-lg px-3 py-2 font-medium">
+              {t(`Zadá ${targetDays.length} směn v ${month}`, `Creates ${targetDays.length} shifts in ${month}`)}
+            </div>
+          )}
+          {targetDays.length === 0 && (
+            <div className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              {t('Vyberte alespoň jeden den.', 'Select at least one day.')}
+            </div>
+          )}
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              {t('Zrušit', 'Cancel')}
+            </button>
+            <button type="submit" disabled={!!progress || targetDays.length === 0}
+              className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {progress ?? t('Zadat směny', 'Assign shifts')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthChange }: GoogleSheetsGridProps) {
@@ -390,9 +539,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [addModalEmployeeId, setAddModalEmployeeId] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Context menu + edit
+  // Context menu + edit + bulk
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: WorkPlanEntry } | null>(null);
   const [editEntry, setEditEntry] = useState<WorkPlanEntry | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   // Sticky month-view header
   const [stickyWeekKey, setStickyWeekKey] = useState<string | null>(null);
@@ -1017,6 +1167,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           )
         )}
 
+        {isManagerMode && (
+          <button
+            onClick={() => setShowBulkModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
+          >
+            ⚡ {t('Plošné zadání', 'Bulk assign')}
+          </button>
+        )}
         {(isManagerMode || sessionEmployee) && (
           <button
             onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
@@ -1030,8 +1189,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         )}
       </div>
 
-      {/* Grid */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
+      {/* Grid — overflowY:clip prevents the browser from promoting overflow-y:visible→auto
+           which would break position:sticky on the thead th elements */}
+      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white" style={{ overflowY: 'clip' }}>
         <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '160px', minWidth: '140px' }} />
@@ -1101,33 +1261,23 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 : f.toLocaleDateString('cs-CZ', { month: 'long' });
               return (
                 <>
-                  {/* Week separator row — visually prominent so month boundaries are clear */}
+                  {/* Week separator — thin labeled divider; dates are in the sticky header above */}
                   <tr
                     key={`sep-${wDays[0]}`}
                     ref={(el) => { if (el) weekSepRowRefs.current.set(wDays[0], el); else weekSepRowRefs.current.delete(wDays[0]); }}
-                    className={`${wi > 0 ? 'border-t-2 border-slate-300' : 'border-t border-slate-200'}`}
+                    className={`${wi > 0 ? 'border-t-2 border-slate-300' : ''}`}
                   >
-                    <td className="sticky left-0 z-10 bg-slate-200/80 px-3 py-1.5 border-r border-slate-300">
-                      <div className="flex flex-col gap-0">
-                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">{monthLabel}</span>
-                        <span className="text-[11px] font-bold text-slate-700 leading-tight">{wLabel}</span>
+                    <td className="sticky left-0 z-10 bg-slate-200/80 px-3 py-1 border-r border-slate-300">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">{monthLabel}</span>
+                        <span className="text-[11px] font-bold text-slate-700">{wLabel}</span>
                       </div>
                     </td>
                     {wDays.map((d, i) => {
-                      const isToday = d === today;
                       const isClosed = closedDates.has(d);
                       const isWeekend = i >= 5;
-                      const dayNum = new Date(d + 'T00:00:00').getDate();
-                      const isNewMonth = i > 0 && new Date(d + 'T00:00:00').getDate() === 1;
                       return (
-                        <td key={d} className={`px-1 py-1.5 text-center text-[11px] border-r border-slate-300 last:border-r-0 ${isClosed ? 'bg-gray-200/60 text-gray-400' : isWeekend ? 'bg-slate-200/60 text-slate-400' : 'bg-slate-100/80 text-slate-600'}`}>
-                          <div className="inline-flex flex-col items-center gap-0">
-                            {isNewMonth && <span className="text-[8px] uppercase tracking-wide text-slate-400 font-medium leading-none">{new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { month: 'short' })}</span>}
-                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${isToday ? 'bg-blue-600 text-white' : ''}`}>
-                              {dayNum}
-                            </span>
-                          </div>
-                        </td>
+                        <td key={d} className={`py-1 border-r border-slate-200 last:border-r-0 ${isClosed ? 'bg-gray-200/60' : isWeekend ? 'bg-slate-200/40' : 'bg-slate-100/60'}`} />
                       );
                     })}
                   </tr>
@@ -1159,6 +1309,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             🗑️ {t('Smazat', 'Delete')}
           </button>
         </div>
+      )}
+
+      {showBulkModal && (
+        <BulkShiftModal
+          orgId={orgId}
+          month={weekDays[3].slice(0, 7)}
+          workTypes={workTypes}
+          onClose={() => setShowBulkModal(false)}
+          onSuccess={() => { setToast(t('Směny zadány!', 'Shifts assigned!')); fetchPlans(); }}
+        />
       )}
 
       {showAddModal && (
