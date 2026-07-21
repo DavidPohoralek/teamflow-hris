@@ -619,28 +619,37 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     const allDates = viewMode === 'month' ? monthWeeks.flatMap(getWeekDays) : weekDays;
     let result = baseEmployees;
 
+    // Name search always applies
     if (nameSearch.trim()) {
       const q = nameSearch.trim().toLowerCase();
       result = result.filter((e) => (e.name ?? '').toLowerCase().includes(q));
     }
-    if (deptFilters.length > 0) {
-      result = result.filter((emp) =>
-        allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => deptFilters.includes(e.workTypeName ?? '')))
-      );
+
+    // In manager mode: don't filter employee rows by shift content —
+    // dept/activity/evening filters only affect which badges render inside cells.
+    // This ensures all employees are always visible regardless of whether
+    // they have shifts in the selected period.
+    if (!isManagerMode) {
+      if (deptFilters.length > 0) {
+        result = result.filter((emp) =>
+          allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => deptFilters.includes(e.workTypeName ?? '')))
+        );
+      }
+      if (activityFilter) {
+        result = result.filter((emp) =>
+          allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => activityDepts.includes(e.workTypeName ?? '')))
+        );
+      }
+      if (eveningFilter) {
+        result = result.filter((emp) =>
+          allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => e.isEvening))
+        );
+      }
     }
-    if (activityFilter) {
-      result = result.filter((emp) =>
-        allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => activityDepts.includes(e.workTypeName ?? '')))
-      );
-    }
-    if (eveningFilter) {
-      result = result.filter((emp) =>
-        allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => e.isEvening))
-      );
-    }
+
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseEmployees, nameSearch, deptFilters, activityFilter, activityDepts, eveningFilter, plansMap, fullPlansMap, viewMode, weekDays.join(','), monthWeeks]);
+  }, [baseEmployees, nameSearch, deptFilters, activityFilter, activityDepts, eveningFilter, plansMap, fullPlansMap, viewMode, isManagerMode, weekDays.join(','), monthWeeks]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const goToPrev = () => {
@@ -851,7 +860,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button onClick={goToPrev}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -864,6 +873,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
+          </button>
+          <button
+            onClick={() => setWeekStart(getWeekStart(new Date()))}
+            className="ml-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
+            title={t('Přejít na aktuální týden', 'Go to current week')}
+          >
+            {t('Dnes', 'Today')}
           </button>
         </div>
 
