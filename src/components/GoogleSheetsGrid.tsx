@@ -395,17 +395,21 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         arr.push(p);
         raw.set(key, arr);
       }
-      // Deduplicate: per cell, if any entry with the same workTypeId has times,
-      // drop timeless entries of that same type (avoids double badge from old data)
+      // Deduplicate: keep only entries with proper work_type_id when any exist;
+      // then also drop timeless entries if a timed entry of the same type exists.
       const map = new Map<string, WorkPlanEntry[]>();
       raw.forEach((entries, key) => {
+        // 1) Prefer typed entries (work_type_id set) over free-text fallback entries
+        const hasTyped = entries.some((e) => e.workTypeId != null);
+        let cleaned = hasTyped ? entries.filter((e) => e.workTypeId != null) : entries;
+        // 2) Drop timeless entry when same workTypeId already has a timed entry
         const timedTypeIds = new Set(
-          entries.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
+          cleaned.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
         );
-        const filtered = entries.filter(
+        cleaned = cleaned.filter(
           (e) => (e.startTime && e.endTime) || !timedTypeIds.has(e.workTypeId ?? '__none__')
         );
-        map.set(key, filtered.length > 0 ? filtered : entries);
+        map.set(key, cleaned.length > 0 ? cleaned : entries);
       });
       setPlansMap(map);
     } finally {
@@ -697,8 +701,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </div>
           )}
 
-          {/* Aktivity toggle */}
-          {activityDepts.length > 0 && (
+          {/* Aktivity toggle — shown whenever activity work types exist in the system */}
+          {workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${activityFilter ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'}`}

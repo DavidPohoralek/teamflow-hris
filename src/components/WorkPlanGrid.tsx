@@ -1929,8 +1929,8 @@ export default function WorkPlanGrid({
             </div>
           )}
 
-          {/* Aktivity toggle */}
-          {activityDepts.length > 0 && (
+          {/* Aktivity toggle — shown whenever activity work types exist in the system */}
+          {workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${activityFilter ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'}`}
