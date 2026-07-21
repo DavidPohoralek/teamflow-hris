@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
 
@@ -268,6 +268,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [addModalEmployeeId, setAddModalEmployeeId] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
+  // ── Filters ───────────────────────────────────────────────────────────────
+  const [deptFilters, setDeptFilters] = useState<string[]>([]);
+  const [activityFilter, setActivityFilter] = useState(false);
+  const [eveningFilter, setEveningFilter] = useState(false);
+  const [nameSearch, setNameSearch] = useState('');
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [activityDepts, setActivityDepts] = useState<string[]>([]);
+  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const deptDropdownRef = useRef<HTMLDivElement>(null);
+
   // ── PIN session (shared with WorkPlanGrid via localStorage) ──────────────
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
@@ -405,9 +415,36 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
+  // ── Compute filter lists from current plans + work types ──────────────────
+  useEffect(() => {
+    const activityNames = new Set(workTypes.filter((w) => w.category === 'activity').map((w) => w.name));
+    const regular = new Set<string>();
+    const activity = new Set<string>();
+    Array.from(plansMap.values()).forEach((entries) => {
+      entries.forEach((e) => {
+        if (!e.workTypeName) return;
+        if (activityNames.has(e.workTypeName)) activity.add(e.workTypeName);
+        else regular.add(e.workTypeName);
+      });
+    });
+    setDepartments(Array.from(regular).sort());
+    setActivityDepts(Array.from(activity).sort());
+  }, [plansMap, workTypes]);
+
+  // ── Close dept dropdown on outside click ──────────────────────────────────
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target as Node)) {
+        setDeptDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, []);
+
   // ── Compute employee list ─────────────────────────────────────────────────
   // Manager: all active employees; non-manager: employees with plans this week
-  const displayEmployees: Employee[] = isManagerMode
+  const baseEmployees: Employee[] = isManagerMode
     ? employees
     : (() => {
         const seen = new Map<string, Employee>();
@@ -424,6 +461,43 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         });
         return Array.from(seen.values()).sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'cs'));
       })();
+
+  // ── Apply filters ─────────────────────────────────────────────────────────
+  const displayEmployees = useMemo(() => {
+    let result = baseEmployees;
+
+    if (nameSearch.trim()) {
+      const q = nameSearch.trim().toLowerCase();
+      result = result.filter((e) => (e.name ?? '').toLowerCase().includes(q));
+    }
+
+    if (deptFilters.length > 0) {
+      result = result.filter((emp) =>
+        weekDays.some((date) =>
+          (plansMap.get(`${emp.id}|${date}`) ?? []).some((e) => deptFilters.includes(e.workTypeName ?? ''))
+        )
+      );
+    }
+
+    if (activityFilter) {
+      result = result.filter((emp) =>
+        weekDays.some((date) =>
+          (plansMap.get(`${emp.id}|${date}`) ?? []).some((e) => activityDepts.includes(e.workTypeName ?? ''))
+        )
+      );
+    }
+
+    if (eveningFilter) {
+      result = result.filter((emp) =>
+        weekDays.some((date) =>
+          (plansMap.get(`${emp.id}|${date}`) ?? []).some((e) => e.isEvening)
+        )
+      );
+    }
+
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseEmployees, nameSearch, deptFilters, activityFilter, activityDepts, eveningFilter, plansMap, weekDays.join(',')]);
 
   // ── Week navigation ───────────────────────────────────────────────────────
   const goToPrevWeek = () => {
@@ -487,7 +561,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       <div className="flex flex-col gap-0.5 items-center justify-center h-full px-0.5">
         {entries.map((e) => {
           const bg = e.workTypeColor ?? '#e2e8f0';
-          // Determine text color based on background brightness
           const textColor = isLight(bg) ? '#1e293b' : '#ffffff';
           const label =
             e.startTime && e.endTime
@@ -496,11 +569,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           return (
             <div
               key={e.id}
-              title={[e.workTypeName, e.note].filter(Boolean).join(' · ')}
+              title={[e.workTypeName, e.startTime && e.endTime ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}` : null, e.note ? `📝 ${e.note}` : null].filter(Boolean).join(' · ')}
               style={{ backgroundColor: bg, color: textColor }}
-              className="w-full rounded text-[11px] font-semibold text-center px-1 py-0.5 leading-tight truncate"
+              className="w-full rounded text-[11px] font-semibold px-1 py-0.5 leading-tight flex items-center justify-center gap-0.5 min-w-0"
             >
-              {label}
+              <span className="truncate">{label}</span>
+              {e.isEvening && <span className="shrink-0 text-[9px] opacity-80">🌙</span>}
+              {e.note && <span className="shrink-0 text-[9px] opacity-80">📝</span>}
             </div>
           );
         })}
@@ -540,6 +615,82 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
+        </div>
+
+        {/* ── Filter bar ─────────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Typ práce multi-select dropdown */}
+          {departments.length > 0 && (
+            <div className="relative" ref={deptDropdownRef}>
+              <button
+                onClick={() => setDeptDropdownOpen((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilters.length > 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+              >
+                {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
+                <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {deptDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
+                  {departments.map((dept) => (
+                    <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={deptFilters.includes(dept)}
+                        onChange={() => setDeptFilters((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept])}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                      />
+                      <span className="text-xs font-medium text-slate-700">{dept}</span>
+                    </label>
+                  ))}
+                  {deptFilters.length > 0 && (
+                    <button
+                      onClick={() => { setDeptFilters([]); setDeptDropdownOpen(false); }}
+                      className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-red-500 text-left border-t border-slate-100 mt-1 transition-colors"
+                    >
+                      {t('Zrušit výběr', 'Clear')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Aktivity toggle */}
+          {activityDepts.length > 0 && (
+            <button
+              onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${activityFilter ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'}`}
+            >
+              🎯 {t('Aktivity', 'Activities')}
+            </button>
+          )}
+
+          {/* Večerní toggle */}
+          <button
+            onClick={() => setEveningFilter((v) => !v)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+          >
+            🌙 {t('Večerní', 'Evening')}
+          </button>
+
+          {/* Name search */}
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              value={nameSearch}
+              onChange={(e) => setNameSearch(e.target.value)}
+              placeholder={t('Hledat…', 'Search…')}
+              className="pl-7 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-36"
+            />
+            {nameSearch && (
+              <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+            )}
+          </div>
         </div>
 
         {/* PIN session — only shown when not manager */}
