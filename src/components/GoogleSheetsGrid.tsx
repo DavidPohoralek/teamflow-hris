@@ -113,6 +113,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [note, setNote] = useState('');
+  const [isEvening, setIsEvening] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(defaultEmployeeId ?? '');
   const [submitting, setSubmitting] = useState(false);
@@ -145,7 +146,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
         if (!selectedEmployeeId) { setError(t('Vyberte zaměstnance.', 'Please select an employee.')); setSubmitting(false); return; }
         const res = await managerFetch('/api/public/work-plans', {
           method: 'POST',
-          body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined }),
+          body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined, isEvening }),
         });
         const json = await res.json();
         if (!res.ok) setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.'));
@@ -155,7 +156,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
         const res = await fetch('/api/public/schedule/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orgId, pin: sessionPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined }),
+          body: JSON.stringify({ orgId, pin: sessionPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined, isEvening }),
         });
         const json = await res.json();
         if (!res.ok) setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.'));
@@ -167,7 +168,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-800">{t('Přidat směnu', 'Add shift')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
@@ -212,6 +213,11 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
             <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Volitelná…', 'Optional…')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)}
+              className="w-4 h-4 accent-orange-500" />
+            <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
+          </label>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose}
@@ -474,23 +480,39 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   // ── Compute employee list ─────────────────────────────────────────────────
   // Manager: all active employees; non-manager: employees with plans this week
-  const baseEmployees: Employee[] = isManagerMode
-    ? employees
-    : (() => {
-        const seen = new Map<string, Employee>();
-        Array.from(plansMap.values()).forEach((p) => {
-          p.forEach((e) => {
-            if (!seen.has(e.employeeId)) {
-              seen.set(e.employeeId, {
-                id: e.employeeId,
-                name: e.employeeName ?? e.employeeId,
-                department: e.employeeDepartment,
-              });
-            }
+  // Department order from work_types sort_order (departments = work type names)
+  const deptOrder = useMemo(() => {
+    const m = new Map<string, number>();
+    workTypes.forEach((wt, i) => m.set(wt.name, wt.sort_order ?? i));
+    return m;
+  }, [workTypes]);
+
+  const baseEmployees: Employee[] = useMemo(() => {
+    const list = isManagerMode
+      ? employees
+      : (() => {
+          const seen = new Map<string, Employee>();
+          Array.from(plansMap.values()).forEach((p) => {
+            p.forEach((e) => {
+              if (!seen.has(e.employeeId)) {
+                seen.set(e.employeeId, {
+                  id: e.employeeId,
+                  name: e.employeeName ?? e.employeeId,
+                  department: e.employeeDepartment,
+                });
+              }
+            });
           });
-        });
-        return Array.from(seen.values()).sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'cs'));
-      })();
+          return Array.from(seen.values());
+        })();
+    return [...list].sort((a, b) => {
+      const da = deptOrder.get(a.department ?? '') ?? 9999;
+      const db = deptOrder.get(b.department ?? '') ?? 9999;
+      if (da !== db) return da - db;
+      return (a.name ?? '').localeCompare(b.name ?? '', 'cs');
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employees, isManagerMode, plansMap, deptOrder]);
 
   // ── Apply filters ─────────────────────────────────────────────────────────
   const displayEmployees = useMemo(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { managerFetch } from '@/lib/managerFetch';
 import PinPad from './PinPad';
@@ -246,7 +246,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-gray-800">{t('Přidat směnu', 'Add shift')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label={t('Zavřít', 'Close')}>×</button>
@@ -759,7 +759,7 @@ function EntryChip({
       </span>
       {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
         <span className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover/chip:opacity-100 transition-opacity">
-          {onCopyEntry && !isManagerMode && sessionEmployeeId && entry.employeeId === sessionEmployeeId && (
+          {onCopyEntry && (isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
             <button
               data-tour="copy-shift"
               onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
@@ -1094,6 +1094,171 @@ async function downloadShiftsIcs(orgId: string, employeeId: string, employeeName
   URL.revokeObjectURL(url);
 }
 
+// ─── BulkShiftModal ───────────────────────────────────────────────────────────
+
+interface BulkShiftModalProps {
+  orgId: string;
+  month: string; // "YYYY-MM"
+  workTypes: WorkType[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const WEEKDAY_LABELS_CS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+
+function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShiftModalProps) {
+  const t = useT();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [workTypeId, setWorkTypeId] = useState(workTypes[0]?.id ?? '');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [isEvening, setIsEvening] = useState(false);
+  // weekdays: 0=Mon … 6=Sun
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set([0, 1, 2, 3, 4])); // Po–Pá default
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    managerFetch('/api/employees')
+      .then((r) => r.json())
+      .then((d: { employees?: Employee[] } | Employee[]) => {
+        const list = Array.isArray(d) ? d : (d as { employees?: Employee[] }).employees ?? [];
+        setEmployees(list);
+        if (list[0]) setSelectedEmployeeId(list[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Compute days in month matching selected weekdays
+  const targetDays = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const days: string[] = [];
+    const daysInMonth = new Date(y, m, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(y, m - 1, d);
+      // getDay(): 0=Sun,1=Mon…6=Sat → convert to 0=Mon…6=Sun
+      const wd = (date.getDay() + 6) % 7;
+      if (selectedDays.has(wd)) {
+        days.push(`${month}-${String(d).padStart(2, '0')}`);
+      }
+    }
+    return days;
+  }, [month, selectedDays]);
+
+  const toggleDay = (wd: number) => {
+    setSelectedDays((prev) => {
+      const next = new Set(prev);
+      next.has(wd) ? next.delete(wd) : next.add(wd);
+      return next;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployeeId || !workTypeId || targetDays.length === 0) return;
+    setProgress(t('Ukládám…', 'Saving…'));
+    setError(null);
+    let ok = 0;
+    let fail = 0;
+    for (const date of targetDays) {
+      try {
+        const res = await managerFetch('/api/public/work-plans', {
+          method: 'POST',
+          body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, isEvening }),
+        });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
+      setProgress(`${ok + fail} / ${targetDays.length}…`);
+    }
+    if (fail > 0) setError(t(`${fail} dnů se nepodařilo uložit.`, `${fail} days failed.`));
+    else { onSuccess(); onClose(); }
+    setProgress(null);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold text-gray-800">⚡ {t('Plošné zadání směn', 'Bulk shift assignment')}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Employee */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
+            <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
+              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+            </select>
+          </div>
+          {/* Work type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
+            <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
+            </select>
+          </div>
+          {/* Times */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          {/* Evening flag */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+            <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
+          </label>
+          {/* Weekday selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('Dny v týdnu', 'Days of week')}</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {WEEKDAY_LABELS_CS.map((label, wd) => (
+                <button key={wd} type="button" onClick={() => toggleDay(wd)}
+                  className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${selectedDays.has(wd) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Preview */}
+          {targetDays.length > 0 && (
+            <div className="text-sm text-blue-700 bg-blue-50 rounded-lg px-3 py-2 font-medium">
+              {t(`Zadá ${targetDays.length} směn v ${month}`, `Creates ${targetDays.length} shifts in ${month}`)}
+            </div>
+          )}
+          {targetDays.length === 0 && (
+            <div className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              {t('Vyberte alespoň jeden den.', 'Select at least one day.')}
+            </div>
+          )}
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              {t('Zrušit', 'Cancel')}
+            </button>
+            <button type="submit" disabled={!!progress || targetDays.length === 0}
+              className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {progress ?? t('Zadat směny', 'Assign shifts')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── WorkPlanGrid ─────────────────────────────────────────────────────────────
 
 export default function WorkPlanGrid({
@@ -1121,6 +1286,7 @@ export default function WorkPlanGrid({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [addShiftDate, setAddShiftDate] = useState<string>(() => todayISO());
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -2105,6 +2271,16 @@ export default function WorkPlanGrid({
             )
           )}
 
+          {/* Bulk shift button — manager only */}
+          {isManagerMode && (
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-violet-500/20 active:scale-95"
+              title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
+            >
+              ⚡ {t('Plošné zadání', 'Bulk assign')}
+            </button>
+          )}
           {/* Add shift button */}
           <button
             data-tour="add-shift"
@@ -2347,6 +2523,15 @@ export default function WorkPlanGrid({
           sessionPin={sessionPin || undefined}
           onClose={() => setShowModal(false)}
           onSuccess={handleShiftSuccess}
+        />
+      )}
+      {showBulkModal && (
+        <BulkShiftModal
+          orgId={orgId}
+          month={month}
+          workTypes={workTypes}
+          onClose={() => setShowBulkModal(false)}
+          onSuccess={() => { setShowBulkModal(false); fetchSchedule(); }}
         />
       )}
 

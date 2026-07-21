@@ -105,6 +105,8 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [benefitSaving, setBenefitSaving] = useState<string | null>(null);
   const [benefitEntries, setBenefitEntries] = useState<{ id: string; benefit_key: string; date: string }[]>([]);
   const [deletingBenefitId, setDeletingBenefitId] = useState<string | null>(null);
+  // Retroactive date picker: key = benefit_key, value = ISO date being picked
+  const [retroDatePicker, setRetroDatePicker] = useState<Record<string, string>>({});
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   // Bottom tab: 'logs' | 'requests'
   const [activeTab, setActiveTab] = useState<'logs' | 'requests'>('logs');
@@ -216,19 +218,21 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     } catch { /* ignore */ }
   };
 
-  const logBenefitToday = async (benefitKey: string) => {
+  const logBenefit = async (benefitKey: string, date?: string) => {
     if (!data?.thisMonth.monthKey) return;
     setBenefitSaving(benefitKey);
     try {
       const res = await fetch('/api/public/benefit-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId, pin, benefit_key: benefitKey }),
+        body: JSON.stringify({ orgId, pin, benefit_key: benefitKey, date }),
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.entry) setBenefitEntries((prev) => [json.entry, ...prev]);
+        if (json.entry) setBenefitEntries((prev) => [json.entry, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
         setBenefitCounts((prev) => ({ ...prev, [benefitKey]: (prev[benefitKey] ?? 0) + 1 }));
+        // Close date picker if it was open
+        setRetroDatePicker((prev) => { const n = { ...prev }; delete n[benefitKey]; return n; });
       }
     } catch { /* ignore */ }
     finally { setBenefitSaving(null); }
@@ -390,6 +394,8 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                         const max = b.maxPerMonth ?? 99;
                         const loggedToday = myEntries.some((e) => e.date === today);
                         const canLog = !loggedToday && count < max;
+                        const retroDate = retroDatePicker[b.key];
+                        const retroAlreadyLogged = retroDate ? myEntries.some((e) => e.date === retroDate) : false;
                         return (
                           <div key={b.key} className="px-4 py-3 space-y-2">
                             <div className="flex items-center gap-3">
@@ -402,22 +408,56 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                   </p>
                                 )}
                               </div>
-                              <button
-                                onClick={() => canLog && logBenefitToday(b.key)}
-                                disabled={!canLog || isSaving}
-                                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                                  loggedToday
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default'
-                                    : canLog
-                                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                }`}
-                              >
-                                {isSaving
-                                  ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  : loggedToday ? '✓ Dnes' : count >= max ? 'Max' : '+ Dnes'}
-                              </button>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {/* + Dnes */}
+                                <button
+                                  onClick={() => canLog && logBenefit(b.key)}
+                                  disabled={!canLog || isSaving}
+                                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                    loggedToday
+                                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default'
+                                      : canLog
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  }`}
+                                >
+                                  {isSaving ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : loggedToday ? '✓ Dnes' : count >= max ? 'Max' : '+ Dnes'}
+                                </button>
+                                {/* + Jiný den toggle */}
+                                {count < max && (
+                                  <button
+                                    onClick={() => setRetroDatePicker((prev) => {
+                                      const n = { ...prev };
+                                      if (n[b.key]) { delete n[b.key]; } else { n[b.key] = today; }
+                                      return n;
+                                    })}
+                                    className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${retroDate ? 'bg-slate-200 text-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                                    title="Zadat pro jiný den"
+                                  >
+                                    📅
+                                  </button>
+                                )}
+                              </div>
                             </div>
+                            {/* Retroactive date picker */}
+                            {retroDate !== undefined && (
+                              <div className="flex items-center gap-2 pl-9">
+                                <input
+                                  type="date"
+                                  value={retroDate}
+                                  max={today}
+                                  onChange={(e) => setRetroDatePicker((prev) => ({ ...prev, [b.key]: e.target.value }))}
+                                  className="border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                />
+                                <button
+                                  onClick={() => !retroAlreadyLogged && logBenefit(b.key, retroDate)}
+                                  disabled={isSaving || retroAlreadyLogged || !retroDate}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${retroAlreadyLogged ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'}`}
+                                >
+                                  {isSaving ? '…' : retroAlreadyLogged ? '✓ Zadáno' : 'Zadat'}
+                                </button>
+                              </div>
+                            )}
                             {myEntries.length > 0 && (
                               <div className="flex flex-wrap gap-1.5 pl-9">
                                 {myEntries.map((e) => {
@@ -426,16 +466,14 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                   return (
                                     <span key={e.id} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${isToday ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
                                       {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit' })}
-                                      {isToday && (
-                                        <button
-                                          onClick={() => !isDeleting && deleteBenefitEntry(e.id, e.benefit_key)}
-                                          disabled={isDeleting}
-                                          className="ml-0.5 text-blue-400 hover:text-red-500 transition-colors disabled:opacity-40"
-                                          title="Zrušit dnešní záznam"
-                                        >
-                                          {isDeleting ? '…' : '×'}
-                                        </button>
-                                      )}
+                                      <button
+                                        onClick={() => !isDeleting && deleteBenefitEntry(e.id, e.benefit_key)}
+                                        disabled={isDeleting}
+                                        className="ml-0.5 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-40"
+                                        title="Zrušit záznam"
+                                      >
+                                        {isDeleting ? '…' : '×'}
+                                      </button>
                                     </span>
                                   );
                                 })}

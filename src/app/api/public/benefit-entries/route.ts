@@ -64,11 +64,11 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/public/benefit-entries
-// Body: { orgId, pin, benefit_key }  — always logs TODAY
+// Body: { orgId, pin, benefit_key, date? }  — logs for today or provided date
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { orgId: string; pin: string; benefit_key: string }
-    const { orgId, pin, benefit_key } = body
+    const body = await req.json() as { orgId: string; pin: string; benefit_key: string; date?: string }
+    const { orgId, pin, benefit_key, date: dateParam } = body
     if (!orgId || !pin || !benefit_key) return NextResponse.json({ error: 'Chybí parametry.' }, { status: 400 })
 
     const sb = svc()
@@ -76,11 +76,13 @@ export async function POST(req: NextRequest) {
     if (!employee) return NextResponse.json({ error: 'Nesprávný PIN.' }, { status: 401 })
 
     const today = new Date().toISOString().slice(0, 10)
-    const month = today.slice(0, 7)
+    // Allow specifying a past date (current month only for safety)
+    const targetDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= today ? dateParam : today
+    const month = targetDate.slice(0, 7)
 
     const { data: entry, error } = await sb
       .from('benefit_entries')
-      .insert({ organization_id: orgId, employee_id: employee.id, benefit_key, date: today })
+      .insert({ organization_id: orgId, employee_id: employee.id, benefit_key, date: targetDate })
       .select('id, benefit_key, date')
       .single()
 
@@ -122,10 +124,9 @@ export async function DELETE(req: NextRequest) {
       .maybeSingle()
 
     if (!existing) return NextResponse.json({ error: 'Záznam nenalezen.' }, { status: 404 })
-    if (existing.date !== today) return NextResponse.json({ error: 'Lze smazat pouze dnešní záznamy.' }, { status: 403 })
 
     await sb.from('benefit_entries').delete().eq('id', entryId)
-    await syncBenefitLogs(sb, orgId, employee.id, existing.benefit_key, today.slice(0, 7))
+    await syncBenefitLogs(sb, orgId, employee.id, existing.benefit_key, existing.date.slice(0, 7))
 
     return NextResponse.json({ ok: true })
   } catch (err) {
