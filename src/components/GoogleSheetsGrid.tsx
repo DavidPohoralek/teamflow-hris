@@ -561,8 +561,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           className="flex items-center justify-center h-full w-full"
           style={{ backgroundImage: XXX_HATCH }}
         >
-          <span className="text-[11px] font-semibold tracking-widest select-none" style={{ color: '#c9d3df', userSelect: 'none' }}>
-            ···
+          <span className="text-[11px] font-semibold tracking-wider select-none" style={{ color: '#c9d3df', userSelect: 'none' }}>
+            XXX
           </span>
         </div>
       );
@@ -742,7 +742,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           sessionEmployee ? (
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 ml-auto">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
+                {(() => {
+                  const h = computePlannedHours(sessionEmployee.id);
+                  if (h <= 0) return null;
+                  const display = Number.isInteger(h) ? String(h) : h.toFixed(1);
+                  return <span className="text-emerald-500 text-[10px] font-medium">{display} h {t('tento týden', 'this week')}</span>;
+                })()}
+              </div>
               <button
                 onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
                 className="text-emerald-400 hover:text-emerald-700 text-xs ml-1"
@@ -852,16 +860,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     {emp.department && (
                       <span className="text-[10px] text-gray-400 leading-tight truncate">{emp.department}</span>
                     )}
-                    {!isManagerMode && sessionEmployee && sessionEmployee.id === emp.id && (() => {
-                      const h = computePlannedHours(emp.id);
-                      if (h <= 0) return null;
-                      const display = Number.isInteger(h) ? String(h) : h.toFixed(1);
-                      return (
-                        <span className="text-[10px] text-blue-500 font-semibold leading-tight">
-                          {display} h {t('tento týden', 'this week')}
-                        </span>
-                      );
-                    })()}
                   </div>
                 </td>
 
