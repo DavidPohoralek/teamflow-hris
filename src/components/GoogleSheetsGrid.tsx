@@ -394,6 +394,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: WorkPlanEntry } | null>(null);
   const [editEntry, setEditEntry] = useState<WorkPlanEntry | null>(null);
 
+  // Sticky month-view header
+  const [stickyWeekKey, setStickyWeekKey] = useState<string | null>(null);
+  const weekSepRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
   const [activityFilter, setActivityFilter] = useState(false);
@@ -564,6 +568,26 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [contextMenu]);
+
+  // ── Sticky header: update dates when scrolling in month view ─────────────
+  useEffect(() => {
+    if (viewMode !== 'month') {
+      setStickyWeekKey(null);
+      return;
+    }
+    const THEAD_H = 48;
+    const handler = () => {
+      let activeKey: string | null = null;
+      for (const [key, row] of Array.from(weekSepRowRefs.current.entries())) {
+        if (row.getBoundingClientRect().top <= THEAD_H) activeKey = key;
+      }
+      setStickyWeekKey(activeKey);
+    };
+    window.addEventListener('scroll', handler, { passive: true, capture: true });
+    handler();
+    return () => window.removeEventListener('scroll', handler, { capture: true } as EventListenerOptions);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, weekDays[3]]);
 
   // ── Department sort order ─────────────────────────────────────────────────
   const deptOrder = useMemo(() => {
@@ -839,6 +863,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   const today = (() => { const d = new Date(); return toISO(d); })();
 
+  // In month view, the sticky header shows dates from whichever week is scrolled into view
+  const stickyDays = viewMode === 'month'
+    ? stickyWeekKey
+      ? getWeekDays(new Date(stickyWeekKey + 'T00:00:00'))
+      : monthWeeks.length > 0 ? getWeekDays(monthWeeks[0]) : weekDays
+    : weekDays;
+
   return (
     <div className="p-4 md:p-6 max-w-full">
       {/* Header toolbar */}
@@ -1007,30 +1038,28 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
           </colgroup>
 
-          {/* Fixed column header (Po Út St…) */}
+          {/* Fixed column header (Po Út St…) — sticky so it stays visible while scrolling */}
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">
+            <tr className="border-b-2 border-gray-200">
+              <th className="sticky left-0 top-0 z-30 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">
                 {t('Zaměstnanec', 'Employee')}
               </th>
               {DAY_NAMES.map((name, i) => {
-                // In week view show full header with dates; in month view just day names
-                const date = viewMode === 'week' ? weekDays[i] : null;
-                const isClosed = date ? closedDates.has(date) : false;
+                // In week mode use weekDays; in month mode use stickyDays (updates as user scrolls)
+                const date = stickyDays[i];
+                const isClosed = closedDates.has(date);
                 const isToday = date === today;
                 const isWeekend = i >= 5;
-                const dayNum = date ? new Date(date + 'T00:00:00').getDate() : null;
+                const dayNum = new Date(date + 'T00:00:00').getDate();
                 return (
                   <th key={i}
-                    className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
+                    className={`sticky top-0 z-20 px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
                   >
                     <div className="inline-flex flex-col items-center gap-0.5">
                       <span className="text-[10px] uppercase tracking-wider">{name}</span>
-                      {dayNum !== null && (
-                        <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
-                          {dayNum}
-                        </span>
-                      )}
+                      <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
+                        {dayNum}
+                      </span>
                       {isClosed && <span className="text-[9px] text-red-400 font-normal normal-case">zavřeno</span>}
                     </div>
                   </th>
@@ -1051,7 +1080,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               </tr>
             )}
 
-            {!loading && displayEmployees.length === 0 && (
+            {!loading && viewMode === 'week' && displayEmployees.length === 0 && (
               <tr>
                 <td colSpan={8} className="py-12 text-center text-gray-400 text-sm">
                   {t('Žádní zaměstnanci.', 'No employees.')}
@@ -1061,30 +1090,43 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
             {!loading && viewMode === 'week' && renderEmployeeRows(weekDays, plansMap)}
 
-            {!loading && viewMode === 'month' && monthWeeks.map((weekMon) => {
+            {!loading && viewMode === 'month' && monthWeeks.map((weekMon, wi) => {
               const wDays = getWeekDays(weekMon);
-              const wLabel = (() => {
-                const f = new Date(wDays[0] + 'T00:00:00');
-                const l = new Date(wDays[6] + 'T00:00:00');
-                return `${f.getDate()}. ${f.getMonth() + 1}. – ${l.getDate()}. ${l.getMonth() + 1}.`;
-              })();
+              const f = new Date(wDays[0] + 'T00:00:00');
+              const l = new Date(wDays[6] + 'T00:00:00');
+              const crossesMonth = f.getMonth() !== l.getMonth();
+              const wLabel = `${f.getDate()}. ${f.getMonth() + 1}. – ${l.getDate()}. ${l.getMonth() + 1}.`;
+              const monthLabel = crossesMonth
+                ? `${f.toLocaleDateString('cs-CZ', { month: 'short' })} / ${l.toLocaleDateString('cs-CZ', { month: 'short' })}`
+                : f.toLocaleDateString('cs-CZ', { month: 'long' });
               return (
                 <>
-                  {/* Week date separator row */}
-                  <tr key={`sep-${wDays[0]}`} className="border-y border-slate-200">
-                    <td className="sticky left-0 z-10 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500 border-r border-slate-200">
-                      {wLabel}
+                  {/* Week separator row — visually prominent so month boundaries are clear */}
+                  <tr
+                    key={`sep-${wDays[0]}`}
+                    ref={(el) => { if (el) weekSepRowRefs.current.set(wDays[0], el); else weekSepRowRefs.current.delete(wDays[0]); }}
+                    className={`${wi > 0 ? 'border-t-2 border-slate-300' : 'border-t border-slate-200'}`}
+                  >
+                    <td className="sticky left-0 z-10 bg-slate-200/80 px-3 py-1.5 border-r border-slate-300">
+                      <div className="flex flex-col gap-0">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">{monthLabel}</span>
+                        <span className="text-[11px] font-bold text-slate-700 leading-tight">{wLabel}</span>
+                      </div>
                     </td>
                     {wDays.map((d, i) => {
                       const isToday = d === today;
                       const isClosed = closedDates.has(d);
                       const isWeekend = i >= 5;
                       const dayNum = new Date(d + 'T00:00:00').getDate();
+                      const isNewMonth = i > 0 && new Date(d + 'T00:00:00').getDate() === 1;
                       return (
-                        <td key={d} className={`px-1 py-1 text-center text-[11px] border-r border-slate-200 last:border-r-0 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-semibold ${isToday ? 'bg-blue-600 text-white' : ''}`}>
-                            {dayNum}
-                          </span>
+                        <td key={d} className={`px-1 py-1.5 text-center text-[11px] border-r border-slate-300 last:border-r-0 ${isClosed ? 'bg-gray-200/60 text-gray-400' : isWeekend ? 'bg-slate-200/60 text-slate-400' : 'bg-slate-100/80 text-slate-600'}`}>
+                          <div className="inline-flex flex-col items-center gap-0">
+                            {isNewMonth && <span className="text-[8px] uppercase tracking-wide text-slate-400 font-medium leading-none">{new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { month: 'short' })}</span>}
+                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${isToday ? 'bg-blue-600 text-white' : ''}`}>
+                              {dayNum}
+                            </span>
+                          </div>
                         </td>
                       );
                     })}
