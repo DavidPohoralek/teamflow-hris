@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import WorkPlanGrid from '@/components/WorkPlanGrid'
+import GoogleSheetsGrid from '@/components/GoogleSheetsGrid'
 import AttendanceKiosk from '@/components/AttendanceKiosk'
 import PresenceDashboard from '@/components/PresenceDashboard'
 import EmployeeHoursPortal from '@/components/EmployeeHoursPortal'
@@ -80,7 +81,7 @@ export default function HomePage() {
   const [showTour, setShowTour] = useState(false)
   const [tourLang, setTourLang] = useState<'cs' | 'en'>('cs')
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
-
+  const [shiftViewMode, setShiftViewMode] = useState<'teamflow' | 'googlesheets'>('teamflow')
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
     const now = new Date()
@@ -94,6 +95,13 @@ export default function HomePage() {
     const handler = (e: Event) => setTheme(getTheme((e as CustomEvent).detail))
     window.addEventListener('tf:theme-change', handler)
     return () => window.removeEventListener('tf:theme-change', handler)
+  }, [])
+
+  // Live shift view mode change from settings panel
+  useEffect(() => {
+    const handler = (e: Event) => setShiftViewMode((e as CustomEvent).detail as 'teamflow' | 'googlesheets')
+    window.addEventListener('tf:shift-view-change', handler)
+    return () => window.removeEventListener('tf:shift-view-change', handler)
   }, [])
 
   // Check subscription status — drives tour gate and paywall
@@ -185,11 +193,14 @@ export default function HomePage() {
         .then(r => r.json())
         .then((d: { logoUrl: string | null }) => setOrgLogoUrl(d.logoUrl ?? null))
         .catch(() => {})
-      // Load theme
+      // Load theme + shift view mode
       fetch(`/api/public/company-settings?orgId=${data.id}`)
         .then(r => r.json())
         .then((d: Record<string, string>) => {
           if (d.ui_theme) setTheme(getTheme(d.ui_theme))
+          if (d.shift_view_mode === 'googlesheets' || d.shift_view_mode === 'teamflow') {
+            setShiftViewMode(d.shift_view_mode)
+          }
           // Apply custom favicon if set, otherwise fall back to default TeamFlow favicon
           const faviconUrl = d.favicon_url || '/favicon.svg'
           let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
@@ -418,12 +429,21 @@ export default function HomePage() {
         {/* Scrollable tabs */}
         {activeTab === 'schedule' && (
           <div className="flex-1 overflow-auto">
-            <WorkPlanGrid
-              orgId={orgId}
-              month={currentMonth}
-              isManagerMode={isManagerMode}
-              onMonthChange={(month: string) => setCurrentMonth(month)}
-            />
+            {shiftViewMode === 'googlesheets' ? (
+              <GoogleSheetsGrid
+                orgId={orgId}
+                month={currentMonth}
+                isManagerMode={isManagerMode}
+                onMonthChange={(m: string) => setCurrentMonth(m)}
+              />
+            ) : (
+              <WorkPlanGrid
+                orgId={orgId}
+                month={currentMonth}
+                isManagerMode={isManagerMode}
+                onMonthChange={(month: string) => setCurrentMonth(month)}
+              />
+            )}
           </div>
         )}
 

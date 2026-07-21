@@ -2777,6 +2777,13 @@ function SettingsTab() {
         </div>
       </section>
 
+      {/* Shift view mode */}
+      <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">{t('Zobrazení směn', 'Shift view')}</h3>
+        <p className="text-xs text-gray-400 mb-4">{t('Vyberte výchozí vizualizaci záložky Směny.', 'Choose the default visualisation for the Shifts tab.')}</p>
+        <ShiftViewModeSetting />
+      </section>
+
       {/* Logo */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <OrgLogoUpload />
@@ -3771,6 +3778,67 @@ function VacationCountingModeSetting() {
           <input type="radio" name="vacation_counting_mode" value="all" checked={mode === 'all'}
             onChange={() => setMode('all')} className="accent-blue-600" />
           <span className="text-sm text-gray-700">{t('Celý týden (Po–Ne)', 'All days (Mon–Sun)')}</span>
+        </label>
+      </div>
+      <button onClick={handleSave} disabled={saving}
+        className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}>
+        {saved ? `✓ ${t('Uloženo', 'Saved')}` : saving ? '…' : t('Uložit', 'Save')}
+      </button>
+    </div>
+  );
+}
+
+// ─── ShiftViewModeSetting ─────────────────────────────────────────────────────
+
+function ShiftViewModeSetting() {
+  const t = useT();
+  const [mode, setMode] = useState<'teamflow' | 'googlesheets'>('teamflow');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    managerFetch('/api/manager/settings')
+      .then((r) => r.json())
+      .then((d: Record<string, unknown>) => {
+        if (d.shift_view_mode === 'googlesheets') setMode('googlesheets');
+        else setMode('teamflow');
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_view_mode: mode }),
+      });
+      setSaved(true);
+      window.dispatchEvent(new CustomEvent('tf:shift-view-change', { detail: mode }));
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input type="radio" name="shift_view_mode" value="teamflow" checked={mode === 'teamflow'}
+            onChange={() => setMode('teamflow')} className="accent-blue-600" />
+          <div>
+            <span className="text-sm font-medium text-gray-700">{t('TeamFlow-Směny', 'TeamFlow-Shifts')}</span>
+            <p className="text-xs text-gray-400">{t('Původní kalendářový pohled s buňkami po dnech a zaměstnancích.', 'Original calendar view with cells per day and employee.')}</p>
+          </div>
+        </label>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input type="radio" name="shift_view_mode" value="googlesheets" checked={mode === 'googlesheets'}
+            onChange={() => setMode('googlesheets')} className="accent-blue-600" />
+          <div>
+            <span className="text-sm font-medium text-gray-700">{t('GoogleSheets-Směny', 'GoogleSheets-Shifts')}</span>
+            <p className="text-xs text-gray-400">{t('Řádky = zaměstnanci, sloupce = dny. Buňka = časy směny nebo XXX.', 'Rows = employees, columns = days. Cell = shift times or XXX.')}</p>
+          </div>
         </label>
       </div>
       <button onClick={handleSave} disabled={saving}
