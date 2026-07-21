@@ -525,22 +525,27 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   })();
 
   // ── Cell rendering ────────────────────────────────────────────────────────
+
+  // Hatching patterns for empty states
+  const DOV_HATCH = 'repeating-linear-gradient(-45deg, #eff6ff 0px, #eff6ff 5px, #dbeafe 5px, #dbeafe 7px)';
+  const XXX_HATCH = 'repeating-linear-gradient(-45deg, #f9fafb 0px, #f9fafb 6px, #e9eef5 6px, #e9eef5 8px)';
+
   function renderCell(emp: Employee, date: string) {
     const key = `${emp.id}|${date}`;
     const entries = plansMap.get(key);
-    const isClosed = closedDates.has(date);
-    const dow = new Date(date + 'T00:00:00').getDay(); // 0=Sun,6=Sat
-    const isWeekend = dow === 0 || dow === 6;
 
     if (!entries || entries.length === 0) {
       const isVacation = vacationSet.has(key);
       if (isVacation) {
         return (
-          <div className="flex items-center justify-center h-full">
+          <div
+            className="flex items-center justify-center h-full w-full"
+            style={{ backgroundImage: DOV_HATCH }}
+          >
             <div
               title={t('Schválená dovolená', 'Approved vacation')}
-              className="w-full rounded text-[11px] font-bold text-center px-1 py-0.5 leading-tight truncate"
-              style={{ backgroundColor: '#bfdbfe', color: '#1d4ed8' }}
+              className="text-[11px] font-bold text-center px-2 py-0.5 leading-tight truncate border border-blue-300"
+              style={{ backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '6px' }}
             >
               {t('DOV', 'VAC')}
             </div>
@@ -549,19 +554,20 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       }
       return (
         <div
-          className="flex items-center justify-center h-full text-xs font-semibold tracking-wide select-none text-gray-300"
-          style={{ userSelect: 'none' }}
+          className="flex items-center justify-center h-full w-full"
+          style={{ backgroundImage: XXX_HATCH }}
         >
-          XXX
+          <span className="text-[11px] font-semibold tracking-widest select-none" style={{ color: '#c9d3df', userSelect: 'none' }}>
+            ···
+          </span>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-col gap-0.5 items-center justify-center h-full px-0.5">
+      <div className="flex flex-col gap-1 items-stretch justify-center h-full">
         {entries.map((e) => {
-          const bg = e.workTypeColor ?? '#e2e8f0';
-          const textColor = isLight(bg) ? '#1e293b' : '#ffffff';
+          const { bg, text } = pastelizeColor(e.workTypeColor ?? '#94a3b8');
           const label =
             e.startTime && e.endTime
               ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}`
@@ -570,12 +576,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             <div
               key={e.id}
               title={[e.workTypeName, e.startTime && e.endTime ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}` : null, e.note ? `📝 ${e.note}` : null].filter(Boolean).join(' · ')}
-              style={{ backgroundColor: bg, color: textColor }}
-              className="w-full rounded text-[11px] font-semibold px-1 py-0.5 leading-tight flex items-center justify-center gap-0.5 min-w-0"
+              style={{ backgroundColor: bg, color: text, borderRadius: '7px' }}
+              className="w-full text-[11px] font-semibold px-1.5 py-[3px] leading-tight flex items-center justify-center gap-0.5 min-w-0"
             >
               <span className="truncate">{label}</span>
-              {e.isEvening && <span className="shrink-0 text-[9px] opacity-80">🌙</span>}
-              {e.note && <span className="shrink-0 text-[9px] opacity-80">📝</span>}
+              {e.isEvening && <span className="shrink-0 text-[9px] opacity-70">🌙</span>}
+              {e.note && <span className="shrink-0 text-[9px] opacity-70">📝</span>}
             </div>
           );
         })}
@@ -590,6 +596,40 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     const g = parseInt(clean.slice(2, 4), 16);
     const b = parseInt(clean.slice(4, 6), 16);
     return (r * 299 + g * 587 + b * 114) / 1000 > 130;
+  }
+
+  function pastelizeColor(hex: string): { bg: string; text: string } {
+    const clean = hex.replace('#', '');
+    if (clean.length < 6) return { bg: '#f1f5f9', text: '#475569' };
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    // Blend 30% original + 70% white
+    const pr = Math.round(r * 0.30 + 255 * 0.70);
+    const pg = Math.round(g * 0.30 + 255 * 0.70);
+    const pb = Math.round(b * 0.30 + 255 * 0.70);
+    const bg = `#${pr.toString(16).padStart(2, '0')}${pg.toString(16).padStart(2, '0')}${pb.toString(16).padStart(2, '0')}`;
+    // Text: 55% of original (darker)
+    const dr = Math.round(r * 0.50);
+    const dg = Math.round(g * 0.50);
+    const db = Math.round(b * 0.50);
+    const text = `#${dr.toString(16).padStart(2, '0')}${dg.toString(16).padStart(2, '0')}${db.toString(16).padStart(2, '0')}`;
+    return { bg, text };
+  }
+
+  function computePlannedHours(empId: string): number {
+    let total = 0;
+    for (const date of weekDays) {
+      for (const e of plansMap.get(`${empId}|${date}`) ?? []) {
+        if (e.startTime && e.endTime) {
+          const [sh, sm] = e.startTime.split(':').map(Number);
+          const [eh, em] = e.endTime.split(':').map(Number);
+          const h = (eh * 60 + em - sh * 60 - sm) / 60;
+          if (h > 0) total += h;
+        }
+      }
+    }
+    return total;
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -798,16 +838,26 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
             {!loading && displayEmployees.map((emp, ri) => (
               <tr key={emp.id}
-                className={`border-b border-gray-100 last:border-b-0 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-75 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                 {/* Employee name cell */}
-                <td className="sticky left-0 z-10 px-3 py-1.5 border-r border-gray-200 bg-inherit">
-                  <div className="flex flex-col">
+                <td className="sticky left-0 z-10 px-3 py-2 border-r border-gray-200 bg-inherit group-hover:bg-blue-50/40 transition-colors duration-75">
+                  <div className="flex flex-col gap-0.5">
                     <span className="text-xs font-semibold text-gray-800 leading-tight truncate" title={emp.name}>
                       {emp.name}
                     </span>
                     {emp.department && (
                       <span className="text-[10px] text-gray-400 leading-tight truncate">{emp.department}</span>
                     )}
+                    {!isManagerMode && sessionEmployee && sessionEmployee.id === emp.id && (() => {
+                      const h = computePlannedHours(emp.id);
+                      if (h <= 0) return null;
+                      const display = Number.isInteger(h) ? String(h) : h.toFixed(1);
+                      return (
+                        <span className="text-[10px] text-blue-500 font-semibold leading-tight">
+                          {display} h {t('tento týden', 'this week')}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </td>
 
@@ -817,7 +867,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                   const isWeekend = di >= 5;
                   return (
                     <td key={date}
-                      className={`h-10 px-0.5 py-0.5 border-r border-gray-100 last:border-r-0 align-middle
+                      className={`px-1.5 py-1.5 border-r border-gray-100 last:border-r-0 align-middle group-hover:bg-blue-50/30 transition-colors duration-75
                         ${isClosed ? 'bg-gray-100/60' : isWeekend ? 'bg-slate-50/60' : ''}`}
                       onClick={() => {
                         if (isManagerMode) {
