@@ -358,13 +358,16 @@ interface BulkShiftModalProps {
   orgId: string;
   month: string;
   workTypes: WorkType[];
+  isManagerMode: boolean;
+  sessionEmployee?: { id: string; name: string } | null;
+  sessionPin?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 const WEEKDAY_LABELS_CS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
-function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShiftModalProps) {
+function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmployee, sessionPin, onClose, onSuccess }: BulkShiftModalProps) {
   const t = useT();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -377,6 +380,7 @@ function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShi
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isManagerMode) return;
     managerFetch('/api/employees')
       .then((r) => r.json())
       .then((d: { employees?: Employee[] } | Employee[]) => {
@@ -385,7 +389,7 @@ function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShi
         if (list[0]) setSelectedEmployeeId(list[0].id);
       })
       .catch(() => {});
-  }, []);
+  }, [isManagerMode]);
 
   const targetDays = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
@@ -405,19 +409,31 @@ function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmployeeId || !workTypeId || targetDays.length === 0) return;
+    if ((!isManagerMode && !sessionPin) || !workTypeId || targetDays.length === 0) return;
+    if (isManagerMode && !selectedEmployeeId) return;
     setProgress(t('Ukládám…', 'Saving…'));
     setError(null);
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, skipped = 0;
     for (const date of targetDays) {
       try {
-        const res = await managerFetch('/api/public/work-plans', {
-          method: 'POST',
-          body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, isEvening }),
-        });
-        if (res.ok) ok++; else fail++;
+        let res: Response;
+        if (isManagerMode) {
+          res = await managerFetch('/api/public/work-plans', {
+            method: 'POST',
+            body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, isEvening }),
+          });
+        } else {
+          res = await fetch('/api/public/schedule/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orgId, pin: sessionPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, isEvening }),
+          });
+        }
+        if (res.ok) ok++;
+        else if (res.status === 409) skipped++; // duplicate — just skip
+        else fail++;
       } catch { fail++; }
-      setProgress(`${ok + fail} / ${targetDays.length}…`);
+      setProgress(`${ok + skipped + fail} / ${targetDays.length}…`);
     }
     if (fail > 0) setError(t(`${fail} dnů se nepodařilo uložit.`, `${fail} days failed.`));
     else { onSuccess(); onClose(); }
@@ -428,18 +444,25 @@ function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShi
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">⚡ {t('Plošné zadání směn', 'Bulk shift assignment')}</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">⚡ {t('Plošné zadání směn', 'Bulk shift assignment')}</h2>
+            {!isManagerMode && sessionEmployee && (
+              <p className="text-xs text-gray-400 mt-0.5">{sessionEmployee.name}</p>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
-            <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
-              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-            </select>
-          </div>
+          {isManagerMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
+              <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
+                {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
             <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} required
@@ -1167,7 +1190,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           )
         )}
 
-        {isManagerMode && (
+        {(isManagerMode || sessionEmployee) && (
           <button
             onClick={() => setShowBulkModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
@@ -1321,6 +1344,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           orgId={orgId}
           month={weekDays[3].slice(0, 7)}
           workTypes={workTypes}
+          isManagerMode={isManagerMode}
+          sessionEmployee={sessionEmployee}
+          sessionPin={sessionPin || undefined}
           onClose={() => setShowBulkModal(false)}
           onSuccess={() => { setToast(t('Směny zadány!', 'Shifts assigned!')); fetchPlans(); }}
         />
