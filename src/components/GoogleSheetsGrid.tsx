@@ -93,18 +93,20 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   );
 }
 
-// ─── AddShiftModal (minimal, manager-only) ────────────────────────────────────
+// ─── AddShiftModal ────────────────────────────────────────────────────────────
 
 interface AddShiftModalProps {
   orgId: string;
   defaultDate: string;
   workTypes: WorkType[];
-  defaultEmployeeId?: string;
+  isManagerMode: boolean;
+  sessionPin?: string;          // employee mode: PIN already confirmed
+  defaultEmployeeId?: string;   // pre-fill employee (manager click on cell)
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function AddShiftModal({ orgId, defaultDate, workTypes, defaultEmployeeId, onClose, onSuccess }: AddShiftModalProps) {
+function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPin, defaultEmployeeId, onClose, onSuccess }: AddShiftModalProps) {
   const t = useT();
   const [date, setDate] = useState(defaultDate);
   const [workTypeId, setWorkTypeId] = useState(workTypes[0]?.id ?? '');
@@ -120,7 +122,9 @@ function AddShiftModal({ orgId, defaultDate, workTypes, defaultEmployeeId, onClo
     if (!workTypeId && workTypes.length > 0) setWorkTypeId(workTypes[0].id);
   }, [workTypes, workTypeId]);
 
+  // Load employees only in manager mode (employee mode uses sessionPin = self)
   useEffect(() => {
+    if (!isManagerMode) return;
     managerFetch('/api/employees')
       .then((r) => r.json())
       .then((data: { employees?: Employee[] } | Employee[]) => {
@@ -129,30 +133,34 @@ function AddShiftModal({ orgId, defaultDate, workTypes, defaultEmployeeId, onClo
         if (!defaultEmployeeId && list[0]) setSelectedEmployeeId(list[0].id);
       })
       .catch(() => {});
-  }, [defaultEmployeeId]);
+  }, [isManagerMode, defaultEmployeeId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workTypeId) { setError(t('Vyberte prosím typ práce.', 'Please select a work type.')); return; }
-    if (!selectedEmployeeId) { setError(t('Vyberte zaměstnance.', 'Please select an employee.')); return; }
     setSubmitting(true);
     setError(null);
     try {
-      const res = await managerFetch('/api/public/work-plans', {
-        method: 'POST',
-        body: JSON.stringify({
-          orgId,
-          employeeId: selectedEmployeeId,
-          date,
-          workTypeId,
-          startTime: startTime || undefined,
-          endTime: endTime || undefined,
-          note: note || undefined,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.'));
-      else { onSuccess(); onClose(); }
+      if (isManagerMode) {
+        if (!selectedEmployeeId) { setError(t('Vyberte zaměstnance.', 'Please select an employee.')); setSubmitting(false); return; }
+        const res = await managerFetch('/api/public/work-plans', {
+          method: 'POST',
+          body: JSON.stringify({ orgId, employeeId: selectedEmployeeId, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined }),
+        });
+        const json = await res.json();
+        if (!res.ok) setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.'));
+        else { onSuccess(); onClose(); }
+      } else {
+        // Employee PIN mode
+        const res = await fetch('/api/public/schedule/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orgId, pin: sessionPin, date, workTypeId, startTime: startTime || undefined, endTime: endTime || undefined, note: note || undefined }),
+        });
+        const json = await res.json();
+        if (!res.ok) setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.'));
+        else { onSuccess(); onClose(); }
+      }
     } catch { setError(t('Síťová chyba.', 'Network error.')); }
     finally { setSubmitting(false); }
   };
@@ -170,14 +178,16 @@ function AddShiftModal({ orgId, defaultDate, workTypes, defaultEmployeeId, onClo
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
-            <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
-              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-            </select>
-          </div>
+          {isManagerMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
+              <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
+                {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
             <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} required
@@ -258,7 +268,49 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [addModalEmployeeId, setAddModalEmployeeId] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
 
-  // ── Fetch employees once ──────────────────────────────────────────────────
+  // ── PIN session (shared with WorkPlanGrid via localStorage) ──────────────
+  const [sessionPin, setSessionPin] = useState('');
+  const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [pinInputValue, setPinInputValue] = useState('');
+  const [pinInputError, setPinInputError] = useState(false);
+  const [pinInputLoading, setPinInputLoading] = useState(false);
+
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('hris_employee_session');
+      if (stored) {
+        const parsed = JSON.parse(stored) as { id: string; name: string; pin: string; orgId: string };
+        if (parsed.orgId === orgId && parsed.id && parsed.name && parsed.pin) {
+          setSessionPin(parsed.pin);
+          setSessionEmployee({ id: parsed.id, name: parsed.name });
+        }
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePinLogin = useCallback(async () => {
+    if (pinInputValue.length < 4) return;
+    setPinInputLoading(true);
+    setPinInputError(false);
+    try {
+      const res = await fetch(`/api/public/presence?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(pinInputValue)}`);
+      if (!res.ok) { setPinInputError(true); setPinInputValue(''); return; }
+      const json = await res.json();
+      setSessionPin(pinInputValue);
+      setSessionEmployee({ id: json.employeeId, name: json.employeeName });
+      try { localStorage.setItem('hris_employee_session', JSON.stringify({ id: json.employeeId, name: json.employeeName, pin: pinInputValue, orgId })); } catch { /* ignore */ }
+      setPinInputValue('');
+    } catch {
+      setPinInputError(true);
+      setPinInputValue('');
+    } finally {
+      setPinInputLoading(false);
+    }
+  }, [pinInputValue, orgId]);
+
+  // ── Fetch employees once (manager mode) ───────────────────────────────────
   useEffect(() => {
     if (!isManagerMode) return;
     managerFetch('/api/employees')
@@ -325,14 +377,26 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       );
       const allPlans = results.flat();
       // Build map: "employeeId|date" → entries[]
-      const map = new Map<string, WorkPlanEntry[]>();
+      const raw = new Map<string, WorkPlanEntry[]>();
       for (const p of allPlans) {
         if (!weekDays.includes(p.date)) continue;
         const key = `${p.employeeId}|${p.date}`;
-        const arr = map.get(key) ?? [];
+        const arr = raw.get(key) ?? [];
         arr.push(p);
-        map.set(key, arr);
+        raw.set(key, arr);
       }
+      // Deduplicate: per cell, if any entry with the same workTypeId has times,
+      // drop timeless entries of that same type (avoids double badge from old data)
+      const map = new Map<string, WorkPlanEntry[]>();
+      raw.forEach((entries, key) => {
+        const timedTypeIds = new Set(
+          entries.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
+        );
+        const filtered = entries.filter(
+          (e) => (e.startTime && e.endTime) || !timedTypeIds.has(e.workTypeId ?? '__none__')
+        );
+        map.set(key, filtered.length > 0 ? filtered : entries);
+      });
       setPlansMap(map);
     } finally {
       setLoading(false);
@@ -461,6 +525,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     <div className="p-4 md:p-6 max-w-full">
       {/* Header toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        {/* Week navigation */}
         <div className="flex items-center gap-2">
           <button onClick={goToPrevWeek}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
@@ -477,10 +542,41 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           </button>
         </div>
 
-        {isManagerMode && (
+        {/* PIN session — only shown when not manager */}
+        {!isManagerMode && (
+          sessionEmployee ? (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 ml-auto">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
+              <button
+                onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
+                className="text-emerald-400 hover:text-emerald-700 text-xs ml-1"
+              >✕</button>
+            </div>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2 ml-auto">
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={8}
+                value={pinInputValue}
+                onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
+                placeholder={t('Váš PIN', 'Your PIN')}
+                className={`w-28 text-sm px-3 py-1.5 rounded-lg border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-slate-200'} focus:outline-none focus:ring-2 focus:ring-blue-400 tracking-widest`}
+              />
+              <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
+                className="px-3 py-1.5 bg-slate-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
+                {pinInputLoading ? '…' : 'OK'}
+              </button>
+            </form>
+          )
+        )}
+
+        {/* Add shift button — manager or employee with active session */}
+        {(isManagerMode || sessionEmployee) && (
           <button
-            onClick={() => { setAddModalDate(today); setAddModalEmployeeId(undefined); setShowAddModal(true); }}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
+            className={`${!isManagerMode ? 'ml-auto' : ''} flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -577,10 +673,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                           setAddModalDate(date);
                           setAddModalEmployeeId(emp.id);
                           setShowAddModal(true);
+                        } else if (sessionEmployee && sessionEmployee.id === emp.id) {
+                          setAddModalDate(date);
+                          setAddModalEmployeeId(emp.id);
+                          setShowAddModal(true);
                         }
                       }}
-                      style={{ cursor: isManagerMode ? 'pointer' : 'default' }}
-                      title={isManagerMode ? t('Kliknout pro přidání směny', 'Click to add shift') : undefined}
+                      style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? 'pointer' : 'default' }}
+                      title={(isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? t('Kliknout pro přidání směny', 'Click to add shift') : undefined}
                     >
                       {renderCell(emp, date)}
                     </td>
@@ -598,6 +698,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           orgId={orgId}
           defaultDate={addModalDate}
           workTypes={workTypes}
+          isManagerMode={isManagerMode}
+          sessionPin={sessionPin || undefined}
           defaultEmployeeId={addModalEmployeeId}
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
