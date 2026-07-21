@@ -1290,26 +1290,31 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       </div>
 
       {/* Context menu */}
-      {contextMenu && (
-        <div
-          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 9999 }}
-          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1 min-w-[160px]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => { setEditEntry(contextMenu.entry); setContextMenu(null); }}
-            className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+      {contextMenu && (() => {
+        const MENU_H = 90, MENU_W = 168;
+        const top = contextMenu.y + MENU_H > window.innerHeight ? contextMenu.y - MENU_H : contextMenu.y;
+        const left = contextMenu.x + MENU_W > window.innerWidth ? contextMenu.x - MENU_W : contextMenu.x;
+        return (
+          <div
+            style={{ position: 'fixed', top, left, zIndex: 9999 }}
+            className="bg-white rounded-xl shadow-xl border border-slate-200 py-1 min-w-[160px]"
+            onClick={(e) => e.stopPropagation()}
           >
-            ✏️ {t('Upravit', 'Edit')}
-          </button>
-          <button
-            onClick={() => { handleDeleteEntry(contextMenu.entry); setContextMenu(null); }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-          >
-            🗑️ {t('Smazat', 'Delete')}
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => { setEditEntry(contextMenu.entry); setContextMenu(null); }}
+              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+            >
+              ✏️ {t('Upravit', 'Edit')}
+            </button>
+            <button
+              onClick={() => { handleDeleteEntry(contextMenu.entry); setContextMenu(null); }}
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            >
+              🗑️ {t('Smazat', 'Delete')}
+            </button>
+          </div>
+        );
+      })()}
 
       {showBulkModal && (
         <BulkShiftModal
