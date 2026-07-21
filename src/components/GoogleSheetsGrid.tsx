@@ -248,6 +248,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [employees, setEmployees] = useState<Employee[]>([]);
   // plans indexed by "employeeId|date" → entries array
   const [plansMap, setPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
+  // approved vacation dates: Set of "employeeId|date"
+  const [vacationSet, setVacationSet] = useState<Set<string>>(new Set());
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -283,6 +285,27 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       .then((d: Record<string, unknown>) => {
         const raw = d['closed_dates'];
         if (Array.isArray(raw)) setClosedDates(new Set(raw as string[]));
+      })
+      .catch(() => {});
+  }, [orgId]);
+
+  // ── Fetch approved vacations ──────────────────────────────────────────────
+  useEffect(() => {
+    fetch(`/api/public/vacation-calendar?orgId=${encodeURIComponent(orgId)}`)
+      .then((r) => r.json())
+      .then((d: { requests?: { employee_id: string; date_from: string; date_to: string | null; status: string }[] }) => {
+        const set = new Set<string>();
+        for (const req of d.requests ?? []) {
+          if (req.status !== 'approved') continue;
+          const from = new Date(req.date_from + 'T00:00:00');
+          const to = req.date_to ? new Date(req.date_to + 'T00:00:00') : new Date(from);
+          const cur = new Date(from);
+          while (cur <= to) {
+            set.add(`${req.employee_id}|${toISO(cur)}`);
+            cur.setDate(cur.getDate() + 1);
+          }
+        }
+        setVacationSet(set);
       })
       .catch(() => {});
   }, [orgId]);
@@ -372,11 +395,23 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     const isWeekend = dow === 0 || dow === 6;
 
     if (!entries || entries.length === 0) {
-      // No plan
+      const isVacation = vacationSet.has(key);
+      if (isVacation) {
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div
+              title={t('Schválená dovolená', 'Approved vacation')}
+              className="w-full rounded text-[11px] font-bold text-center px-1 py-0.5 leading-tight truncate"
+              style={{ backgroundColor: '#bfdbfe', color: '#1d4ed8' }}
+            >
+              {t('DOV', 'VAC')}
+            </div>
+          </div>
+        );
+      }
       return (
         <div
-          className={`flex items-center justify-center h-full text-xs font-semibold tracking-wide select-none
-            ${isClosed ? 'text-gray-300' : isWeekend ? 'text-gray-300' : 'text-gray-300'}`}
+          className="flex items-center justify-center h-full text-xs font-semibold tracking-wide select-none text-gray-300"
           style={{ userSelect: 'none' }}
         >
           XXX
