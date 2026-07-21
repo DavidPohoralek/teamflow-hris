@@ -39,7 +39,7 @@ interface Employee {
 
 interface GoogleSheetsGridProps {
   orgId: string;
-  month: string; // YYYY-MM — used only for initial week alignment
+  month: string;
   isManagerMode: boolean;
   onMonthChange: (month: string) => void;
 }
@@ -67,13 +67,38 @@ function toISO(d: Date): string {
 }
 
 function formatTime(t: string): string {
-  // Trim seconds: "09:00:00" → "9:00"
   const [h, m] = t.split(':');
   return `${parseInt(h, 10)}:${m}`;
 }
 
 function getMonthsForWeek(weekDays: string[]): string[] {
   return Array.from(new Set(weekDays.map((d) => d.slice(0, 7))));
+}
+
+function dedup(entries: WorkPlanEntry[]): WorkPlanEntry[] {
+  const hasTyped = entries.some((e) => e.workTypeId != null);
+  let cleaned = hasTyped ? entries.filter((e) => e.workTypeId != null) : entries;
+  const timedTypeIds = new Set(
+    cleaned.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
+  );
+  cleaned = cleaned.filter(
+    (e) => (e.startTime && e.endTime) || !timedTypeIds.has(e.workTypeId ?? '__none__')
+  );
+  return cleaned.length > 0 ? cleaned : entries;
+}
+
+function buildMap(plans: WorkPlanEntry[], dateFilter?: (d: string) => boolean): Map<string, WorkPlanEntry[]> {
+  const raw = new Map<string, WorkPlanEntry[]>();
+  for (const p of plans) {
+    if (dateFilter && !dateFilter(p.date)) continue;
+    const key = `${p.employeeId}|${p.date}`;
+    const arr = raw.get(key) ?? [];
+    arr.push(p);
+    raw.set(key, arr);
+  }
+  const out = new Map<string, WorkPlanEntry[]>();
+  raw.forEach((entries, key) => out.set(key, dedup(entries)));
+  return out;
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -100,8 +125,8 @@ interface AddShiftModalProps {
   defaultDate: string;
   workTypes: WorkType[];
   isManagerMode: boolean;
-  sessionPin?: string;          // employee mode: PIN already confirmed
-  defaultEmployeeId?: string;   // pre-fill employee (manager click on cell)
+  sessionPin?: string;
+  defaultEmployeeId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -123,7 +148,6 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
     if (!workTypeId && workTypes.length > 0) setWorkTypeId(workTypes[0].id);
   }, [workTypes, workTypeId]);
 
-  // Load employees only in manager mode (employee mode uses sessionPin = self)
   useEffect(() => {
     if (!isManagerMode) return;
     managerFetch('/api/employees')
@@ -152,7 +176,6 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
         if (!res.ok) setError(json.error ?? t('Nepodařilo se přidat směnu.', 'Failed to add shift.'));
         else { onSuccess(); onClose(); }
       } else {
-        // Employee PIN mode
         const res = await fetch('/api/public/schedule/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -235,6 +258,100 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
   );
 }
 
+// ─── EditShiftModal ───────────────────────────────────────────────────────────
+
+interface EditShiftModalProps {
+  orgId: string;
+  entry: WorkPlanEntry;
+  workTypes: WorkType[];
+  isManagerMode: boolean;
+  sessionPin?: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, onClose, onSuccess }: EditShiftModalProps) {
+  const t = useT();
+  const [workTypeId, setWorkTypeId] = useState(entry.workTypeId ?? workTypes[0]?.id ?? '');
+  const [startTime, setStartTime] = useState(entry.startTime?.slice(0, 5) ?? '');
+  const [endTime, setEndTime] = useState(entry.endTime?.slice(0, 5) ?? '');
+  const [isEvening, setIsEvening] = useState(entry.isEvening ?? false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const bodyObj: Record<string, unknown> = {
+        orgId,
+        workPlanId: entry.id,
+        workTypeId: workTypeId || undefined,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        isEvening,
+      };
+      if (!isManagerMode) bodyObj.pin = sessionPin;
+      const res = isManagerMode
+        ? await managerFetch('/api/public/work-plans', { method: 'PATCH', body: JSON.stringify(bodyObj) })
+        : await fetch('/api/public/work-plans', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj) });
+      const json = await res.json();
+      if (!res.ok) setError(json.error ?? t('Nepodařilo se upravit.', 'Update failed.'));
+      else { onSuccess(); onClose(); }
+    } catch { setError(t('Síťová chyba.', 'Network error.')); }
+    finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">{t('Upravit směnu', 'Edit shift')}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{entry.employeeName} · {entry.date}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
+            <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)} className="w-4 h-4 accent-orange-500" />
+            <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
+          </label>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              {t('Zrušit', 'Cancel')}
+            </button>
+            <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {submitting ? '…' : t('Uložit', 'Save')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthChange }: GoogleSheetsGridProps) {
@@ -242,7 +359,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   const DAY_NAMES = [t('Po', 'Mon'), t('Út', 'Tue'), t('St', 'Wed'), t('Čt', 'Thu'), t('Pá', 'Fri'), t('So', 'Sat'), t('Ne', 'Sun')];
 
-  // Week navigation — start on the Monday of the month's first week
   const [weekStart, setWeekStart] = useState<Date>(() => {
     const [y, m] = month.split('-').map(Number);
     return getWeekStart(new Date(y, m - 1, 1));
@@ -250,10 +366,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   const weekDays = getWeekDays(weekStart);
 
-  // Notify parent when week moves into a different month
   const prevMonthRef = useRef(month);
   useEffect(() => {
-    const midWeek = weekDays[3]; // Thursday
+    const midWeek = weekDays[3];
     const weekMonth = midWeek.slice(0, 7);
     if (weekMonth !== prevMonthRef.current) {
       prevMonthRef.current = weekMonth;
@@ -261,12 +376,11 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     }
   }, [weekDays, onMonthChange]);
 
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [employees, setEmployees] = useState<Employee[]>([]);
-  // plans indexed by "employeeId|date" → entries array
   const [plansMap, setPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
-  // month-wide plans map: "employeeId|date" → entries[] (current month, for monthly hour totals)
   const [monthPlansMap, setMonthPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
-  // approved vacation dates: Set of "employeeId|date"
+  const [fullPlansMap, setFullPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
   const [vacationSet, setVacationSet] = useState<Set<string>>(new Set());
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
@@ -275,6 +389,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [addModalDate, setAddModalDate] = useState('');
   const [addModalEmployeeId, setAddModalEmployeeId] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Context menu + edit
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: WorkPlanEntry } | null>(null);
+  const [editEntry, setEditEntry] = useState<WorkPlanEntry | null>(null);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
@@ -286,14 +404,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const deptDropdownRef = useRef<HTMLDivElement>(null);
 
-  // ── PIN session (shared with WorkPlanGrid via localStorage) ──────────────
+  // ── PIN session ──────────────────────────────────────────────────────────
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinInputError, setPinInputError] = useState(false);
   const [pinInputLoading, setPinInputLoading] = useState(false);
 
-  // Restore session from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem('hris_employee_session');
@@ -340,7 +457,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       .catch(() => {});
   }, [isManagerMode]);
 
-  // ── Fetch work types ──────────────────────────────────────────────────────
   useEffect(() => {
     fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
@@ -348,7 +464,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       .catch(() => {});
   }, [orgId]);
 
-  // ── Fetch company settings (closed dates) ─────────────────────────────────
   useEffect(() => {
     fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
@@ -359,7 +474,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       .catch(() => {});
   }, [orgId]);
 
-  // ── Fetch approved vacations ──────────────────────────────────────────────
   useEffect(() => {
     fetch(`/api/public/vacation-calendar?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
@@ -380,11 +494,22 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       .catch(() => {});
   }, [orgId]);
 
-  // ── Fetch schedule for the week's months ─────────────────────────────────
+  // ── Fetch schedule — always fetch full month range so month view has data ──
   const fetchPlans = useCallback(async () => {
     setLoading(true);
     try {
-      const months = getMonthsForWeek(weekDays);
+      const currentMonth = weekDays[3].slice(0, 7);
+      const [cy, cm] = currentMonth.split('-').map(Number);
+      // Months touched by first and last week of the month (handles cross-month weeks)
+      const firstWeekDays = getWeekDays(getWeekStart(new Date(cy, cm - 1, 1)));
+      const lastWeekDays = getWeekDays(getWeekStart(new Date(cy, cm, 0)));
+      const months = Array.from(new Set([
+        ...getMonthsForWeek(weekDays),
+        ...getMonthsForWeek(firstWeekDays),
+        currentMonth,
+        ...getMonthsForWeek(lastWeekDays),
+      ]));
+
       const results = await Promise.all(
         months.map((m) =>
           fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(m)}`)
@@ -394,56 +519,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         )
       );
       const allPlans = results.flat();
-      // Build map: "employeeId|date" → entries[]
-      const raw = new Map<string, WorkPlanEntry[]>();
-      for (const p of allPlans) {
-        if (!weekDays.includes(p.date)) continue;
-        const key = `${p.employeeId}|${p.date}`;
-        const arr = raw.get(key) ?? [];
-        arr.push(p);
-        raw.set(key, arr);
-      }
-      // Deduplicate: keep only entries with proper work_type_id when any exist;
-      // then also drop timeless entries if a timed entry of the same type exists.
-      const map = new Map<string, WorkPlanEntry[]>();
-      raw.forEach((entries, key) => {
-        // 1) Prefer typed entries (work_type_id set) over free-text fallback entries
-        const hasTyped = entries.some((e) => e.workTypeId != null);
-        let cleaned = hasTyped ? entries.filter((e) => e.workTypeId != null) : entries;
-        // 2) Drop timeless entry when same workTypeId already has a timed entry
-        const timedTypeIds = new Set(
-          cleaned.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
-        );
-        cleaned = cleaned.filter(
-          (e) => (e.startTime && e.endTime) || !timedTypeIds.has(e.workTypeId ?? '__none__')
-        );
-        map.set(key, cleaned.length > 0 ? cleaned : entries);
-      });
-      setPlansMap(map);
 
-      // Build month-wide map (same dedup, all dates in current month)
-      const currentMonth = weekDays[3].slice(0, 7); // Thursday's month
-      const rawMonth = new Map<string, WorkPlanEntry[]>();
-      for (const p of allPlans) {
-        if (!p.date.startsWith(currentMonth)) continue;
-        const key = `${p.employeeId}|${p.date}`;
-        const arr = rawMonth.get(key) ?? [];
-        arr.push(p);
-        rawMonth.set(key, arr);
-      }
-      const monthMap = new Map<string, WorkPlanEntry[]>();
-      rawMonth.forEach((entries, key) => {
-        const hasTyped = entries.some((e) => e.workTypeId != null);
-        let cleaned = hasTyped ? entries.filter((e) => e.workTypeId != null) : entries;
-        const timedTypeIds = new Set(
-          cleaned.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
-        );
-        cleaned = cleaned.filter(
-          (e) => (e.startTime && e.endTime) || !timedTypeIds.has(e.workTypeId ?? '__none__')
-        );
-        monthMap.set(key, cleaned.length > 0 ? cleaned : entries);
-      });
-      setMonthPlansMap(monthMap);
+      setPlansMap(buildMap(allPlans, (d) => weekDays.includes(d)));
+      setMonthPlansMap(buildMap(allPlans, (d) => d.startsWith(currentMonth)));
+      setFullPlansMap(buildMap(allPlans));
     } finally {
       setLoading(false);
     }
@@ -451,7 +530,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
-  // ── Compute filter lists from current plans + work types ──────────────────
+  // ── Filter lists ──────────────────────────────────────────────────────────
   useEffect(() => {
     const activityNames = new Set(workTypes.filter((w) => w.category === 'activity').map((w) => w.name));
     const regular = new Set<string>();
@@ -478,28 +557,48 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return () => document.removeEventListener('mousedown', onOutside);
   }, []);
 
-  // ── Compute employee list ─────────────────────────────────────────────────
-  // Manager: all active employees; non-manager: employees with plans this week
-  // Department order from work_types sort_order (departments = work type names)
+  // ── Close context menu on any click ──────────────────────────────────────
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [contextMenu]);
+
+  // ── Department sort order ─────────────────────────────────────────────────
   const deptOrder = useMemo(() => {
     const m = new Map<string, number>();
     workTypes.forEach((wt, i) => m.set(wt.name, wt.sort_order ?? i));
     return m;
   }, [workTypes]);
 
+  // ── Weeks of current month (for month view) ───────────────────────────────
+  const monthWeeks = useMemo(() => {
+    const currentMonth = weekDays[3].slice(0, 7);
+    const [y, m] = currentMonth.split('-').map(Number);
+    const first = new Date(y, m - 1, 1);
+    const last = new Date(y, m, 0);
+    const weeks: Date[] = [];
+    const cur = getWeekStart(first);
+    while (cur <= last) {
+      weeks.push(new Date(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+    return weeks;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekDays[3]]);
+
+  // ── Employee list ─────────────────────────────────────────────────────────
   const baseEmployees: Employee[] = useMemo(() => {
+    const sourceMap = viewMode === 'month' ? fullPlansMap : plansMap;
     const list = isManagerMode
       ? employees
       : (() => {
           const seen = new Map<string, Employee>();
-          Array.from(plansMap.values()).forEach((p) => {
+          Array.from(sourceMap.values()).forEach((p) => {
             p.forEach((e) => {
               if (!seen.has(e.employeeId)) {
-                seen.set(e.employeeId, {
-                  id: e.employeeId,
-                  name: e.employeeName ?? e.employeeId,
-                  department: e.employeeDepartment,
-                });
+                seen.set(e.employeeId, { id: e.employeeId, name: e.employeeName ?? e.employeeId, department: e.employeeDepartment });
               }
             });
           });
@@ -512,118 +611,108 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       return (a.name ?? '').localeCompare(b.name ?? '', 'cs');
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employees, isManagerMode, plansMap, deptOrder]);
+  }, [employees, isManagerMode, plansMap, fullPlansMap, viewMode, deptOrder]);
 
   // ── Apply filters ─────────────────────────────────────────────────────────
   const displayEmployees = useMemo(() => {
+    const sourceMap = viewMode === 'month' ? fullPlansMap : plansMap;
+    const allDates = viewMode === 'month' ? monthWeeks.flatMap(getWeekDays) : weekDays;
     let result = baseEmployees;
 
     if (nameSearch.trim()) {
       const q = nameSearch.trim().toLowerCase();
       result = result.filter((e) => (e.name ?? '').toLowerCase().includes(q));
     }
-
     if (deptFilters.length > 0) {
       result = result.filter((emp) =>
-        weekDays.some((date) =>
-          (plansMap.get(`${emp.id}|${date}`) ?? []).some((e) => deptFilters.includes(e.workTypeName ?? ''))
-        )
+        allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => deptFilters.includes(e.workTypeName ?? '')))
       );
     }
-
     if (activityFilter) {
       result = result.filter((emp) =>
-        weekDays.some((date) =>
-          (plansMap.get(`${emp.id}|${date}`) ?? []).some((e) => activityDepts.includes(e.workTypeName ?? ''))
-        )
+        allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => activityDepts.includes(e.workTypeName ?? '')))
       );
     }
-
     if (eveningFilter) {
       result = result.filter((emp) =>
-        weekDays.some((date) =>
-          (plansMap.get(`${emp.id}|${date}`) ?? []).some((e) => e.isEvening)
-        )
+        allDates.some((date) => (sourceMap.get(`${emp.id}|${date}`) ?? []).some((e) => e.isEvening))
       );
     }
-
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseEmployees, nameSearch, deptFilters, activityFilter, activityDepts, eveningFilter, plansMap, weekDays.join(',')]);
+  }, [baseEmployees, nameSearch, deptFilters, activityFilter, activityDepts, eveningFilter, plansMap, fullPlansMap, viewMode, weekDays.join(','), monthWeeks]);
 
-  // ── Week navigation ───────────────────────────────────────────────────────
-  const goToPrevWeek = () => {
-    setWeekStart((d) => {
-      const nd = new Date(d);
-      nd.setDate(nd.getDate() - 7);
-      return nd;
-    });
+  // ── Navigation ────────────────────────────────────────────────────────────
+  const goToPrev = () => {
+    if (viewMode === 'month') {
+      const [y, m] = weekDays[3].slice(0, 7).split('-').map(Number);
+      setWeekStart(getWeekStart(new Date(y, m - 2, 1)));
+    } else {
+      setWeekStart((d) => { const nd = new Date(d); nd.setDate(nd.getDate() - 7); return nd; });
+    }
+  };
+  const goToNext = () => {
+    if (viewMode === 'month') {
+      const [y, m] = weekDays[3].slice(0, 7).split('-').map(Number);
+      setWeekStart(getWeekStart(new Date(y, m, 1)));
+    } else {
+      setWeekStart((d) => { const nd = new Date(d); nd.setDate(nd.getDate() + 7); return nd; });
+    }
   };
 
-  const goToNextWeek = () => {
-    setWeekStart((d) => {
-      const nd = new Date(d);
-      nd.setDate(nd.getDate() + 7);
-      return nd;
-    });
-  };
+  const navLabel = viewMode === 'month'
+    ? new Date(weekDays[3] + 'T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })
+    : (() => {
+        const first = new Date(weekDays[0] + 'T00:00:00');
+        const last = new Date(weekDays[6] + 'T00:00:00');
+        return `${first.getDate()}. ${first.getMonth() + 1}.–${last.getDate()}. ${last.getMonth() + 1}. ${last.getFullYear()}`;
+      })();
 
-  const weekLabel = (() => {
-    const first = new Date(weekDays[0] + 'T00:00:00');
-    const last = new Date(weekDays[6] + 'T00:00:00');
-    const fmt = (d: Date) =>
-      `${d.getDate()}. ${d.getMonth() + 1}.`;
-    return `${fmt(first)}–${fmt(last)} ${last.getFullYear()}`;
-  })();
+  // ── Delete entry ──────────────────────────────────────────────────────────
+  const handleDeleteEntry = useCallback(async (entry: WorkPlanEntry) => {
+    if (!confirm(t('Smazat tuto směnu?', 'Delete this shift?'))) return;
+    try {
+      const params = new URLSearchParams({ workPlanId: entry.id, orgId });
+      const res = isManagerMode
+        ? await managerFetch(`/api/public/work-plans?${params}`, { method: 'DELETE' })
+        : await fetch(`/api/public/work-plans?${params}&pin=${encodeURIComponent(sessionPin)}`, { method: 'DELETE' });
+      if (res.ok) { setToast(t('Směna smazána', 'Shift deleted')); fetchPlans(); }
+    } catch { /* ignore */ }
+  }, [orgId, isManagerMode, sessionPin, fetchPlans, t]);
 
   // ── Cell rendering ────────────────────────────────────────────────────────
 
-  // Hatching patterns for empty states
   const DOV_HATCH = 'repeating-linear-gradient(-45deg, #eff6ff 0px, #eff6ff 5px, #dbeafe 5px, #dbeafe 7px)';
   const XXX_HATCH = 'repeating-linear-gradient(-45deg, #f9fafb 0px, #f9fafb 6px, #e9eef5 6px, #e9eef5 8px)';
 
-  function renderCell(emp: Employee, date: string) {
+  function renderCell(emp: Employee, date: string, dataMap: Map<string, WorkPlanEntry[]> = plansMap) {
     const key = `${emp.id}|${date}`;
-    const rawEntries = plansMap.get(key);
+    const rawEntries = dataMap.get(key);
 
-    // When a type/activity filter is active, apply it at cell level too:
-    // only show matching badges; days with no match fall through to XXX/DOV.
     let entries: WorkPlanEntry[] | undefined = rawEntries;
     if (rawEntries && rawEntries.length > 0 && (deptFilters.length > 0 || activityFilter)) {
       const matching = rawEntries.filter((e) =>
-        deptFilters.length > 0
-          ? deptFilters.includes(e.workTypeName ?? '')
-          : activityDepts.includes(e.workTypeName ?? '')
+        deptFilters.length > 0 ? deptFilters.includes(e.workTypeName ?? '') : activityDepts.includes(e.workTypeName ?? '')
       );
       entries = matching.length > 0 ? matching : undefined;
     }
+
+    const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
 
     if (!entries || entries.length === 0) {
       const isVacation = vacationSet.has(key);
       if (isVacation) {
         return (
-          <div
-            className="flex items-center justify-center h-full w-full"
-            style={{ backgroundImage: DOV_HATCH }}
-          >
-            <div
-              title={t('Schválená dovolená', 'Approved vacation')}
-              className="text-[11px] font-bold text-center px-2 py-0.5 leading-tight truncate border border-blue-300"
-              style={{ backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '6px' }}
-            >
+          <div className="flex items-center justify-center h-full w-full" style={{ backgroundImage: DOV_HATCH }}>
+            <div title={t('Schválená dovolená', 'Approved vacation')} className="text-[11px] font-bold text-center px-2 py-0.5 leading-tight truncate border border-blue-300" style={{ backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '6px' }}>
               {t('DOV', 'VAC')}
             </div>
           </div>
         );
       }
       return (
-        <div
-          className="flex items-center justify-center h-full w-full"
-          style={{ backgroundImage: XXX_HATCH }}
-        >
-          <span className="text-[11px] font-semibold tracking-wider select-none" style={{ color: '#c9d3df', userSelect: 'none' }}>
-            XXX
-          </span>
+        <div className="flex items-center justify-center h-full w-full" style={{ backgroundImage: XXX_HATCH }}>
+          <span className="text-[11px] font-semibold tracking-wider select-none" style={{ color: '#c9d3df', userSelect: 'none' }}>XXX</span>
         </div>
       );
     }
@@ -632,16 +721,21 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       <div className="flex flex-col gap-1 items-stretch justify-center h-full">
         {entries.map((e) => {
           const { bg, text } = pastelizeColor(e.workTypeColor ?? '#94a3b8');
-          const label =
-            e.startTime && e.endTime
-              ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}`
-              : e.workTypeName ?? (e.workType ?? '');
+          const label = e.startTime && e.endTime
+            ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}`
+            : e.workTypeName ?? (e.workType ?? '');
           return (
             <div
               key={e.id}
               title={[e.workTypeName, e.startTime && e.endTime ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}` : null, e.note ? `📝 ${e.note}` : null].filter(Boolean).join(' · ')}
               style={{ backgroundColor: bg, color: text, borderRadius: '7px' }}
               className="w-full text-[11px] font-semibold px-1.5 py-[3px] leading-tight flex items-center justify-center gap-0.5 min-w-0"
+              onContextMenu={(ev) => {
+                if (!canInteract) return;
+                ev.preventDefault();
+                ev.stopPropagation();
+                setContextMenu({ x: ev.clientX, y: ev.clientY, entry: e });
+              }}
             >
               <span className="truncate">{label}</span>
               {e.isEvening && <span className="shrink-0 text-[9px] opacity-70">🌙</span>}
@@ -653,27 +747,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     );
   }
 
-  function isLight(hex: string): boolean {
-    const clean = hex.replace('#', '');
-    if (clean.length < 6) return true;
-    const r = parseInt(clean.slice(0, 2), 16);
-    const g = parseInt(clean.slice(2, 4), 16);
-    const b = parseInt(clean.slice(4, 6), 16);
-    return (r * 299 + g * 587 + b * 114) / 1000 > 130;
-  }
-
   function pastelizeColor(hex: string): { bg: string; text: string } {
     const clean = hex.replace('#', '');
     if (clean.length < 6) return { bg: '#f1f5f9', text: '#475569' };
     const r = parseInt(clean.slice(0, 2), 16);
     const g = parseInt(clean.slice(2, 4), 16);
     const b = parseInt(clean.slice(4, 6), 16);
-    // Blend 30% original + 70% white
     const pr = Math.round(r * 0.30 + 255 * 0.70);
     const pg = Math.round(g * 0.30 + 255 * 0.70);
     const pb = Math.round(b * 0.30 + 255 * 0.70);
     const bg = `#${pr.toString(16).padStart(2, '0')}${pg.toString(16).padStart(2, '0')}${pb.toString(16).padStart(2, '0')}`;
-    // Text: 55% of original (darker)
     const dr = Math.round(r * 0.50);
     const dg = Math.round(g * 0.50);
     const db = Math.round(b * 0.50);
@@ -712,6 +795,37 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return total;
   }
 
+  // ── Shared cell row renderer ──────────────────────────────────────────────
+  function renderEmployeeRows(wDays: string[], dataMap: Map<string, WorkPlanEntry[]>) {
+    return displayEmployees.map((emp, ri) => (
+      <tr key={`${emp.id}-${wDays[0]}`}
+        className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-75 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+        <td className="sticky left-0 z-10 px-3 py-2 border-r border-gray-200 bg-inherit group-hover:bg-blue-50/40 transition-colors duration-75">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-semibold text-gray-800 leading-tight truncate" title={emp.name}>{emp.name}</span>
+            {emp.department && <span className="text-[10px] text-gray-400 leading-tight truncate">{emp.department}</span>}
+          </div>
+        </td>
+        {wDays.map((date, di) => {
+          const isClosed = closedDates.has(date);
+          const isWeekend = di >= 5;
+          return (
+            <td key={date}
+              className={`px-1.5 py-1.5 border-r border-gray-100 last:border-r-0 align-middle group-hover:bg-blue-50/30 transition-colors duration-75 ${isClosed ? 'bg-gray-100/60' : isWeekend ? 'bg-slate-50/60' : ''}`}
+              onClick={() => {
+                if (isManagerMode) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
+                else if (sessionEmployee && sessionEmployee.id === emp.id) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
+              }}
+              style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? 'pointer' : 'default' }}
+            >
+              {renderCell(emp, date, dataMap)}
+            </td>
+          );
+        })}
+      </tr>
+    ));
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const today = (() => { const d = new Date(); return toISO(d); })();
@@ -720,16 +834,32 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     <div className="p-4 md:p-6 max-w-full">
       {/* Header toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        {/* Week navigation */}
+        {/* View mode toggle */}
+        <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
+          <button
+            onClick={() => setViewMode('week')}
+            className={`px-3 py-1.5 transition-colors ${viewMode === 'week' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+          >
+            {t('Týden', 'Week')}
+          </button>
+          <button
+            onClick={() => setViewMode('month')}
+            className={`px-3 py-1.5 transition-colors ${viewMode === 'month' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+          >
+            {t('Měsíc', 'Month')}
+          </button>
+        </div>
+
+        {/* Navigation */}
         <div className="flex items-center gap-2">
-          <button onClick={goToPrevWeek}
+          <button onClick={goToPrev}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">{weekLabel}</span>
-          <button onClick={goToNextWeek}
+          <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">{navLabel}</span>
+          <button onClick={goToNext}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -737,9 +867,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           </button>
         </div>
 
-        {/* ── Filter bar ─────────────────────────────────────────────────── */}
+        {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Typ práce multi-select dropdown */}
           {departments.length > 0 && (
             <div className="relative" ref={deptDropdownRef}>
               <button
@@ -755,20 +884,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 <div className="absolute left-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
                   {departments.map((dept) => (
                     <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={deptFilters.includes(dept)}
+                      <input type="checkbox" checked={deptFilters.includes(dept)}
                         onChange={() => setDeptFilters((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept])}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
-                      />
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-400" />
                       <span className="text-xs font-medium text-slate-700">{dept}</span>
                     </label>
                   ))}
                   {deptFilters.length > 0 && (
-                    <button
-                      onClick={() => { setDeptFilters([]); setDeptDropdownOpen(false); }}
-                      className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-red-500 text-left border-t border-slate-100 mt-1 transition-colors"
-                    >
+                    <button onClick={() => { setDeptFilters([]); setDeptDropdownOpen(false); }}
+                      className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-red-500 text-left border-t border-slate-100 mt-1 transition-colors">
                       {t('Zrušit výběr', 'Clear')}
                     </button>
                   )}
@@ -777,7 +901,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </div>
           )}
 
-          {/* Aktivity toggle — shown whenever activity work types exist in the system */}
           {workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
@@ -787,7 +910,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </button>
           )}
 
-          {/* Večerní toggle */}
           <button
             onClick={() => setEveningFilter((v) => !v)}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
@@ -795,25 +917,20 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             🌙 {t('Večerní', 'Evening')}
           </button>
 
-          {/* Name search */}
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
             </svg>
-            <input
-              type="text"
-              value={nameSearch}
-              onChange={(e) => setNameSearch(e.target.value)}
+            <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
               placeholder={t('Hledat…', 'Search…')}
-              className="pl-7 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-36"
-            />
+              className="pl-7 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-36" />
             {nameSearch && (
               <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
             )}
           </div>
         </div>
 
-        {/* PIN session — only shown when not manager */}
+        {/* PIN session */}
         {!isManagerMode && (
           sessionEmployee ? (
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 ml-auto">
@@ -840,10 +957,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2 ml-auto">
               <input
-                type="password"
-                inputMode="numeric"
-                maxLength={8}
-                value={pinInputValue}
+                type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
                 onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
                 placeholder={t('Váš PIN', 'Your PIN')}
                 className={`w-28 text-sm px-3 py-1.5 rounded-lg border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-slate-200'} focus:outline-none focus:ring-2 focus:ring-blue-400 tracking-widest`}
@@ -856,7 +970,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           )
         )}
 
-        {/* Add shift button — manager or employee with active session */}
         {(isManagerMode || sessionEmployee) && (
           <button
             onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
@@ -875,32 +988,34 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '160px', minWidth: '140px' }} />
-            {weekDays.map((d) => <col key={d} style={{ width: '120px', minWidth: '100px' }} />)}
+            {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
           </colgroup>
 
-          {/* Header row */}
+          {/* Fixed column header (Po Út St…) */}
           <thead>
             <tr className="border-b border-gray-200">
               <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">
                 {t('Zaměstnanec', 'Employee')}
               </th>
-              {weekDays.map((d, i) => {
-                const isClosed = closedDates.has(d);
-                const isToday = d === today;
+              {DAY_NAMES.map((name, i) => {
+                // In week view show full header with dates; in month view just day names
+                const date = viewMode === 'week' ? weekDays[i] : null;
+                const isClosed = date ? closedDates.has(date) : false;
+                const isToday = date === today;
                 const isWeekend = i >= 5;
-                const dayNum = new Date(d + 'T00:00:00').getDate();
+                const dayNum = date ? new Date(date + 'T00:00:00').getDate() : null;
                 return (
-                  <th key={d}
-                    className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0
-                      ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
+                  <th key={i}
+                    className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
                   >
-                    <div className={`inline-flex flex-col items-center gap-0.5`}>
-                      <span className="text-[10px] uppercase tracking-wider">{DAY_NAMES[i]}</span>
-                      <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
-                        ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
-                        {dayNum}
-                      </span>
-                      {isClosed && <span className="text-[9px] text-red-400 font-normal normal-case tracking-normal">zavřeno</span>}
+                    <div className="inline-flex flex-col items-center gap-0.5">
+                      <span className="text-[10px] uppercase tracking-wider">{name}</span>
+                      {dayNum !== null && (
+                        <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
+                          {dayNum}
+                        </span>
+                      )}
+                      {isClosed && <span className="text-[9px] text-red-400 font-normal normal-case">zavřeno</span>}
                     </div>
                   </th>
                 );
@@ -908,7 +1023,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </tr>
           </thead>
 
-          {/* Body */}
           <tbody>
             {loading && (
               <tr>
@@ -929,54 +1043,66 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               </tr>
             )}
 
-            {!loading && displayEmployees.map((emp, ri) => (
-              <tr key={emp.id}
-                className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-75 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                {/* Employee name cell */}
-                <td className="sticky left-0 z-10 px-3 py-2 border-r border-gray-200 bg-inherit group-hover:bg-blue-50/40 transition-colors duration-75">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-semibold text-gray-800 leading-tight truncate" title={emp.name}>
-                      {emp.name}
-                    </span>
-                    {emp.department && (
-                      <span className="text-[10px] text-gray-400 leading-tight truncate">{emp.department}</span>
-                    )}
-                  </div>
-                </td>
+            {!loading && viewMode === 'week' && renderEmployeeRows(weekDays, plansMap)}
 
-                {/* Day cells */}
-                {weekDays.map((date, di) => {
-                  const isClosed = closedDates.has(date);
-                  const isWeekend = di >= 5;
-                  return (
-                    <td key={date}
-                      className={`px-1.5 py-1.5 border-r border-gray-100 last:border-r-0 align-middle group-hover:bg-blue-50/30 transition-colors duration-75
-                        ${isClosed ? 'bg-gray-100/60' : isWeekend ? 'bg-slate-50/60' : ''}`}
-                      onClick={() => {
-                        if (isManagerMode) {
-                          setAddModalDate(date);
-                          setAddModalEmployeeId(emp.id);
-                          setShowAddModal(true);
-                        } else if (sessionEmployee && sessionEmployee.id === emp.id) {
-                          setAddModalDate(date);
-                          setAddModalEmployeeId(emp.id);
-                          setShowAddModal(true);
-                        }
-                      }}
-                      style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? 'pointer' : 'default' }}
-                      title={(isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? t('Kliknout pro přidání směny', 'Click to add shift') : undefined}
-                    >
-                      {renderCell(emp, date)}
+            {!loading && viewMode === 'month' && monthWeeks.map((weekMon) => {
+              const wDays = getWeekDays(weekMon);
+              const wLabel = (() => {
+                const f = new Date(wDays[0] + 'T00:00:00');
+                const l = new Date(wDays[6] + 'T00:00:00');
+                return `${f.getDate()}. ${f.getMonth() + 1}. – ${l.getDate()}. ${l.getMonth() + 1}.`;
+              })();
+              return (
+                <>
+                  {/* Week date separator row */}
+                  <tr key={`sep-${wDays[0]}`} className="border-y border-slate-200">
+                    <td className="sticky left-0 z-10 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500 border-r border-slate-200">
+                      {wLabel}
                     </td>
-                  );
-                })}
-              </tr>
-            ))}
+                    {wDays.map((d, i) => {
+                      const isToday = d === today;
+                      const isClosed = closedDates.has(d);
+                      const isWeekend = i >= 5;
+                      const dayNum = new Date(d + 'T00:00:00').getDate();
+                      return (
+                        <td key={d} className={`px-1 py-1 text-center text-[11px] border-r border-slate-200 last:border-r-0 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-semibold ${isToday ? 'bg-blue-600 text-white' : ''}`}>
+                            {dayNum}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {renderEmployeeRows(wDays, fullPlansMap)}
+                </>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Add shift modal */}
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 9999 }}
+          className="bg-white rounded-xl shadow-xl border border-slate-200 py-1 min-w-[160px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => { setEditEntry(contextMenu.entry); setContextMenu(null); }}
+            className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+          >
+            ✏️ {t('Upravit', 'Edit')}
+          </button>
+          <button
+            onClick={() => { handleDeleteEntry(contextMenu.entry); setContextMenu(null); }}
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            🗑️ {t('Smazat', 'Delete')}
+          </button>
+        </div>
+      )}
+
       {showAddModal && (
         <AddShiftModal
           orgId={orgId}
@@ -986,10 +1112,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           sessionPin={sessionPin || undefined}
           defaultEmployeeId={addModalEmployeeId}
           onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
-            setToast(t('Směna přidána!', 'Shift added!'));
-            fetchPlans();
-          }}
+          onSuccess={() => { setToast(t('Směna přidána!', 'Shift added!')); fetchPlans(); }}
+        />
+      )}
+
+      {editEntry && (
+        <EditShiftModal
+          orgId={orgId}
+          entry={editEntry}
+          workTypes={workTypes}
+          isManagerMode={isManagerMode}
+          sessionPin={sessionPin || undefined}
+          onClose={() => setEditEntry(null)}
+          onSuccess={() => { setToast(t('Směna upravena!', 'Shift updated!')); fetchPlans(); }}
         />
       )}
 
