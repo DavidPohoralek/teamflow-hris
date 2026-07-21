@@ -97,33 +97,35 @@ export async function GET(req: NextRequest) {
 
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-  // Split approved vacation into already-consumed (past) vs planned (future)
-  let consumedDays = 0;     // approved & end date already passed → actually used
-  let futurePlannedDays = 0; // approved & start date in future → planned but not yet taken
-  let pendingDays = 0;
+  // Use Sets to count unique dates — prevents overlapping requests from being counted twice
+  const consumedDateSet = new Set<string>();
+  const plannedDateSet = new Set<string>();
+  const pendingDateSet = new Set<string>();
 
   for (const req of requests ?? []) {
-    if (req.status === 'approved') {
-      const dateFrom = req.date_from;
-      const dateTo = req.date_to ?? req.date_from;
-      if (dateTo < today) {
-        // Entire period is in the past
-        consumedDays += countVacationDays(dateFrom, dateTo, countWeekends);
-      } else if (dateFrom >= today) {
-        // Entire period is in the future
-        futurePlannedDays += countVacationDays(dateFrom, dateTo, countWeekends);
-      } else {
-        // Period spans today — split: days before today = consumed, today onward = planned
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
-        consumedDays += countVacationDays(dateFrom, yesterdayStr, countWeekends);
-        futurePlannedDays += countVacationDays(today, dateTo, countWeekends);
+    const dateFrom = req.date_from;
+    const dateTo = req.date_to ?? req.date_from;
+    const from = new Date(dateFrom + 'T00:00:00');
+    const to = new Date(dateTo + 'T00:00:00');
+    const cur = new Date(from);
+    while (cur <= to) {
+      const dow = cur.getDay();
+      if (countWeekends || (dow !== 0 && dow !== 6)) {
+        const ds = cur.toISOString().split('T')[0];
+        if (req.status === 'approved') {
+          if (ds < today) consumedDateSet.add(ds);
+          else plannedDateSet.add(ds);
+        } else if (req.status === 'pending') {
+          pendingDateSet.add(ds);
+        }
       }
-    } else if (req.status === 'pending') {
-      pendingDays += countVacationDays(req.date_from, req.date_to ?? null, countWeekends);
+      cur.setDate(cur.getDate() + 1);
     }
   }
+
+  const consumedDays = consumedDateSet.size;
+  const futurePlannedDays = plannedDateSet.size;
+  const pendingDays = pendingDateSet.size;
 
   // effectiveStartDays is the starting balance → remaining = start - used in system
   const remainingDays = Math.max(0, effectiveStartDays - consumedDays - futurePlannedDays);
