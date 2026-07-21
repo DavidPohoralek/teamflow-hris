@@ -570,6 +570,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   // Sticky month-view header
   const [stickyWeekKey, setStickyWeekKey] = useState<string | null>(null);
   const weekSepRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  // Scroll sync: header div scrollLeft follows body div (split-table sticky approach)
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
@@ -1212,44 +1215,67 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         )}
       </div>
 
-      {/* Grid — overflowY:clip prevents the browser from promoting overflow-y:visible→auto
-           which would break position:sticky on the thead th elements */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white" style={{ overflowY: 'clip' }}>
+      {/* Grid — split into sticky header + scrollable body so position:sticky works
+           (overflow-x:auto on any ancestor breaks sticky; the header div has no overflow) */}
+      <div className="rounded-xl border border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
+
+        {/* Sticky header div — no overflow here, so position:sticky works vs. the window */}
+        <div
+          ref={headerScrollRef}
+          style={{ position: 'sticky', top: 0, zIndex: 20, overflow: 'hidden' }}
+          className="bg-gray-50 border-b-2 border-gray-200 rounded-t-xl"
+        >
+          <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '160px', minWidth: '140px' }} />
+              {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200 bg-gray-50">
+                  {t('Zaměstnanec', 'Employee')}
+                </th>
+                {DAY_NAMES.map((name, i) => {
+                  // In week mode use weekDays; in month mode use stickyDays (updates as user scrolls)
+                  const date = stickyDays[i];
+                  const isClosed = closedDates.has(date);
+                  const isToday = date === today;
+                  const isWeekend = i >= 5;
+                  const dayNum = new Date(date + 'T00:00:00').getDate();
+                  return (
+                    <th key={i}
+                      className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
+                    >
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] uppercase tracking-wider">{name}</span>
+                        <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
+                          {dayNum}
+                        </span>
+                        {isClosed && <span className="text-[9px] text-red-400 font-normal normal-case">zavřeno</span>}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+          </table>
+        </div>
+
+        {/* Scrollable body — overflow-x:auto here only, header scrollLeft is synced on scroll */}
+        <div
+          ref={bodyScrollRef}
+          className="overflow-x-auto"
+          onScroll={(e) => {
+            if (headerScrollRef.current) {
+              headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+            }
+          }}
+        >
         <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '160px', minWidth: '140px' }} />
             {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
           </colgroup>
-
-          {/* Fixed column header (Po Út St…) — sticky so it stays visible while scrolling */}
-          <thead>
-            <tr className="border-b-2 border-gray-200">
-              <th className="sticky left-0 top-0 z-30 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">
-                {t('Zaměstnanec', 'Employee')}
-              </th>
-              {DAY_NAMES.map((name, i) => {
-                // In week mode use weekDays; in month mode use stickyDays (updates as user scrolls)
-                const date = stickyDays[i];
-                const isClosed = closedDates.has(date);
-                const isToday = date === today;
-                const isWeekend = i >= 5;
-                const dayNum = new Date(date + 'T00:00:00').getDate();
-                return (
-                  <th key={i}
-                    className={`sticky top-0 z-20 px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
-                  >
-                    <div className="inline-flex flex-col items-center gap-0.5">
-                      <span className="text-[10px] uppercase tracking-wider">{name}</span>
-                      <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
-                        {dayNum}
-                      </span>
-                      {isClosed && <span className="text-[9px] text-red-400 font-normal normal-case">zavřeno</span>}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
 
           <tbody>
             {loading && (
@@ -1310,7 +1336,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             })}
           </tbody>
         </table>
-      </div>
+        </div>{/* end overflow-x:auto body scroll div */}
+      </div>{/* end grid outer container */}
 
       {/* Context menu */}
       {contextMenu && (() => {
