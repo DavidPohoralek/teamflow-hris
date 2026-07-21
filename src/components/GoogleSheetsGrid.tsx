@@ -258,6 +258,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [employees, setEmployees] = useState<Employee[]>([]);
   // plans indexed by "employeeId|date" → entries array
   const [plansMap, setPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
+  // month-wide plans map: "employeeId|date" → entries[] (current month, for monthly hour totals)
+  const [monthPlansMap, setMonthPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
   // approved vacation dates: Set of "employeeId|date"
   const [vacationSet, setVacationSet] = useState<Set<string>>(new Set());
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
@@ -412,6 +414,30 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         map.set(key, cleaned.length > 0 ? cleaned : entries);
       });
       setPlansMap(map);
+
+      // Build month-wide map (same dedup, all dates in current month)
+      const currentMonth = weekDays[3].slice(0, 7); // Thursday's month
+      const rawMonth = new Map<string, WorkPlanEntry[]>();
+      for (const p of allPlans) {
+        if (!p.date.startsWith(currentMonth)) continue;
+        const key = `${p.employeeId}|${p.date}`;
+        const arr = rawMonth.get(key) ?? [];
+        arr.push(p);
+        rawMonth.set(key, arr);
+      }
+      const monthMap = new Map<string, WorkPlanEntry[]>();
+      rawMonth.forEach((entries, key) => {
+        const hasTyped = entries.some((e) => e.workTypeId != null);
+        let cleaned = hasTyped ? entries.filter((e) => e.workTypeId != null) : entries;
+        const timedTypeIds = new Set(
+          cleaned.filter((e) => e.startTime && e.endTime && e.workTypeId).map((e) => e.workTypeId!)
+        );
+        cleaned = cleaned.filter(
+          (e) => (e.startTime && e.endTime) || !timedTypeIds.has(e.workTypeId ?? '__none__')
+        );
+        monthMap.set(key, cleaned.length > 0 ? cleaned : entries);
+      });
+      setMonthPlansMap(monthMap);
     } finally {
       setLoading(false);
     }
@@ -648,6 +674,22 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return total;
   }
 
+  function computeMonthlyHours(empId: string): number {
+    let total = 0;
+    for (const [key, entries] of Array.from(monthPlansMap.entries())) {
+      if (!key.startsWith(`${empId}|`)) continue;
+      for (const e of entries) {
+        if (e.startTime && e.endTime) {
+          const [sh, sm] = e.startTime.split(':').map(Number);
+          const [eh, em] = e.endTime.split(':').map(Number);
+          const h = (eh * 60 + em - sh * 60 - sm) / 60;
+          if (h > 0) total += h;
+        }
+      }
+    }
+    return total;
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const today = (() => { const d = new Date(); return toISO(d); })();
@@ -757,10 +799,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               <div className="flex flex-col leading-tight">
                 <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
                 {(() => {
-                  const h = computePlannedHours(sessionEmployee.id);
-                  if (h <= 0) return null;
-                  const display = Number.isInteger(h) ? String(h) : h.toFixed(1);
-                  return <span className="text-emerald-500 text-[10px] font-medium">{display} h {t('tento týden', 'this week')}</span>;
+                  const hw = computePlannedHours(sessionEmployee.id);
+                  const hm = computeMonthlyHours(sessionEmployee.id);
+                  const fmt = (h: number) => Number.isInteger(h) ? String(h) : h.toFixed(1);
+                  return (
+                    <>
+                      {hw > 0 && <span className="text-emerald-500 text-[10px] font-medium">{fmt(hw)} h {t('tento týden', 'this week')}</span>}
+                      {hm > 0 && <span className="text-emerald-400 text-[10px]">{fmt(hm)} h {t('tento měsíc', 'this month')}</span>}
+                    </>
+                  );
                 })()}
               </div>
               <button
