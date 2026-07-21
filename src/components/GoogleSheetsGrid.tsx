@@ -855,7 +855,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const goToPrev = () => {
     if (viewMode === 'month') {
       const [y, m] = weekDays[3].slice(0, 7).split('-').map(Number);
-      setWeekStart(getWeekStart(new Date(y, m - 2, 1)));
+      // Use the 15th of the target month — guarantees weekDays[3] (Thu) lands in that month
+      setWeekStart(getWeekStart(new Date(y, m - 2, 15)));
     } else {
       setWeekStart((d) => { const nd = new Date(d); nd.setDate(nd.getDate() - 7); return nd; });
     }
@@ -863,7 +864,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const goToNext = () => {
     if (viewMode === 'month') {
       const [y, m] = weekDays[3].slice(0, 7).split('-').map(Number);
-      setWeekStart(getWeekStart(new Date(y, m, 1)));
+      // Use the 15th of the target month — guarantees weekDays[3] (Thu) lands in that month
+      setWeekStart(getWeekStart(new Date(y, m, 15)));
     } else {
       setWeekStart((d) => { const nd = new Date(d); nd.setDate(nd.getDate() + 7); return nd; });
     }
