@@ -536,7 +536,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   function renderCell(emp: Employee, date: string) {
     const key = `${emp.id}|${date}`;
-    const entries = plansMap.get(key);
+    const rawEntries = plansMap.get(key);
+
+    // When a type/activity filter is active, apply it at cell level too:
+    // only show matching badges; days with no match fall through to XXX/DOV.
+    let entries: WorkPlanEntry[] | undefined = rawEntries;
+    if (rawEntries && rawEntries.length > 0 && (deptFilters.length > 0 || activityFilter)) {
+      const matching = rawEntries.filter((e) =>
+        deptFilters.length > 0
+          ? deptFilters.includes(e.workTypeName ?? '')
+          : activityDepts.includes(e.workTypeName ?? '')
+      );
+      entries = matching.length > 0 ? matching : undefined;
+    }
 
     if (!entries || entries.length === 0) {
       const isVacation = vacationSet.has(key);
