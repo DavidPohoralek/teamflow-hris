@@ -1325,26 +1325,22 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
               </FormField>
             </div>
             {shortLongWeekEnabled && (
-              <FormField label={t('Krátký / dlouhý týden', 'Short / long week')}>
-                <label className="flex items-start gap-2 mt-1 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.short_long_week ?? false}
-                    onChange={(e) => set('short_long_week', e.target.checked)}
-                    className="w-4 h-4 rounded accent-purple-600 mt-0.5"
-                  />
-                  <div>
-                    <span className="text-sm text-slate-700">
-                      {form.short_long_week ? t('Ano — střídá krátký/dlouhý týden', 'Yes — alternates short/long week') : t('Ne', 'No')}
-                    </span>
-                    {form.short_long_week && (
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {t('Asistent směn tomuto zaměstnanci směny nepřesouvá', 'Shift assistant will not reassign shifts for this employee')}
-                      </p>
-                    )}
-                  </div>
-                </label>
-              </FormField>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.short_long_week ?? false}
+                  onChange={(e) => set('short_long_week', e.target.checked)}
+                  className="w-4 h-4 rounded accent-purple-600 mt-0.5"
+                />
+                <div>
+                  <span className="text-sm text-slate-700 font-medium">
+                    {t('Jede na krátký / dlouhý týden', 'Alternates short / long week')}
+                  </span>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {t('Asistent směn tomuto zaměstnanci směny nepřesouvá', 'Shift assistant will not reassign shifts for this employee')}
+                  </p>
+                </div>
+              </label>
             )}
           </div>
 
