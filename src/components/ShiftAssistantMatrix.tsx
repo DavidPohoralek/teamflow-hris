@@ -143,6 +143,38 @@ export default function ShiftAssistantMatrix({
   // empId|date → draft info
   const [pendingDrafts, setPendingDrafts] = useState<Map<string, DraftEntry>>(new Map());
 
+  // ── LocalStorage draft key ──────────────────────────────────────────────────
+  const draftStorageKey = `sa_draft_${orgId}_${month}`;
+
+  // Load saved drafts + analyzeResult from localStorage on mount / month change
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftStorageKey);
+      if (saved) {
+        const { result, drafts } = JSON.parse(saved) as {
+          result: AssistantResult;
+          drafts: [string, DraftEntry][];
+        };
+        setAnalyzeResult(result);
+        setPendingDrafts(new Map(drafts));
+      } else {
+        setAnalyzeResult(null);
+        setPendingDrafts(new Map());
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftStorageKey]);
+
+  // Helper: persist drafts to localStorage
+  const saveDraftsToStorage = useCallback((result: AssistantResult, drafts: Map<string, DraftEntry>) => {
+    try {
+      localStorage.setItem(draftStorageKey, JSON.stringify({
+        result,
+        drafts: Array.from(drafts.entries()),
+      }));
+    } catch { /* ignore */ }
+  }, [draftStorageKey]);
+
   // ── Computed ────────────────────────────────────────────────────────────────
   const [y, m] = month.split('-').map(Number);
   const monthLabel = `${MONTH_NAMES[m - 1]} ${y}`;
@@ -173,22 +205,19 @@ export default function ShiftAssistantMatrix({
     return new Set(analyzeResult.problemDays.map(d => d.date));
   }, [analyzeResult]);
 
-  // actual assigned count per day (from workPlans, unique employees)
-  const dayActual = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const p of workPlans) {
-      if (!map.has(p.date)) map.set(p.date, new Set());
-      map.get(p.date)!.add(p.employeeId);
-    }
-    const counts = new Map<string, number>();
-    map.forEach((set, date) => counts.set(date, set.size));
-    return counts;
-  }, [workPlans]);
-
-  const dayRequired = useMemo(() => {
-    const map = new Map<string, number>();
+  // Per-day crisis info from analyze result for the column header badge
+  const crisisMeta = useMemo(() => {
+    const map = new Map<string, { missing: number; eveningMissing: number }>();
     if (!analyzeResult) return map;
-    for (const d of analyzeResult.problemDays) map.set(d.date, d.requiredTotal);
+    for (const d of analyzeResult.problemDays) {
+      const eveningMissing = (d as unknown as Record<string, unknown>).closingCoverage
+        ? ((d as unknown as Record<string, { missingStaff?: number }>).closingCoverage?.missingStaff ?? 0)
+        : 0;
+      map.set(d.date, {
+        missing: d.missingCount ?? 0,
+        eveningMissing,
+      });
+    }
     return map;
   }, [analyzeResult]);
 
@@ -261,12 +290,13 @@ export default function ShiftAssistantMatrix({
         }
       }
       setPendingDrafts(drafts);
+      saveDraftsToStorage(data, drafts);
     } catch {
       setAnalyzeError(t('Síťová chyba', 'Network error'));
     } finally {
       setAnalyzing(false);
     }
-  }, [month, t]);
+  }, [month, t, saveDraftsToStorage]);
 
   // ── Apply all recommendations ────────────────────────────────────────────────
   const handleApplyAll = useCallback(async () => {
@@ -290,6 +320,7 @@ export default function ShiftAssistantMatrix({
       setToast(`${appliedCount} ${t('směn přidáno', 'shifts added')}`);
       setAnalyzeResult(null);
       setPendingDrafts(new Map());
+      try { localStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
       fetchData();
     } catch {
       setApplyError(t('Síťová chyba', 'Network error'));
@@ -399,8 +430,16 @@ export default function ShiftAssistantMatrix({
                   const isToday = date === today;
                   const isCrisis = crisisDays.has(date);
                   const isWeekend = dow === 0 || dow === 6;
-                  const actual = dayActual.get(date) ?? 0;
-                  const required = dayRequired.get(date);
+                  const crisis = crisisMeta.get(date);
+
+                  // Build crisis badge label: "−2" for missing prodejna, "CA" for evening, "−1+CA" for both
+                  const crisisBadge = crisis
+                    ? crisis.missing > 0 && crisis.eveningMissing > 0
+                      ? `−${crisis.missing}+CA`
+                      : crisis.missing > 0
+                      ? `−${crisis.missing}`
+                      : 'CA'
+                    : null;
 
                   return (
                     <th
@@ -421,9 +460,9 @@ export default function ShiftAssistantMatrix({
                         {dayNum}
                       </div>
                       <div className="text-[8px] font-medium text-slate-400 leading-none mt-0.5">{dayAbbr}</div>
-                      {isCrisis && (
-                        <div className="text-[8px] font-bold bg-red-500 text-white rounded px-0.5 leading-tight mt-0.5 mx-0.5">
-                          {actual}/{required ?? '?'}
+                      {isCrisis && crisisBadge && (
+                        <div className="text-[7px] font-bold bg-red-500 text-white rounded px-0.5 leading-tight mt-0.5 mx-0.5 whitespace-nowrap">
+                          {crisisBadge}
                         </div>
                       )}
                       {!isCrisis && isToday && (

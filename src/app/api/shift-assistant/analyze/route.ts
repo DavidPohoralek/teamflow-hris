@@ -85,6 +85,7 @@ export async function GET(req: NextRequest) {
     employmentType: String(e.employment_type ?? 'Zaměstnanec'),
     shiftPattern: String(e.shift_pattern ?? 'Standardní'),
     storeRating: Number(e.store_rating ?? 3),
+    shortLongWeek: Boolean(e.short_long_week),
   }));
 
   // Index confirmed (non-draft) shifts by date
@@ -138,6 +139,7 @@ interface EmpRecord {
   employmentType: string;
   shiftPattern: string;
   storeRating: number;
+  shortLongWeek: boolean;
 }
 
 interface WorkPlanRecord {
@@ -236,6 +238,10 @@ function analyzeLocally(
   let allSuggestionCount = 0;
   let recommendedCount = 0;
 
+  // Track which employees have already been recommended to diversify picks across days
+  const alreadyRecommendedFds = new Set<string>();
+  const alreadyRecommendedCa = new Set<string>();
+
   for (const day of draftDays) {
     if (day.requiredTotal === 0) continue; // closed day
 
@@ -247,6 +253,8 @@ function analyzeLocally(
     const dateLabel = `${parseInt(dd, 10)}. ${parseInt(mm, 10)}.`;
     const shiftH = shiftHoursFromTimes(day.startTime, day.endTime);
     const storeHoursLabel = day.startTime && day.endTime ? `${day.startTime}–${day.endTime}` : '';
+    const dow = new Date(day.date + 'T00:00:00').getDay();
+    const isSaturday = dow === 6;
 
     const suggestions: SuggestionOut[] = [];
     const recommendedIds: string[] = [];
@@ -255,31 +263,45 @@ function analyzeLocally(
     if (missingProdejna > 0) {
       const assignedSet = new Set(day.assignedEmployees);
       const candidates = employees
-        .filter(e => !assignedSet.has(e.id) && !absenceSet.has(`${e.id}|${day.date}`))
+        .filter(e =>
+          !assignedSet.has(e.id) &&
+          !absenceSet.has(`${e.id}|${day.date}`) &&
+          !e.shortLongWeek &&
+          (!isSaturday || e.canSaturday)
+        )
         .map(e => {
           const assignedH = assignedHoursMap.get(e.id) ?? 0;
           const assignedD = assignedDaysMap.get(e.id) ?? 0;
-          const avail = e.targetHours > 0 ? Math.max(0, (e.targetHours - assignedH) / e.targetHours) : 0;
-          const score = 0.5 * avail + 0.3 * (e.storeRating / 5) + 0.2 * Math.min(1, e.prodejnaTier / 3);
-          return { e, score, assignedH, assignedD };
+          const hasProdejnaLabel = e.labels.some(l => l.toLowerCase().includes('prodejna'));
+          // Availability: allow up to 30h over target without penalty
+          const headroom = e.targetHours + 30;
+          const avail = headroom > 0 ? Math.max(0, (headroom - assignedH) / headroom) : 0;
+          // Saturday tier bonus: if this is Saturday and employee has unused Saturday budget
+          const satBonus = isSaturday && e.maxSaturdays > 0 && e.prodejnaTier >= 1 ? 0.2 : 0;
+          const score =
+            0.25 * avail +
+            0.1 * (e.storeRating / 5) +
+            0.35 * Math.min(1, e.prodejnaTier / 3) +
+            (hasProdejnaLabel ? 0.3 : 0) +
+            satBonus;
+          return { e, score, assignedH, assignedD, hasProdejnaLabel };
         })
         .sort((a, b) => b.score - a.score)
         .slice(0, 6);
 
-      for (let i = 0; i < candidates.length; i++) {
-        const { e, score, assignedH, assignedD } = candidates[i];
-        const remaining = e.targetHours - assignedH;
+      for (const { e, score, assignedH, assignedD, hasProdejnaLabel } of candidates) {
         const projected = assignedH + shiftH;
         const badges: string[] = [];
         const reasons: string[] = [];
         const warnings: string[] = [];
         reasons.push(`Naplánováno ${assignedH.toFixed(1)} h / ${e.targetHours} h`);
-        if (e.storeRating >= 4) { reasons.push('Vysoké hodnocení pro Prodejnu'); badges.push('★★'); }
-        if (e.prodejnaTier >= 2) { reasons.push('Zkušený na Prodejně'); badges.push('Prodejna'); }
-        if (projected > e.targetHours) warnings.push(`Přesáhne fond (${e.targetHours} h)`);
-        if (assignedD >= 20) warnings.push('Pracuje již 20+ dní');
+        if (hasProdejnaLabel) { badges.push('Prodejna'); reasons.push('Štítek Prodejna'); }
+        if (e.prodejnaTier >= 1) { reasons.push(`Tier ${e.prodejnaTier}`); badges.push(`T${e.prodejnaTier}`); }
+        if (isSaturday && e.maxSaturdays > 0) reasons.push(`Max sobot: ${e.maxSaturdays}/měsíc`);
+        if (projected > e.targetHours + 30) warnings.push(`Výrazně přesáhne fond`);
         const sugg: SuggestionOut = {
           id: `${day.date}__${e.id}__FDS`,
+          employeeId: e.id,
           employeeName: e.name,
           firstName: e.name.split(' ')[0],
           dateLabel,
@@ -298,7 +320,14 @@ function analyzeLocally(
           assignedDays: assignedD,
         };
         suggestions.push(sugg);
-        if (i === 0) recommendedIds.push(sugg.id);
+      }
+
+      // Pick best FDS candidate who hasn't been recommended yet (diversify across days)
+      const fdsRecs = suggestions.filter(s => s.suggestionType === 'FULL_DAY_STORE');
+      const pick = fdsRecs.find(s => !alreadyRecommendedFds.has(s.employeeId)) ?? fdsRecs[0];
+      if (pick) {
+        recommendedIds.push(pick.id);
+        alreadyRecommendedFds.add(pick.employeeId);
       }
     }
 
@@ -307,24 +336,23 @@ function analyzeLocally(
       const ev = day.eveningCoverage;
       const candMap = new Map<string, EveningCandidate>(ev.candidates.map(c => [c.employeeId, c]));
       const closingCandidates = employees
-        .filter(e => candMap.has(e.id))
+        .filter(e => candMap.has(e.id) && !e.shortLongWeek)
         .map(e => {
           const c = candMap.get(e.id)!;
           const assignedH = assignedHoursMap.get(e.id) ?? 0;
           const assignedD = assignedDaysMap.get(e.id) ?? 0;
-          const avail = e.targetHours > 0 ? Math.max(0, (e.targetHours - assignedH) / e.targetHours) : 0;
+          const avail = e.targetHours > 0 ? Math.max(0, (e.targetHours + 30 - assignedH) / (e.targetHours + 30)) : 0;
           const score =
-            0.25 * avail +
-            0.2 * (e.storeRating / 5) +
-            (c.hasProdejnaLabel ? 0.35 : 0) +
+            0.2 * avail +
+            0.1 * (e.storeRating / 5) +
+            (c.hasProdejnaLabel ? 0.5 : 0) +
             (c.freeForEvening ? 0.2 : 0);
           return { e, score, assignedH, assignedD, c };
         })
         .sort((a, b) => b.score - a.score)
         .slice(0, 4);
 
-      for (let i = 0; i < closingCandidates.length; i++) {
-        const { e, score, assignedH, assignedD, c } = closingCandidates[i];
+      for (const { e, score, assignedH, assignedD, c } of closingCandidates) {
         const from = c.freeForEvening ? ev.from : c.shiftEnd;
         const partialH = shiftHoursFromTimes(from, ev.to);
         const projected = assignedH + partialH;
@@ -332,13 +360,13 @@ function analyzeLocally(
         const reasons: string[] = [];
         const warnings: string[] = [];
         if (c.hasProdejnaLabel) { badges.push('Prodejna'); reasons.push('Má štítek Prodejna'); }
-        if (c.freeForEvening) reasons.push(`Směna končí v ${c.shiftEnd}, večerní začíná ${ev.from}`);
+        if (c.freeForEvening) reasons.push(`Směna končí ${c.shiftEnd}, večerní od ${ev.from}`);
         else reasons.push(`Může zůstat od ${from} do ${ev.to}`);
-        const remaining = e.targetHours - assignedH;
         reasons.push(`Naplánováno ${assignedH.toFixed(1)} h / ${e.targetHours} h`);
-        if (projected > e.targetHours) warnings.push(`Přesáhne fond (${e.targetHours} h)`);
+        if (projected > e.targetHours + 30) warnings.push(`Výrazně přesáhne fond`);
         const sugg: SuggestionOut = {
           id: `${day.date}__${e.id}__CA`,
+          employeeId: e.id,
           employeeName: e.name,
           firstName: e.name.split(' ')[0],
           dateLabel,
@@ -363,9 +391,14 @@ function analyzeLocally(
           assignedDays: assignedD,
         };
         suggestions.push(sugg);
-        if (i === 0 && suggestions.filter(s => s.suggestionType === 'CLOSING_ASSIST').length === 1) {
-          recommendedIds.push(sugg.id);
-        }
+      }
+
+      // Pick best CA candidate who hasn't been recommended yet
+      const caRecs = suggestions.filter(s => s.suggestionType === 'CLOSING_ASSIST');
+      const pick = caRecs.find(s => !alreadyRecommendedCa.has(s.employeeId)) ?? caRecs[0];
+      if (pick) {
+        recommendedIds.push(pick.id);
+        alreadyRecommendedCa.add(pick.employeeId);
       }
     }
 
@@ -431,6 +464,7 @@ function analyzeLocally(
 
 interface SuggestionOut {
   id: string;
+  employeeId: string;
   employeeName: string;
   firstName: string;
   dateLabel: string;
