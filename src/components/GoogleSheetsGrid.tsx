@@ -1062,7 +1062,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const stickyDays = viewMode === 'month'
     ? stickyWeekKey
       ? getWeekDays(new Date(stickyWeekKey + 'T00:00:00'))
-      : monthWeeks.length > 0 ? getWeekDays(monthWeeks[0]) : weekDays
+      : (() => {
+          // Prefer the week containing today; fall back to the first week of the month.
+          // This ensures today is always highlighted even when there's no scrolling.
+          const todayWeek = monthWeeks.find((w) => getWeekDays(w).includes(today));
+          return getWeekDays(todayWeek ?? monthWeeks[0]);
+        })()
     : weekDays;
 
   return (
