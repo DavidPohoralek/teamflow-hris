@@ -575,7 +575,16 @@ function buildDraftDays(
     const allShifts = confirmed?.shifts ?? [];
     let eveningCoverage: DraftDayRecord['eveningCoverage'] = null;
 
-    if (eveningEnabled && !isClosed) {
+    // Determine store closing time for this specific day:
+    // prefer per-day schedule_days.end_time, fall back to weekly hours_DOW setting
+    const dowHoursKey = DOW_HOURS_KEYS[dow]; // e.g. 'hours_fri'
+    const orgDayHours = dowHoursKey ? String(orgSettings[dowHoursKey] ?? '') : '';
+    const orgDayEndTime = orgDayHours.includes('-') ? orgDayHours.split('-').slice(-1)[0] : null;
+    const dayEndTime = meta?.endTime ?? orgDayEndTime;
+    // If store closes at or before evening shift start, skip evening coverage entirely
+    const storeClosesBeforeEvening = dayEndTime ? dayEndTime <= eveningStart : false;
+
+    if (eveningEnabled && !isClosed && !storeClosesBeforeEvening) {
       const eveningCovered = allShifts.filter(s =>
         s.isEvening ||
         (isProdejnaType(s.workType) && s.startTime <= eveningStart && s.endTime >= eveningEnd)
