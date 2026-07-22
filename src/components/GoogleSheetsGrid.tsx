@@ -548,7 +548,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     }
   }, [weekDays, onMonthChange]);
 
-  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('month');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [plansMap, setPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
   const [monthPlansMap, setMonthPlansMap] = useState<Map<string, WorkPlanEntry[]>>(new Map());
@@ -789,6 +789,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return m;
   }, [workTypes]);
 
+  // Department colour derived from the matching workType colour (departments share workType names)
+  const deptColorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    workTypes.forEach(wt => { if (wt.color) m.set(wt.name, wt.color); });
+    return m;
+  }, [workTypes]);
+
   // ── Weeks of current month (for month view) ───────────────────────────────
   const monthWeeks = useMemo(() => {
     const currentMonth = weekDays[3].slice(0, 7);
@@ -1024,34 +1031,49 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   }
 
   // ── Shared cell row renderer ──────────────────────────────────────────────
-  function renderEmployeeRows(wDays: string[], dataMap: Map<string, WorkPlanEntry[]>) {
-    return displayEmployees.map((emp, ri) => (
-      <tr key={`${emp.id}-${wDays[0]}`}
-        className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-75 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-        <td className="sticky left-0 z-10 px-3 py-2 border-r border-gray-200 bg-inherit group-hover:bg-blue-50/40 transition-colors duration-75">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-semibold text-gray-800 leading-tight truncate" title={emp.name}>{emp.name}</span>
-            {emp.department && <span className="text-[10px] text-gray-400 leading-tight truncate">{emp.department}</span>}
-          </div>
-        </td>
-        {wDays.map((date, di) => {
-          const isClosed = closedDates.has(date);
-          const isWeekend = di >= 5;
-          return (
-            <td key={date}
-              className={`px-1.5 py-1.5 border-r border-gray-100 last:border-r-0 align-middle group-hover:bg-blue-50/30 transition-colors duration-75 ${isClosed ? 'bg-gray-100/60' : isWeekend ? 'bg-slate-50/60' : ''}`}
-              onClick={() => {
-                if (isManagerMode) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
-                else if (sessionEmployee && sessionEmployee.id === emp.id) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
-              }}
-              style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? 'pointer' : 'default' }}
-            >
-              {renderCell(emp, date, dataMap)}
-            </td>
-          );
-        })}
-      </tr>
-    ));
+  function renderEmployeeRows(wDays: string[], dataMap: Map<string, WorkPlanEntry[]>, maskOutsideMonth = false) {
+    const currentMonth = weekDays[3].slice(0, 7);
+    return displayEmployees.map((emp, ri) => {
+      const deptColor = emp.department ? (deptColorMap.get(emp.department) ?? '#94a3b8') : null;
+      return (
+        <tr key={`${emp.id}-${wDays[0]}`}
+          className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-75 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+          <td className="sticky left-0 z-10 px-2 py-1 border-r border-gray-200 bg-inherit group-hover:bg-blue-100/60 transition-colors duration-75">
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="text-xs font-semibold text-gray-800 leading-tight truncate" title={emp.name}>{emp.name}</span>
+              {emp.department && deptColor && (
+                <span
+                  className="flex-shrink-0 text-[9px] font-semibold text-black leading-none px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                  style={{ background: deptColor + '35' }}
+                >
+                  {emp.department}
+                </span>
+              )}
+            </div>
+          </td>
+          {wDays.map((date, di) => {
+            const isOutside = maskOutsideMonth && date.slice(0, 7) !== currentMonth;
+            if (isOutside) {
+              return <td key={date} className="border-r border-gray-100 last:border-r-0 bg-gray-50/20" />;
+            }
+            const isClosed = closedDates.has(date);
+            const isWeekend = di >= 5;
+            return (
+              <td key={date}
+                className={`px-1.5 py-1 border-r border-gray-100 last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isClosed ? 'bg-gray-100/60' : isWeekend ? 'bg-slate-50/60' : ''}`}
+                onClick={() => {
+                  if (isManagerMode) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
+                  else if (sessionEmployee && sessionEmployee.id === emp.id) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
+                }}
+                style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? 'pointer' : 'default' }}
+              >
+                {renderCell(emp, date, dataMap)}
+              </td>
+            );
+          })}
+        </tr>
+      );
+    });
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1325,6 +1347,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
             {!loading && viewMode === 'month' && monthWeeks.map((weekMon, wi) => {
               const wDays = getWeekDays(weekMon);
+              const currentMonth = weekDays[3].slice(0, 7);
               const f = new Date(wDays[0] + 'T00:00:00');
               const l = new Date(wDays[6] + 'T00:00:00');
               const crossesMonth = f.getMonth() !== l.getMonth();
@@ -1350,8 +1373,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         <span className="text-[11px] font-bold text-slate-100">{wLabel}</span>
                       </div>
                     </td>
-                    {/* Day cells showing name + date number */}
+                    {/* Day cells showing name + date number; blank for days outside current month */}
                     {wDays.map((d, i) => {
+                      const isOutside = d.slice(0, 7) !== currentMonth;
+                      if (isOutside) {
+                        return (
+                          <td key={d} className="border-r border-slate-600 last:border-r-0" style={{ background: '#1e293b' }} />
+                        );
+                      }
                       const dayNum = new Date(d + 'T00:00:00').getDate();
                       const isToday = d === today;
                       const isClosed = closedDates.has(d);
@@ -1379,7 +1408,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                       );
                     })}
                   </tr>
-                  {renderEmployeeRows(wDays, fullPlansMap)}
+                  {renderEmployeeRows(wDays, fullPlansMap, true)}
                 </>
               );
             })}
