@@ -751,17 +751,34 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       setStickyWeekKey(null);
       return;
     }
-    const THEAD_H = 48;
+
+    const getThreshold = () =>
+      headerScrollRef.current
+        ? headerScrollRef.current.getBoundingClientRect().bottom
+        : 113; // nav ~65 + table header ~48
+
     const handler = () => {
+      const threshold = getThreshold();
       let activeKey: string | null = null;
       for (const [key, row] of Array.from(weekSepRowRefs.current.entries())) {
-        if (row.getBoundingClientRect().top <= THEAD_H) activeKey = key;
+        if (row.getBoundingClientRect().top <= threshold) activeKey = key;
       }
       setStickyWeekKey(activeKey);
     };
+
+    // Listen both on window (capture) and on the actual scroll container
+    const scrollContainer = bodyScrollRef.current?.closest<HTMLElement>('.overflow-auto') ?? null;
     window.addEventListener('scroll', handler, { passive: true, capture: true });
-    handler();
-    return () => window.removeEventListener('scroll', handler, { capture: true } as EventListenerOptions);
+    scrollContainer?.addEventListener('scroll', handler, { passive: true });
+
+    // Wait one frame for the DOM to lay out before computing initial state
+    const raf = requestAnimationFrame(handler);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', handler, { capture: true } as EventListenerOptions);
+      scrollContainer?.removeEventListener('scroll', handler);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, weekDays[3]]);
 
