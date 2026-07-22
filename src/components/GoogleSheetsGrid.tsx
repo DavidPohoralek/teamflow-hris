@@ -1334,23 +1334,48 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 : f.toLocaleDateString('cs-CZ', { month: 'long' });
               return (
                 <>
-                  {/* Week separator — thin labeled divider; dates are in the sticky header above */}
+                  {/* Week separator — mini-header row with dates for this week */}
                   <tr
                     key={`sep-${wDays[0]}`}
                     ref={(el) => { if (el) weekSepRowRefs.current.set(wDays[0], el); else weekSepRowRefs.current.delete(wDays[0]); }}
-                    className={`${wi > 0 ? 'border-t-2 border-slate-300' : ''}`}
+                    style={wi > 0 ? { borderTop: '3px solid #475569' } : undefined}
                   >
-                    <td className="sticky left-0 z-10 bg-slate-200/80 px-3 py-1 border-r border-slate-300">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider">{monthLabel}</span>
-                        <span className="text-[11px] font-bold text-slate-700">{wLabel}</span>
+                    {/* Label cell — sticky left */}
+                    <td
+                      className="sticky left-0 z-10 px-3 py-2 border-r border-slate-500"
+                      style={{ background: 'linear-gradient(to right, #334155, #3b4f66)' }}
+                    >
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">{monthLabel}</span>
+                        <span className="text-[11px] font-bold text-slate-100">{wLabel}</span>
                       </div>
                     </td>
+                    {/* Day cells showing name + date number */}
                     {wDays.map((d, i) => {
+                      const dayNum = new Date(d + 'T00:00:00').getDate();
+                      const isToday = d === today;
                       const isClosed = closedDates.has(d);
                       const isWeekend = i >= 5;
+                      const bg = isClosed
+                        ? '#475569'
+                        : isWeekend ? '#3d4f63' : '#334155';
                       return (
-                        <td key={d} className={`py-1 border-r border-slate-200 last:border-r-0 ${isClosed ? 'bg-gray-200/60' : isWeekend ? 'bg-slate-200/40' : 'bg-slate-100/60'}`} />
+                        <td
+                          key={d}
+                          className="py-2 text-center border-r border-slate-500 last:border-r-0"
+                          style={{ background: bg }}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className={`text-[9px] uppercase tracking-wider font-semibold ${isWeekend || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {DAY_NAMES[i]}
+                            </span>
+                            <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
+                              isToday ? 'bg-blue-500 text-white' : isWeekend || isClosed ? 'text-slate-500' : 'text-slate-200'
+                            }`}>
+                              {dayNum}
+                            </span>
+                          </div>
+                        </td>
                       );
                     })}
                   </tr>
