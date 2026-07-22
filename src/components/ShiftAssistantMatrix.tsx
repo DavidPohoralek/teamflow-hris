@@ -298,10 +298,74 @@ export default function ShiftAssistantMatrix({
     }
   }, [month, t, saveDraftsToStorage]);
 
+  // ── Apply a single suggestion ────────────────────────────────────────────────
+  const [applyingSingle, setApplyingSingle] = useState<string | null>(null);
+
+  const handleApplySingle = useCallback(async (suggId: string) => {
+    setApplyingSingle(suggId);
+    setApplyError(null);
+    try {
+      const res = await managerFetch('/api/shift-assistant/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionIds: [suggId] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setApplyError(data.error ?? t('Chyba při aplikaci', 'Apply error'));
+        return;
+      }
+      setToast(t('Směna přidána', 'Shift added'));
+      // Remove this single draft from state
+      setPendingDrafts(prev => {
+        const next = new Map(prev);
+        const keyToDelete = Array.from(next.entries()).find(([, e]) => e.suggId === suggId)?.[0];
+        if (keyToDelete) next.delete(keyToDelete);
+        // Also update stored analyzeResult recommendedSuggestionIds
+        if (analyzeResult) {
+          const updatedResult: AssistantResult = {
+            ...analyzeResult,
+            problemDays: analyzeResult.problemDays.map(d => ({
+              ...d,
+              recommendedSuggestionIds: d.recommendedSuggestionIds.filter(id => id !== suggId),
+            })),
+          };
+          saveDraftsToStorage(updatedResult, next);
+        }
+        return next;
+      });
+      fetchData();
+    } catch {
+      setApplyError(t('Síťová chyba', 'Network error'));
+    } finally {
+      setApplyingSingle(null);
+    }
+  }, [t, analyzeResult, saveDraftsToStorage, fetchData]);
+
+  // ── Remove a single draft (dismiss without applying) ─────────────────────────
+  const handleDismissSingle = useCallback((suggId: string) => {
+    setPendingDrafts(prev => {
+      const next = new Map(prev);
+      const keyToDelete = Array.from(next.entries()).find(([, e]) => e.suggId === suggId)?.[0];
+      if (keyToDelete) next.delete(keyToDelete);
+      if (analyzeResult) {
+        const updatedResult: AssistantResult = {
+          ...analyzeResult,
+          problemDays: analyzeResult.problemDays.map(d => ({
+            ...d,
+            recommendedSuggestionIds: d.recommendedSuggestionIds.filter(id => id !== suggId),
+          })),
+        };
+        saveDraftsToStorage(updatedResult, next);
+      }
+      return next;
+    });
+  }, [analyzeResult, saveDraftsToStorage]);
+
   // ── Apply all recommendations ────────────────────────────────────────────────
   const handleApplyAll = useCallback(async () => {
     if (!analyzeResult) return;
-    const ids = analyzeResult.problemDays.flatMap(d => d.recommendedSuggestionIds);
+    const ids = Array.from(pendingDrafts.values()).map(d => d.suggId);
     if (!ids.length) return;
     setApplying(true);
     setApplyError(null);
@@ -327,7 +391,7 @@ export default function ShiftAssistantMatrix({
     } finally {
       setApplying(false);
     }
-  }, [analyzeResult, t, fetchData]);
+  }, [analyzeResult, pendingDrafts, t, fetchData, draftStorageKey]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -432,14 +496,9 @@ export default function ShiftAssistantMatrix({
                   const isWeekend = dow === 0 || dow === 6;
                   const crisis = crisisMeta.get(date);
 
-                  // Build crisis badge label: "−2" for missing prodejna, "CA" for evening, "−1+CA" for both
-                  const crisisBadge = crisis
-                    ? crisis.missing > 0 && crisis.eveningMissing > 0
-                      ? `−${crisis.missing}+CA`
-                      : crisis.missing > 0
-                      ? `−${crisis.missing}`
-                      : 'CA'
-                    : null;
+                  // Build crisis badge: show total missing (prodejna + evening)
+                  const totalMissing = crisis ? crisis.missing + crisis.eveningMissing : 0;
+                  const crisisBadge = totalMissing > 0 ? `−${totalMissing}` : null;
 
                   return (
                     <th
@@ -745,17 +804,18 @@ export default function ShiftAssistantMatrix({
                           </div>
                           {/* Candidate list */}
                           {recommended.length > 0 && (
-                            <div className="border-t border-slate-100 px-2.5 py-1.5 space-y-1">
+                            <div className="border-t border-slate-100 divide-y divide-slate-50">
                               {recommended.map(sugg => {
                                 const color = sugg.suggestionType === 'CLOSING_ASSIST'
                                   ? '#7C3AED' : '#2563EB';
                                 const initials = sugg.employeeName
                                   .split(' ').filter(Boolean).slice(0, 2)
                                   .map(n => n[0]).join('').toUpperCase();
+                                const isSingleApplying = applyingSingle === sugg.id;
                                 return (
-                                  <div key={sugg.id} className="flex items-center gap-1.5">
+                                  <div key={sugg.id} className="flex items-center gap-1.5 px-2.5 py-1.5">
                                     <div
-                                      className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold flex-shrink-0"
+                                      className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[7px] font-bold flex-shrink-0"
                                       style={{ background: color }}
                                     >
                                       {initials}
@@ -768,9 +828,36 @@ export default function ShiftAssistantMatrix({
                                       style={{ background: color + '18', color }}
                                     >
                                       {sugg.suggestionType === 'CLOSING_ASSIST'
-                                        ? (sugg.timeLabel || 'CA')
+                                        ? (sugg.timeLabel || '17–19')
                                         : 'PRO'}
                                     </span>
+                                    {/* Dismiss button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDismissSingle(sugg.id)}
+                                      className="w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors flex-shrink-0"
+                                      title={t('Odebrat návrh', 'Dismiss')}
+                                    >
+                                      <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M2 2l8 8M10 2l-8 8"/>
+                                      </svg>
+                                    </button>
+                                    {/* Apply single button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleApplySingle(sugg.id)}
+                                      disabled={isSingleApplying || applying}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 transition-colors flex-shrink-0"
+                                      title={t('Potvrdit tuto směnu', 'Confirm this shift')}
+                                    >
+                                      {isSingleApplying ? (
+                                        <div className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" fill="none" stroke="white" strokeWidth="2.5">
+                                          <path d="M2 6l3 3 5-5"/>
+                                        </svg>
+                                      )}
+                                    </button>
                                   </div>
                                 );
                               })}

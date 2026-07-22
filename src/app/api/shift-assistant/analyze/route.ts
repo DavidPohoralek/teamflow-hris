@@ -322,12 +322,26 @@ function analyzeLocally(
         suggestions.push(sugg);
       }
 
-      // Pick best FDS candidate who hasn't been recommended yet (diversify across days)
+      // Pick up to missingProdejna candidates, preferring employees not yet recommended elsewhere
       const fdsRecs = suggestions.filter(s => s.suggestionType === 'FULL_DAY_STORE');
-      const pick = fdsRecs.find(s => !alreadyRecommendedFds.has(s.employeeId)) ?? fdsRecs[0];
-      if (pick) {
-        recommendedIds.push(pick.id);
-        alreadyRecommendedFds.add(pick.employeeId);
+      let fdsPicked = 0;
+      for (const s of fdsRecs) {
+        if (fdsPicked >= missingProdejna) break;
+        if (!alreadyRecommendedFds.has(s.employeeId)) {
+          recommendedIds.push(s.id);
+          alreadyRecommendedFds.add(s.employeeId);
+          fdsPicked++;
+        }
+      }
+      // If not enough unique employees, backfill with best remaining
+      if (fdsPicked < missingProdejna) {
+        for (const s of fdsRecs) {
+          if (fdsPicked >= missingProdejna) break;
+          if (!recommendedIds.includes(s.id)) {
+            recommendedIds.push(s.id);
+            fdsPicked++;
+          }
+        }
       }
     }
 
@@ -393,12 +407,25 @@ function analyzeLocally(
         suggestions.push(sugg);
       }
 
-      // Pick best CA candidate who hasn't been recommended yet
+      // Pick up to eveningMissing CA candidates, preferring employees not yet recommended
       const caRecs = suggestions.filter(s => s.suggestionType === 'CLOSING_ASSIST');
-      const pick = caRecs.find(s => !alreadyRecommendedCa.has(s.employeeId)) ?? caRecs[0];
-      if (pick) {
-        recommendedIds.push(pick.id);
-        alreadyRecommendedCa.add(pick.employeeId);
+      let caPicked = 0;
+      for (const s of caRecs) {
+        if (caPicked >= eveningMissing) break;
+        if (!alreadyRecommendedCa.has(s.employeeId)) {
+          recommendedIds.push(s.id);
+          alreadyRecommendedCa.add(s.employeeId);
+          caPicked++;
+        }
+      }
+      if (caPicked < eveningMissing) {
+        for (const s of caRecs) {
+          if (caPicked >= eveningMissing) break;
+          if (!recommendedIds.includes(s.id)) {
+            recommendedIds.push(s.id);
+            caPicked++;
+          }
+        }
       }
     }
 
