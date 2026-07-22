@@ -279,7 +279,7 @@ function analyzeLocally(
         if (projected > e.targetHours) warnings.push(`Přesáhne fond (${e.targetHours} h)`);
         if (assignedD >= 20) warnings.push('Pracuje již 20+ dní');
         const sugg: SuggestionOut = {
-          id: `${day.date}-${e.id}-FDS`,
+          id: `${day.date}__${e.id}__FDS`,
           employeeName: e.name,
           firstName: e.name.split(' ')[0],
           dateLabel,
@@ -338,7 +338,7 @@ function analyzeLocally(
         reasons.push(`Naplánováno ${assignedH.toFixed(1)} h / ${e.targetHours} h`);
         if (projected > e.targetHours) warnings.push(`Přesáhne fond (${e.targetHours} h)`);
         const sugg: SuggestionOut = {
-          id: `${day.date}-${e.id}-CA`,
+          id: `${day.date}__${e.id}__CA`,
           employeeName: e.name,
           firstName: e.name.split(' ')[0],
           dateLabel,

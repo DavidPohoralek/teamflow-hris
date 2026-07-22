@@ -11,7 +11,7 @@ import ManagerPanel from '@/components/ManagerPanel'
 import { getManagerScope, type ManagerScope } from '@/lib/managerFetch'
 import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
-import ShiftAssistant from '@/components/ShiftAssistant'
+import ShiftAssistantMatrix from '@/components/ShiftAssistantMatrix'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
 import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
@@ -476,7 +476,7 @@ export default function HomePage() {
                 </p>
               </div>
             ) : (
-              <ShiftAssistant
+              <ShiftAssistantMatrix
                 orgId={orgId}
                 month={currentMonth}
                 onMonthChange={(m) => setCurrentMonth(m)}
