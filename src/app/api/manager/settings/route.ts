@@ -39,6 +39,9 @@ const EXTRA_KEYS = [
   'require_ho_activity_report',
   'bonus_saturday_departments',
   'shift_view_mode',
+  'short_long_weeks_enabled',
+  'bonus_sunday_departments',
+  'bonus_special_days',
 ];
 
 // GET /api/manager/settings
