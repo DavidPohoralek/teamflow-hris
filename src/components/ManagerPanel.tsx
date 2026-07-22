@@ -464,7 +464,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
           )}
           {activeTab === 'employees' && <EmployeesTab isAdmin={isAdmin} orgId={orgId} />}
           {activeTab === 'work-types' && isAdmin && <WorkTypesTab />}
-          {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} />}
+          {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} isAdmin={isAdmin} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && isAdmin && <SettingsTab />}
@@ -1777,7 +1777,7 @@ function VacationOverviewPanel() {
 
 // ─── Requests Tab ─────────────────────────────────────────────────────────────
 
-function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void }) {
+function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: number) => void; isAdmin?: boolean }) {
   const t = useT();
   const [subTab, setSubTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [requests, setRequests] = useState<Request[]>([]);
@@ -1787,6 +1787,8 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
   const [notePopup, setNotePopup] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async (status: string) => {
     setLoading(true);
@@ -1840,6 +1842,26 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
       alert(e instanceof Error ? e.message : 'Chyba');
     } finally {
       setBulkLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeleteLoading(id);
+    try {
+      const res = await managerFetch(`/api/requests/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? 'Smazání selhalo.');
+      }
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      if (subTab === 'pending') {
+        managerFetch('/api/requests?status=pending').then((r) => r.json()).then((d) => onCountChange?.((d.requests ?? []).length)).catch(() => {});
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Chyba při mazání.');
+    } finally {
+      setDeleteLoading(null);
+      setDeleteConfirm(null);
     }
   };
 
@@ -1930,7 +1952,7 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
                     />
                   </th>
                 )}
-                {[t('Zaměstnanec', 'Employee'), t('Typ', 'Type'), t('Od', 'From'), t('Do', 'To'), t('Hodiny', 'Hours'), t('Poznámka', 'Note'), t('Datum podání', 'Submitted'), ...(subTab === 'pending' ? [t('Akce', 'Actions')] : [])].map((h) => (
+                {[t('Zaměstnanec', 'Employee'), t('Typ', 'Type'), t('Od', 'From'), t('Do', 'To'), t('Hodiny', 'Hours'), t('Poznámka', 'Note'), t('Datum podání', 'Submitted'), t('Akce', 'Actions')].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -1938,7 +1960,7 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
             <tbody className="bg-white divide-y divide-gray-200">
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={subTab === 'pending' ? 9 : 7} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={subTab === 'pending' ? 9 : 8} className="px-4 py-8 text-center text-sm text-gray-400">
                     {t('Žádné žádosti', 'No requests')}
                   </td>
                 </tr>
@@ -1985,24 +2007,58 @@ function RequestsTab({ onCountChange }: { onCountChange?: (n: number) => void })
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                       {new Date(req.created_at).toLocaleDateString('cs-CZ')}
                     </td>
-                    {subTab === 'pending' && (
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button
-                          onClick={() => handleAction(req.id, 'approved')}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 hover:bg-green-200 mr-2 text-base"
-                          title={t('Schválit', 'Approve')}
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={() => handleAction(req.id, 'rejected')}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 text-base"
-                          title={t('Zamítnout', 'Reject')}
-                        >
-                          ✗
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        {subTab === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleAction(req.id, 'approved')}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 hover:bg-green-200 text-base"
+                              title={t('Schválit', 'Approve')}
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => handleAction(req.id, 'rejected')}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 text-base"
+                              title={t('Zamítnout', 'Reject')}
+                            >
+                              ✗
+                            </button>
+                          </>
+                        )}
+                        {isAdmin && (
+                          deleteConfirm === req.id ? (
+                            <>
+                              <span className="text-xs text-gray-500 ml-1">{t('Opravdu?', 'Sure?')}</span>
+                              <button
+                                onClick={() => handleDelete(req.id)}
+                                disabled={deleteLoading === req.id}
+                                className="px-2 py-1 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50 ml-1"
+                              >
+                                {deleteLoading === req.id ? '...' : t('Ano', 'Yes')}
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="px-2 py-1 rounded-md bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200"
+                              >
+                                {t('Ne', 'No')}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(req.id)}
+                              title={t('Smazat žádost', 'Delete request')}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors ml-1"
+                            >
+                              <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
