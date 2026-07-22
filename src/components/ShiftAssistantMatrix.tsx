@@ -521,22 +521,44 @@ export default function ShiftAssistantMatrix({
                               );
                             })}
 
-                            {/* Draft overlay — only show when cell is empty */}
+                            {/* Draft overlay — empty cell (FDS) or alongside existing shift (CA) */}
                             {entries.length === 0 && draft && (
                               <div
-                                className="flex items-center justify-center rounded leading-none"
+                                className="flex flex-col items-center justify-center rounded leading-none gap-0"
                                 style={{
-                                  background: DRAFT_COLORS[draft.type] + '14',
-                                  border: `1.5px dashed ${DRAFT_COLORS[draft.type]}`,
-                                  minHeight: '18px',
+                                  background: DRAFT_COLORS[draft.type] + '2e',
+                                  border: `2px dashed ${DRAFT_COLORS[draft.type]}`,
+                                  boxShadow: `inset 0 0 0 1px ${DRAFT_COLORS[draft.type]}18`,
+                                  minHeight: '22px',
                                 }}
-                                title={`${t('Návrh', 'Draft')}: ${draft.timeLabel || draft.type}`}
+                                title={`AI ${draft.type === 'CLOSING_ASSIST' ? 'Večerní' : 'Prodejna'}: ${draft.timeLabel || ''}`}
                               >
                                 <span
-                                  className="text-[8px] font-bold"
+                                  className="text-[8px] font-extrabold leading-none"
                                   style={{ color: DRAFT_COLORS[draft.type] }}
                                 >
-                                  AI
+                                  {draft.type === 'CLOSING_ASSIST' ? 'CA' : 'PRO'}
+                                </span>
+                                {draft.timeLabel && (
+                                  <span className="text-[7px] leading-none mt-0.5" style={{ color: DRAFT_COLORS[draft.type] + 'cc' }}>
+                                    {draft.timeLabel.replace(/:00/g, '').slice(0, 8)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {/* CA draft badge on top of existing shift (employee extending into evening) */}
+                            {entries.length > 0 && draft?.type === 'CLOSING_ASSIST' && (
+                              <div
+                                className="flex items-center justify-center rounded-sm leading-none"
+                                style={{
+                                  background: DRAFT_COLORS.CLOSING_ASSIST + '2a',
+                                  border: `1.5px dashed ${DRAFT_COLORS.CLOSING_ASSIST}`,
+                                  minHeight: '10px',
+                                }}
+                                title={`AI Večerní: ${draft.timeLabel}`}
+                              >
+                                <span className="text-[6px] font-extrabold" style={{ color: DRAFT_COLORS.CLOSING_ASSIST }}>
+                                  +CA
                                 </span>
                               </div>
                             )}
@@ -652,31 +674,72 @@ export default function ShiftAssistantMatrix({
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1">
                       {t('Krizové dny', 'Crisis days')}
                     </p>
-                    <div className="space-y-1">
-                      {analyzeResult.problemDays.map(day => (
+                    <div className="space-y-1.5">
+                      {analyzeResult.problemDays.map(day => {
+                        const recommended = day.suggestions.filter(s =>
+                          day.recommendedSuggestionIds.includes(s.id)
+                        );
+                        return (
                         <div
                           key={day.date}
-                          className="flex items-start gap-2 bg-white rounded-lg border border-red-100 px-2.5 py-2"
+                          className="bg-white rounded-lg border border-red-100 overflow-hidden"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-red-50 flex flex-col items-center justify-center flex-shrink-0 border border-red-100">
-                            <span className="text-[11px] font-bold text-red-600 leading-none">
-                              {parseInt(day.date.slice(8), 10)}
-                            </span>
-                            <span className="text-[8px] text-red-400 leading-none">
-                              {DAY_ABBREVS[new Date(day.date + 'T00:00:00').getDay()]}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[10px] font-semibold text-slate-700 leading-tight">
-                              {day.statusLabel}
+                          {/* Day header */}
+                          <div className="flex items-start gap-2 px-2.5 py-2">
+                            <div className="w-8 h-8 rounded-lg bg-red-50 flex flex-col items-center justify-center flex-shrink-0 border border-red-100">
+                              <span className="text-[11px] font-bold text-red-600 leading-none">
+                                {parseInt(day.date.slice(8), 10)}
+                              </span>
+                              <span className="text-[8px] text-red-400 leading-none">
+                                {DAY_ABBREVS[new Date(day.date + 'T00:00:00').getDay()]}
+                              </span>
                             </div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">
-                              {day.assignedCount}/{day.requiredTotal} {t('obsazeno', 'assigned')} ·{' '}
-                              {day.recommendedSuggestionIds.length} {t('návrhů', 'drafts')}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] font-semibold text-slate-700 leading-tight">
+                                {day.statusLabel}
+                              </div>
+                              <div className="text-[9px] text-slate-400 mt-0.5">
+                                {day.assignedCount}/{day.requiredTotal} {t('obsazeno', 'assigned')} ·{' '}
+                                {recommended.length} {t('navrhov.', 'suggested')}
+                              </div>
                             </div>
                           </div>
+                          {/* Candidate list */}
+                          {recommended.length > 0 && (
+                            <div className="border-t border-slate-100 px-2.5 py-1.5 space-y-1">
+                              {recommended.map(sugg => {
+                                const color = sugg.suggestionType === 'CLOSING_ASSIST'
+                                  ? '#7C3AED' : '#2563EB';
+                                const initials = sugg.employeeName
+                                  .split(' ').filter(Boolean).slice(0, 2)
+                                  .map(n => n[0]).join('').toUpperCase();
+                                return (
+                                  <div key={sugg.id} className="flex items-center gap-1.5">
+                                    <div
+                                      className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold flex-shrink-0"
+                                      style={{ background: color }}
+                                    >
+                                      {initials}
+                                    </div>
+                                    <span className="text-[10px] font-medium text-slate-700 truncate flex-1 min-w-0">
+                                      {sugg.employeeName}
+                                    </span>
+                                    <span
+                                      className="text-[8px] font-semibold shrink-0 px-1 py-0.5 rounded"
+                                      style={{ background: color + '18', color }}
+                                    >
+                                      {sugg.suggestionType === 'CLOSING_ASSIST'
+                                        ? (sugg.timeLabel || 'CA')
+                                        : 'PRO'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (

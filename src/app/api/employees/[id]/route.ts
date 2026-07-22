@@ -63,6 +63,7 @@ export async function PUT(
     tier,
     can_saturday,
     max_saturdays,
+    short_long_week,
     target_hours,
     active,
     profile_id,
@@ -94,6 +95,8 @@ export async function PUT(
     update.can_saturday = typeof can_saturday === 'boolean' ? can_saturday : false;
   if (max_saturdays !== undefined)
     update.max_saturdays = typeof max_saturdays === 'number' ? max_saturdays : 0;
+  if (short_long_week !== undefined)
+    update.short_long_week = typeof short_long_week === 'boolean' ? short_long_week : false;
   if (target_hours !== undefined)
     update.target_hours = typeof target_hours === 'number' ? target_hours : 160;
   if (active !== undefined) update.active = typeof active === 'boolean' ? active : true;

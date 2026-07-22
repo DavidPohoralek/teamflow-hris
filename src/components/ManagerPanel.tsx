@@ -261,6 +261,7 @@ interface Employee {
   employment_type?: EmploymentType | null;
   can_saturday?: boolean;
   max_saturdays?: number;
+  short_long_week?: boolean;
   tier?: number;
   active: boolean;
   is_manager?: boolean;
@@ -1107,6 +1108,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
     tier: employee?.tier ?? 0,
     can_saturday: employee?.can_saturday ?? false,
     max_saturdays: employee?.max_saturdays ?? 0,
+    short_long_week: employee?.short_long_week ?? false,
     is_manager: employee?.is_manager ?? false,
     managed_departments: (employee?.managed_departments ?? []) as string[],
     manager_permissions: (employee?.manager_permissions ?? []) as string[],
@@ -1314,6 +1316,26 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
                 </label>
               </FormField>
             </div>
+            <FormField label={t('Krátký / dlouhý týden', 'Short / long week')}>
+              <label className="flex items-start gap-2 mt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.short_long_week ?? false}
+                  onChange={(e) => set('short_long_week', e.target.checked)}
+                  className="w-4 h-4 rounded accent-purple-600 mt-0.5"
+                />
+                <div>
+                  <span className="text-sm text-slate-700">
+                    {form.short_long_week ? t('Ano — střídá krátký/dlouhý týden', 'Yes — alternates short/long week') : t('Ne', 'No')}
+                  </span>
+                  {form.short_long_week && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {t('Asistent směn tomuto zaměstnanci směny nepřesouvá', 'Shift assistant will not reassign shifts for this employee')}
+                    </p>
+                  )}
+                </div>
+              </label>
+            </FormField>
           </div>
 
           {/* Hourly rate — admin only */}
@@ -2756,6 +2778,13 @@ function SettingsTab() {
             label={t('Víkendový provoz', 'Weekend operation')}
             description={t('Firma má otevřeno i o víkendech. Víkendové buňky v gridu budou zvýrazněny jako pracovní dny. Směny lze přidávat o víkendech vždy bez ohledu na toto nastavení.', 'The business is open on weekends. Weekend cells in the grid will be highlighted as working days. Shifts can always be added on weekends regardless of this setting.')}
             settingKey="weekend_open"
+          />
+        </div>
+        <div className="mt-4">
+          <ToggleSetting
+            label={t('Krátký / dlouhý týden', 'Short / long week')}
+            description={t('Zapne logiku střídání krátkého a dlouhého týdne. Zaměstnancům s touto volbou asistent směn nebude přesouvat ani přidávat směny.', 'Enables short/long week alternation logic. The shift assistant will not move or add shifts for employees with this option enabled.')}
+            settingKey="short_long_weeks_enabled"
           />
         </div>
       </section>
