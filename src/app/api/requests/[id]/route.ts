@@ -91,6 +91,65 @@ async function sendApprovalEmail(opts: {
   }
 }
 
+// DELETE /api/requests/[id]
+// Admin-only — permanently deletes the request.
+// For approved vacations, also removes the auto-created attendance_log rows.
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const resolved = await resolveOrgId(req);
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  const { orgId, isAdmin } = resolved;
+
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Pouze administrátor může mazat žádosti.' }, { status: 403 });
+  }
+
+  const svc = getServiceClient();
+
+  const { data: existing, error: fetchError } = await svc
+    .from('requests')
+    .select('id, type, status, employee_id, date_from, date_to')
+    .eq('id', params.id)
+    .eq('organization_id', orgId)
+    .single();
+
+  if (fetchError || !existing) {
+    return NextResponse.json({ error: 'Žádost nenalezena.' }, { status: 404 });
+  }
+
+  // For approved vacations, remove the attendance_log rows that were auto-inserted
+  if (existing.status === 'approved' && existing.type === 'vacation') {
+    const dateFrom = existing.date_from as string;
+    const dateTo = (existing.date_to as string | null) ?? dateFrom;
+    const { error: logError } = await svc
+      .from('attendance_logs')
+      .delete()
+      .eq('organization_id', orgId)
+      .eq('employee_id', existing.employee_id)
+      .eq('type', 'vacation')
+      .gte('date', dateFrom)
+      .lte('date', dateTo);
+    if (logError) {
+      console.error('DELETE vacation attendance_logs error:', logError.message);
+    }
+  }
+
+  const { error: deleteError } = await svc
+    .from('requests')
+    .delete()
+    .eq('id', params.id)
+    .eq('organization_id', orgId);
+
+  if (deleteError) {
+    console.error('DELETE /api/requests/[id] error:', deleteError);
+    return NextResponse.json({ error: 'Nepodařilo se smazat žádost.' }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 // PUT /api/requests/[id]
 // Body: { status: 'approved' | 'rejected', note? }
 export async function PUT(

@@ -262,6 +262,7 @@ export default function RequestsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // Pending count for badge — keep a separate count
   const [pendingCount, setPendingCount] = useState(0);
@@ -336,6 +337,24 @@ export default function RequestsPage() {
       alert(err instanceof Error ? err.message : 'Chyba při zpracování žádosti.');
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setActionLoading(id + 'delete');
+    try {
+      const res = await fetch(`/api/requests/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? 'Smazání selhalo.');
+      }
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      if (activeTab === 'pending') setPendingCount((c) => Math.max(0, c - 1));
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při mazání žádosti.');
+    } finally {
+      setActionLoading(null);
+      setDeleteConfirm(null);
     }
   }
 
@@ -434,11 +453,7 @@ export default function RequestsPage() {
                     <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Do</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Poznámka</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Datum podání</th>
-                    {activeTab === 'pending' ? (
-                      <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Akce</th>
-                    ) : (
-                      <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Stav</th>
-                    )}
+                    <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wide">Akce</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -494,61 +509,98 @@ export default function RequestsPage() {
                           {formatDate(req.created_at)}
                         </td>
 
-                        {/* Action or Status */}
-                        {activeTab === 'pending' ? (
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleAction(req.id, 'approved')}
-                                disabled={isActing}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-green-700 border-green-200 bg-green-50 hover:bg-green-100"
-                              >
-                                {isApproving ? (
-                                  <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                                  </svg>
-                                ) : (
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
-                                    <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                )}
-                                Schválit
-                              </button>
-                              <button
-                                onClick={() => handleAction(req.id, 'rejected')}
-                                disabled={isActing}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-red-700 border-red-200 bg-red-50 hover:bg-red-100"
-                              >
-                                {isRejecting ? (
-                                  <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                                  </svg>
-                                ) : (
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
-                                    <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                  </svg>
-                                )}
-                                Zamítnout
-                              </button>
-                            </div>
-                          </td>
-                        ) : (
-                          <td className="px-4 py-3">
-                            {activeTab === 'approved' ? (
+                        {/* Actions */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Status badge for non-pending */}
+                            {activeTab === 'approved' && (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                                 Schváleno
                               </span>
-                            ) : (
+                            )}
+                            {activeTab === 'rejected' && (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                 <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                                 Zamítnuto
                               </span>
                             )}
-                          </td>
-                        )}
+                            {/* Approve / Reject for pending */}
+                            {activeTab === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleAction(req.id, 'approved')}
+                                  disabled={isActing}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-green-700 border-green-200 bg-green-50 hover:bg-green-100"
+                                >
+                                  {isApproving ? (
+                                    <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+                                      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  )}
+                                  Schválit
+                                </button>
+                                <button
+                                  onClick={() => handleAction(req.id, 'rejected')}
+                                  disabled={isActing}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-red-700 border-red-200 bg-red-50 hover:bg-red-100"
+                                >
+                                  {isRejecting ? (
+                                    <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+                                      <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                  )}
+                                  Zamítnout
+                                </button>
+                              </>
+                            )}
+                            {/* Delete — always visible for admin */}
+                            {deleteConfirm === req.id ? (
+                              <>
+                                <span className="text-xs text-slate-500">Opravdu?</span>
+                                <button
+                                  onClick={() => handleDelete(req.id)}
+                                  disabled={actionLoading === req.id + 'delete'}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
+                                >
+                                  {actionLoading === req.id + 'delete' ? (
+                                    <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                  ) : 'Ano, smazat'}
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm(null)}
+                                  className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium border text-slate-600 border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+                                >
+                                  Zrušit
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteConfirm(req.id)}
+                                disabled={isActing}
+                                title="Smazat žádost"
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors disabled:opacity-40"
+                              >
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
