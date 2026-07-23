@@ -42,6 +42,7 @@ const EXTRA_KEYS = [
   'short_long_weeks_enabled',
   'bonus_sunday_departments',
   'bonus_special_days',
+  'ui_layout',
 ];
 
 // GET /api/manager/settings

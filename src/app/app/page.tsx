@@ -17,6 +17,8 @@ import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
 import TourSelectModal from '@/components/TourSelectModal'
 import SubscriptionGate from '@/components/SubscriptionGate'
+import LayoutEditor, { type LayoutConfig, type HideableElement, mergeLayout, DEFAULT_LAYOUT } from '@/components/LayoutEditor'
+import { managerFetch } from '@/lib/managerFetch'
 
 type Tab = 'schedule' | 'attendance' | 'overview' | 'my-hours' | 'vacation' | 'analytics' | 'management' | 'assistant'
 
@@ -82,6 +84,8 @@ export default function HomePage() {
   const [tourLang, setTourLang] = useState<'cs' | 'en'>('cs')
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
   const [shiftViewMode, setShiftViewMode] = useState<'teamflow' | 'googlesheets'>('teamflow')
+  const [layout, setLayout] = useState<LayoutConfig>(DEFAULT_LAYOUT)
+  const [showLayoutEditor, setShowLayoutEditor] = useState(false)
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
     const now = new Date()
@@ -193,16 +197,22 @@ export default function HomePage() {
         .then(r => r.json())
         .then((d: { logoUrl: string | null }) => setOrgLogoUrl(d.logoUrl ?? null))
         .catch(() => {})
-      // Load theme + shift view mode
+      // Load theme + shift view mode + layout
       fetch(`/api/public/company-settings?orgId=${data.id}`)
         .then(r => r.json())
-        .then((d: Record<string, string>) => {
-          if (d.ui_theme) setTheme(getTheme(d.ui_theme))
+        .then((d: Record<string, unknown>) => {
+          if (d.ui_theme) setTheme(getTheme(d.ui_theme as string))
           if (d.shift_view_mode === 'googlesheets' || d.shift_view_mode === 'teamflow') {
-            setShiftViewMode(d.shift_view_mode)
+            setShiftViewMode(d.shift_view_mode as 'teamflow' | 'googlesheets')
+          }
+          if (d.ui_layout) {
+            try {
+              const parsed = typeof d.ui_layout === 'string' ? JSON.parse(d.ui_layout) : d.ui_layout
+              setLayout(mergeLayout(parsed))
+            } catch { /* ignore bad JSON */ }
           }
           // Apply custom favicon if set, otherwise fall back to default TeamFlow favicon
-          const faviconUrl = d.favicon_url || '/favicon.svg'
+          const faviconUrl = (d.favicon_url as string) || '/favicon.svg'
           let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
           if (!link) {
             link = document.createElement('link')
@@ -226,6 +236,17 @@ export default function HomePage() {
     setManagerScope(getManagerScope())
     setShowManagerLogin(false)
     setActiveTab('management')
+  }
+
+  async function handleSaveLayout(newLayout: LayoutConfig) {
+    setLayout(newLayout)
+    setShowLayoutEditor(false)
+    try {
+      await managerFetch('/api/manager/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ ui_layout: JSON.stringify(newLayout) }),
+      })
+    } catch { /* layout already applied locally, server error is non-critical */ }
   }
 
   function handleManagerLogout() {
@@ -317,7 +338,12 @@ export default function HomePage() {
           }
           <div className="flex-1 flex justify-center">
             <div className={`flex items-center rounded-xl p-1 gap-0.5 ${theme.tabsBg}`}>
-              {[...BASE_TABS, ...(isManagerMode ? MANAGER_TABS : [])].map((tab) => (
+              {layout.tabs
+                .filter(lt => lt.visible)
+                .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
+                .filter((t): t is typeof BASE_TABS[0] => t !== undefined)
+                .filter(t => !MANAGER_TABS.some(mt => mt.id === t.id) || isManagerMode)
+                .map((tab) => (
                 <button
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
@@ -341,6 +367,15 @@ export default function HomePage() {
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                   <span className="text-emerald-400 text-sm font-medium">{t('Manažer', 'Manager')}</span>
                 </div>
+                {managerScope?.isAdmin !== false && (
+                  <button
+                    onClick={() => setShowLayoutEditor(true)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}
+                    title="Upravit rozhraní"
+                  >
+                    ✏️
+                  </button>
+                )}
                 <button onClick={handleManagerLogout} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}>
                   {t('Odhlásit', 'Log out')}
                 </button>
@@ -377,6 +412,15 @@ export default function HomePage() {
                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                     <span className="text-emerald-400 text-xs font-medium">{t('Manažer', 'Manager')}</span>
                   </div>
+                  {managerScope?.isAdmin !== false && (
+                    <button
+                      onClick={() => setShowLayoutEditor(true)}
+                      className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}
+                      title="Upravit rozhraní"
+                    >
+                      ✏️
+                    </button>
+                  )}
                   <button onClick={handleManagerLogout} className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}>
                     {t('Odhlásit', 'Log out')}
                   </button>
@@ -392,7 +436,12 @@ export default function HomePage() {
           {/* Scrollable tabs row */}
           <div className={`overflow-x-auto scrollbar-none border-t ${theme.navBorder}`}>
             <div className={`flex items-center gap-0.5 p-1 min-w-max ${theme.tabsBg} mx-2 mb-2 rounded-xl`}>
-              {[...BASE_TABS, ...(isManagerMode ? MANAGER_TABS : [])].map((tab) => (
+              {layout.tabs
+                .filter(lt => lt.visible)
+                .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
+                .filter((t): t is typeof BASE_TABS[0] => t !== undefined)
+                .filter(t => !MANAGER_TABS.some(mt => mt.id === t.id) || isManagerMode)
+                .map((tab) => (
                 <button
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
@@ -435,6 +484,7 @@ export default function HomePage() {
                 month={currentMonth}
                 isManagerMode={isManagerMode}
                 onMonthChange={(m: string) => setCurrentMonth(m)}
+                hiddenElements={layout.hiddenElements}
               />
             ) : (
               <WorkPlanGrid
@@ -521,6 +571,15 @@ export default function HomePage() {
           canClose={subscriptionStatus === 'active'}
           paid={subscriptionStatus !== 'pending' && subscriptionStatus !== 'expired'}
           onSwitchTab={(tab) => setActiveTab(tab as Tab)}
+        />
+      )}
+
+      {/* Layout editor drawer */}
+      {showLayoutEditor && (
+        <LayoutEditor
+          layout={layout}
+          onSave={handleSaveLayout}
+          onClose={() => setShowLayoutEditor(false)}
         />
       )}
 

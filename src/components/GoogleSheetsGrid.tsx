@@ -42,6 +42,7 @@ interface GoogleSheetsGridProps {
   month: string;
   isManagerMode: boolean;
   onMonthChange: (month: string) => void;
+  hiddenElements?: string[];
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -538,7 +539,7 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthChange }: GoogleSheetsGridProps) {
+export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthChange, hiddenElements = [] }: GoogleSheetsGridProps) {
   const t = useT();
 
   const DAY_NAMES = [t('Po', 'Mon'), t('Út', 'Tue'), t('St', 'Wed'), t('Čt', 'Thu'), t('Pá', 'Fri'), t('So', 'Sat'), t('Ne', 'Sun')];
@@ -1200,7 +1201,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </div>
           )}
 
-          {workTypes.some((w) => w.category === 'activity') && (
+          {!hiddenElements.includes('schedule_activity_btn') && workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${activityFilter ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'}`}
@@ -1209,12 +1210,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </button>
           )}
 
-          <button
-            onClick={() => setEveningFilter((v) => !v)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
-          >
-            🌙 {t('Večerní', 'Evening')}
-          </button>
+          {!hiddenElements.includes('schedule_evening_btn') && (
+            <button
+              onClick={() => setEveningFilter((v) => !v)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+            >
+              🌙 {t('Večerní', 'Evening')}
+            </button>
+          )}
 
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
@@ -1269,7 +1272,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           )
         )}
 
-        {(isManagerMode || sessionEmployee) && (
+        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
           <button
             onClick={() => setShowBulkModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
@@ -1278,7 +1281,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             ⚡ {t('Plošné zadání', 'Bulk assign')}
           </button>
         )}
-        {(isManagerMode || sessionEmployee) && (
+        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
           <button
             onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
             className={`${!isManagerMode ? 'ml-auto' : ''} flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors`}
