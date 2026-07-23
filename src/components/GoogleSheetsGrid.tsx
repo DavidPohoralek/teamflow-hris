@@ -585,6 +585,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   // Scroll sync: header div scrollLeft follows body div (split-table sticky approach)
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
+  // Sticky toolbar
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarHeight, setToolbarHeight] = useState(56);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
@@ -756,6 +759,18 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [contextMenu]);
+
+  // ── Toolbar height tracking for sticky offset ─────────────────────────────
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (toolbarRef.current) setToolbarHeight(toolbarRef.current.offsetHeight);
+    });
+    ro.observe(el);
+    setToolbarHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
 
   // ── Sticky header: update dates when scrolling in month view ─────────────
   useEffect(() => {
@@ -1011,9 +1026,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return { bg, text };
   }
 
-  function computePlannedHours(empId: string): number {
+  function computePlannedHours(empId: string, days?: string[]): number {
     let total = 0;
-    for (const date of weekDays) {
+    for (const date of (days ?? weekDays)) {
       for (const e of plansMap.get(`${empId}|${date}`) ?? []) {
         if (e.startTime && e.endTime) {
           const [sh, sm] = e.startTime.split(':').map(Number);
@@ -1105,9 +1120,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     : weekDays;
 
   return (
-    <div className="p-4 md:p-6 max-w-full">
-      {/* Header toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+    <div className="max-w-full">
+      {/* Header toolbar — sticky */}
+      <div
+        ref={toolbarRef}
+        className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center gap-3"
+      >
         {/* View mode toggle */}
         <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
           <button
@@ -1219,7 +1237,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               <div className="flex flex-col leading-tight">
                 <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
                 {(() => {
-                  const hw = computePlannedHours(sessionEmployee.id);
+                  const hw = computePlannedHours(sessionEmployee.id, stickyDays);
                   const hm = computeMonthlyHours(sessionEmployee.id);
                   const fmt = (h: number) => Number.isInteger(h) ? String(h) : h.toFixed(1);
                   return (
@@ -1273,6 +1291,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         )}
       </div>
 
+      <div className="px-4 md:px-6 pb-4 md:pb-6 pt-4">
       {/* Grid — split into sticky header + scrollable body so position:sticky works
            (overflow-x:auto on any ancestor breaks sticky; the header div has no overflow) */}
       <div className="rounded-xl border border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
@@ -1280,7 +1299,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         {/* Sticky header div — no overflow here, so position:sticky works vs. the window */}
         <div
           ref={headerScrollRef}
-          style={{ position: 'sticky', top: 0, zIndex: 20, overflow: 'hidden' }}
+          style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden' }}
           className="bg-gray-50 border-b-2 border-gray-200 rounded-t-xl"
         >
           <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
@@ -1428,6 +1447,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         </table>
         </div>{/* end overflow-x:auto body scroll div */}
       </div>{/* end grid outer container */}
+      </div>{/* end padded content wrapper */}
 
       {/* Context menu */}
       {contextMenu && (() => {
