@@ -6,6 +6,7 @@ import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
 import ThemeSelector from './ThemeSelector';
 import NotificationsPanel from './NotificationsPanel';
+import BonusesTab from './BonusesTab';
 import { useT } from '@/lib/i18n';
 
 // ─── ManagerTour ──────────────────────────────────────────────────────────────
@@ -347,7 +348,7 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice'>(initialTab ?? 'employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice' | 'bonuses'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showTour, setShowTour] = useState(false);
@@ -371,6 +372,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
     ...(isAdmin ? [{ id: 'work-types' as const, label: t('Oddělení', 'Departments'), icon: '🏷️' }] : []),
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
     { id: 'homeoffice' as const, label: t('HomeOffice', 'Home Office'), icon: '🏠' },
+    { id: 'bonuses' as const, label: t('Evidence bonusů', 'Bonus records'), icon: '💰' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     ...(isAdmin ? [{ id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' }] : []),
   ];
@@ -467,6 +469,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
           {activeTab === 'work-types' && isAdmin && <WorkTypesTab />}
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} isAdmin={isAdmin} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
+          {activeTab === 'bonuses' && <BonusesTab />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && isAdmin && <SettingsTab />}
         </div>

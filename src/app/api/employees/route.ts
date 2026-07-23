@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
 // GET /api/employees — list active employees, filtered by dept scope for scoped managers
+// ?all=1 — skip the department scope (shift views show the whole company)
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   const { orgId, supabase, departments } = resolved;
+
+  const showAll = new URL(req.url).searchParams.get('all') === '1';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
@@ -15,7 +18,7 @@ export async function GET(req: NextRequest) {
     .eq('active', true)
     .order('name');
 
-  if (departments && departments.length > 0) {
+  if (!showAll && departments && departments.length > 0) {
     query = query.in('department', departments);
   }
 

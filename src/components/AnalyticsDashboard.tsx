@@ -129,6 +129,7 @@ const EXPORT_COLS = [
   { key: 'targetHours',   label: 'Fond hodin (h)' },
   { key: 'delta',         label: 'Rozdíl (h)' },
   { key: 'vacDays',       label: 'Dovolená čerpáno (h)' },
+  { key: 'managerBonus',  label: 'Bonus od vedoucího (Kč)' },
   { key: 'hourlyRate',    label: 'Sazba (Kč/h) + náklad 🔐' },
 ] as const;
 

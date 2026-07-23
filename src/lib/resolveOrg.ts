@@ -10,6 +10,7 @@ type ResolveResult =
       isAdmin: boolean
       departments: string[] | null
       permissions: string[]
+      employeeId: string | null
     }
   | { error: string; status: number }
 
@@ -24,6 +25,7 @@ export async function resolveOrgId(req: { headers: { get(k: string): string | nu
       isAdmin: result.role === 'admin',
       departments: result.departments,
       permissions: result.permissions,
+      employeeId: result.employeeId,
     }
   }
 
@@ -47,5 +49,6 @@ export async function resolveOrgId(req: { headers: { get(k: string): string | nu
     isAdmin: true,
     departments: null,
     permissions: [],
+    employeeId: null,
   }
 }

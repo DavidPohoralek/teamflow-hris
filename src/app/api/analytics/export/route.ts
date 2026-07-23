@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     .order('name');
   if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
 
-  const [empRes, logsRes, plansRes, vacRes, benefitLogsRes] = await Promise.all([
+  const [empRes, logsRes, plansRes, vacRes, benefitLogsRes, bonusRes] = await Promise.all([
     empQuery,
     sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
     sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
     activeBenefits.length > 0
       ? sb.from('employee_benefit_logs').select('employee_id, benefit_key, count').eq('organization_id', orgId).eq('month', month)
       : Promise.resolve({ data: [] }),
+    sb.from('employee_bonuses').select('employee_id, amount').eq('organization_id', orgId).eq('month', month),
   ]);
 
   const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number; hourly_rate?: number | null }[] = empRes.data ?? [];
@@ -75,6 +76,10 @@ export async function GET(req: NextRequest) {
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
   const benefitLogs: { employee_id: string; benefit_key: string; count: number }[] = benefitLogsRes.data ?? [];
+  // Manager-granted monthly bonuses (CZK) — table may not exist yet, then the map stays empty
+  const managerBonusMap = new Map<string, number>(
+    ((bonusRes?.data ?? []) as { employee_id: string; amount: number }[]).map((b) => [b.employee_id, Number(b.amount) || 0])
+  );
 
   function isSat(dateStr: string) { return new Date(dateStr + 'T00:00:00').getDay() === 6; }
 
@@ -145,9 +150,11 @@ export async function GET(req: NextRequest) {
       - (benefitHours['english'] ?? 0)
     ) * 100) / 100;
 
+    const managerBonus = managerBonusMap.get(emp.id) ?? 0;
     const hourlyRate = includeRate ? (emp.hourly_rate ?? null) : null;
+    // Payroll total = final hours × rate + manager bonus (CZK)
     const billableTotal = hourlyRate != null
-      ? Math.round(finalHours * hourlyRate * 100) / 100
+      ? Math.round((finalHours * hourlyRate + managerBonus) * 100) / 100
       : null;
 
     return {
@@ -165,6 +172,7 @@ export async function GET(req: NextRequest) {
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
       vacHours: countVacHours(emp.id),
+      managerBonus,
       hourlyRate,
       billableTotal,
     };
@@ -190,6 +198,7 @@ export async function GET(req: NextRequest) {
     ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']  : []),
     ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']      : []),
     ...(col('vacDays')        ? [isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)'] : []),
+    ...(col('managerBonus')   ? [isEn ? 'Manager bonus (CZK)' : 'Bonus od vedoucího (Kč)'] : []),
     ...(includeRate           ? [isEn ? 'Hourly rate (CZK)' : 'Sazba (Kč/h)']  : []),
     ...(includeRate           ? [isEn ? 'Billable total (CZK)' : 'Mzdový náklad (Kč)'] : []),
   ];
@@ -208,6 +217,7 @@ export async function GET(req: NextRequest) {
     ...(col('targetHours')    ? [r.targetHours]            : []),
     ...(col('delta')          ? [r.delta]                  : []),
     ...(col('vacDays')        ? [r.vacHours]               : []),
+    ...(col('managerBonus')   ? [r.managerBonus]           : []),
     ...(includeRate           ? [r.hourlyRate]             : []),
     ...(includeRate           ? [r.billableTotal]          : []),
   ]);
