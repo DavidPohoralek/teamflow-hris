@@ -276,6 +276,7 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
   const [startTime, setStartTime] = useState(entry.startTime?.slice(0, 5) ?? '');
   const [endTime, setEndTime] = useState(entry.endTime?.slice(0, 5) ?? '');
   const [isEvening, setIsEvening] = useState(entry.isEvening ?? false);
+  const [note, setNote] = useState((entry as unknown as Record<string, unknown>).note as string ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -291,6 +292,7 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
         startTime: startTime || null,
         endTime: endTime || null,
         isEvening,
+        note: note.trim() || null,
       };
       if (!isManagerMode) bodyObj.pin = sessionPin;
       const res = isManagerMode
@@ -337,6 +339,16 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
             <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)} className="w-4 h-4 accent-orange-500" />
             <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
           </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Poznámka', 'Note')}</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder={t('Volitelná poznámka ke směně…', 'Optional shift note…')}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
