@@ -10,11 +10,7 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from('employees')
-    .select(`id, name, pin_code, email, phone, department, department_id,
-      department_color, position, labels, target_hours, vacation_days_per_year,
-      hourly_rate, employment_type, can_saturday, max_saturdays, short_long_week,
-      tier, store_rating, saturday_priority, prodejna_tier, shift_pattern,
-      work_type_ids, active, is_manager, managed_departments, manager_permissions`)
+    .select('*')
     .eq('organization_id', orgId)
     .eq('active', true)
     .order('name');
