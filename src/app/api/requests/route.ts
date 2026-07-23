@@ -67,7 +67,14 @@ export async function GET(req: NextRequest) {
     const firstDay = `${monthFilter}-01`;
     const lastDay = new Date(year, month, 0).toISOString().slice(0, 10);
     query = query.gte('date_from', firstDay).lte('date_from', lastDay);
+  } else {
+    // Bez month parametru omez na posledních 13 měsíců
+    const fence = new Date();
+    fence.setFullYear(fence.getFullYear() - 1);
+    query = query.gte('date_from', fence.toISOString().slice(0, 10));
   }
+
+  query = query.limit(500);
 
   const { data, error } = await query;
 

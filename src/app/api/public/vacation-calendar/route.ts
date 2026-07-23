@@ -18,12 +18,14 @@ export async function GET(req: NextRequest) {
 
     const supabase = getServiceClient();
 
+    const yearFence = `${new Date().getFullYear() - 1}-01-01`;
     const { data: requests, error } = await supabase
       .from('requests')
       .select('id, employee_id, type, date_from, date_to, status, note, employees(name)')
       .eq('organization_id', orgId)
       .eq('type', 'vacation')
       .in('status', ['approved', 'pending'])
+      .gte('date_from', yearFence)
       .order('date_from');
 
     if (error) return NextResponse.json({ error: 'Chyba načítání.' }, { status: 500 });

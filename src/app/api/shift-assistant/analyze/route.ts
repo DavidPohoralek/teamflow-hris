@@ -46,7 +46,11 @@ export async function GET(req: NextRequest) {
 
   // Load all data needed for analysis
   const [empRes, draftRes, absenceRes, wpRes, settingsRes, scheduleDaysRes] = await Promise.all([
-    sb.from('employees').select('*').eq('organization_id', orgId).eq('active', true).order('name'),
+    sb.from('employees')
+      .select(`id, name, target_hours, labels, can_saturday, saturday_priority,
+        max_saturdays, tier, prodejna_tier, employment_type, shift_pattern,
+        store_rating, short_long_week`)
+      .eq('organization_id', orgId).eq('active', true).order('name'),
     sb.from('work_plans')
       .select('employee_id, date, work_type, start_time, end_time, notes')
       .eq('organization_id', orgId)

@@ -165,8 +165,19 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
 
   useEffect(() => {
     fetchPresence();
-    const interval = setInterval(fetchPresence, 60000);
-    return () => clearInterval(interval);
+    let interval = setInterval(fetchPresence, 60_000);
+    const onVisibility = () => {
+      clearInterval(interval);
+      if (!document.hidden) {
+        fetchPresence();
+        interval = setInterval(fetchPresence, 60_000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [fetchPresence]);
 
   const sorted = sortRecords(records, workTypes);

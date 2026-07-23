@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
     .from('attendance_logs')
     .select('id, employee_id, date, check_in, check_out, note, work_type_name, employees(id, name)')
     .eq('organization_id', orgId)
+    .or('work_type_name.ilike.%homeoffice%,work_type_name.ilike.%home office%,work_type_name.eq.HO')
     .order('date', { ascending: false })
     .order('check_in', { ascending: false })
 

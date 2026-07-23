@@ -25,8 +25,9 @@ export async function GET(req: NextRequest) {
   if (isAdmin(req)) {
     const { data, error } = await sb()
       .from('tickets')
-      .select('*')
+      .select('id, user_id, user_email, user_name, title, description, reason, impact, priority, status, admin_reply, created_at, updated_at')
       .order('created_at', { ascending: false })
+      .limit(200)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ tickets: data ?? [] })
   }
@@ -36,9 +37,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await sb()
     .from('tickets')
-    .select('*')
+    .select('id, user_id, user_email, user_name, title, description, reason, impact, priority, status, admin_reply, created_at, updated_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(50)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ tickets: data ?? [] })
 }

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   let query = sb
     .from('attendance_logs')
-    .select('*, employees(name)')
+    .select('id, employee_id, date, check_in, check_out, note, work_type_name, work_type_id, employees(id, name)')
     .eq('organization_id', orgId)
     .order('date', { ascending: false })
     .order('check_in', { ascending: true });
@@ -50,6 +50,9 @@ export async function GET(req: NextRequest) {
     const firstDay = `${month}-01`;
     const lastDay = new Date(year, mon, 0).toISOString().slice(0, 10);
     query = query.gte('date', firstDay).lte('date', lastDay);
+  } else {
+    // Fallback: bez parametrů vrátí jen dnešek aby nevylila celá historie
+    query = query.eq('date', new Date().toISOString().slice(0, 10));
   }
 
   const { data, error } = await query;
