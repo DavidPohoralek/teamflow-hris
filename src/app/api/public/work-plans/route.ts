@@ -235,13 +235,14 @@ export async function PATCH(req: NextRequest) {
     workTypeId?: string
     startTime?: string | null
     endTime?: string | null
+    note?: string | null
     pin?: string
     isEvening?: boolean
   }
   try { body = await req.json() }
   catch { return NextResponse.json({ error: 'Neplatné tělo.' }, { status: 400 }) }
 
-  const { orgId, workPlanId, workTypeId, startTime, endTime, pin, isEvening } = body
+  const { orgId, workPlanId, workTypeId, startTime, endTime, note, pin, isEvening } = body
   if (!orgId || !workPlanId) return NextResponse.json({ error: 'Chybí parametry.' }, { status: 400 })
 
   const supabase = getServiceClient()
@@ -276,6 +277,7 @@ export async function PATCH(req: NextRequest) {
   if (startTime !== undefined) update.start_time = startTime ?? null
   if (endTime !== undefined) update.end_time = endTime ?? null
   if (isEvening !== undefined) update.is_evening = isEvening
+  if (note !== undefined) update.note = note ?? null
 
   if (!Object.keys(update).length)
     return NextResponse.json({ error: 'Nic ke změně.' }, { status: 400 })

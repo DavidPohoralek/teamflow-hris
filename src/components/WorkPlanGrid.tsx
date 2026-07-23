@@ -809,6 +809,7 @@ function EditShiftModal({
   const [startTime, setStartTime] = useState(entry.startTime?.slice(0, 5) ?? '');
   const [endTime, setEndTime] = useState(entry.endTime?.slice(0, 5) ?? '');
   const [isEvening, setIsEvening] = useState(entry.isEvening ?? false);
+  const [note, setNote] = useState((entry as unknown as Record<string, unknown>).note as string ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -821,6 +822,7 @@ function EditShiftModal({
       body.startTime = startTime || null;
       body.endTime = endTime || null;
       body.isEvening = isEvening;
+      body.note = note.trim() || null;
       if (!isManagerMode && sessionPin) body.pin = sessionPin;
 
       const res = isManagerMode
@@ -873,6 +875,17 @@ function EditShiftModal({
               className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400" />
             <span className="text-sm font-medium text-gray-700">🌙 {t('Večerní', 'Evening')}</span>
           </label>
+          {/* Note */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('Poznámka', 'Note')}</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder={t('Volitelná poznámka ke směně…', 'Optional shift note…')}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            />
+          </div>
         </div>
 
         {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
