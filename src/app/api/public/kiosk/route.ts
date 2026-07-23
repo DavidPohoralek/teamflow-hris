@@ -8,6 +8,53 @@ function getServiceClient() {
   return createClient(url, key)
 }
 
+// Matches "Lékař", "Doktor", "Doctor" etc. — diacritics- and case-insensitive
+function isDoctorVisit(workTypeName?: string | null): boolean {
+  if (!workTypeName) return false
+  const normalized = workTypeName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return normalized.includes('lekar') || normalized.includes('doktor') || normalized.includes('doctor')
+}
+
+// HPP employee records a doctor visit → manager should ask for a doctor's note
+async function notifyDoctorVisit(
+  supabase: ReturnType<typeof getServiceClient>,
+  orgId: string,
+  employee: { id: string; name: string },
+  date: string,
+) {
+  try {
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('employment_type')
+      .eq('id', employee.id)
+      .maybeSingle()
+    if ((emp as { employment_type?: string } | null)?.employment_type !== 'hpp') return
+
+    const message = `${employee.name} si zaznamenal/a návštěvu lékaře (${date}). Požádejte o předložení potvrzení od lékaře.`
+
+    // One notification per employee+day is enough
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('type', 'doctor_visit')
+      .eq('message', message)
+      .limit(1)
+      .maybeSingle()
+    if (existing) return
+
+    await supabase.from('notifications').insert({
+      organization_id: orgId,
+      type: 'doctor_visit',
+      title: '🩺 Návštěva lékaře',
+      message,
+      read: false,
+    })
+  } catch {
+    // Non-critical — never block the kiosk flow
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -102,6 +149,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      if (isDoctorVisit(workTypeName)) {
+        await notifyDoctorVisit(supabase, orgId, employee, today)
+      }
+
       return NextResponse.json({
         ok: true,
         employee: { name: employee.name },
@@ -173,6 +224,10 @@ export async function POST(req: NextRequest) {
       if (insertError) {
         console.error('Kiosk ho-record error:', insertError)
         return NextResponse.json({ ok: false, error: 'Chyba při zápisu záznamu.' }, { status: 500 })
+      }
+
+      if (isDoctorVisit(workTypeName)) {
+        await notifyDoctorVisit(supabase, orgId, employee, date)
       }
 
       return NextResponse.json({ ok: true, durationHours, durationLabel })

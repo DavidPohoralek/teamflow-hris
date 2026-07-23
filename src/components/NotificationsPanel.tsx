@@ -106,10 +106,10 @@ export default function NotificationsPanel({ onUnreadChange }: Props) {
                 n.read ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'
               }`}
             >
-              <div className="text-xl mt-0.5">{n.title?.startsWith('✅') ? '✅' : '❌'}</div>
+              <div className="text-xl mt-0.5">{(n.title ?? '').match(new RegExp('^\\p{Extended_Pictographic}', 'u'))?.[0] ?? '🔔'}</div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-slate-800 text-sm">
-                  {(n.title ?? '').replace(/^[✅❌]\s*/, '')}
+                  {(n.title ?? '').replace(new RegExp('^\\p{Extended_Pictographic}️?\\s*', 'u'), '')}
                 </p>
                 <p className="text-slate-600 text-sm mt-0.5">{n.message}</p>
                 <p className="text-xs text-slate-400 mt-1">
