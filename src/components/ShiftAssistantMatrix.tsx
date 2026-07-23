@@ -229,6 +229,21 @@ export default function ShiftAssistantMatrix({
     return map;
   }, [workTypes]);
 
+  // Legend: work types actually used this month, with their 3-letter chip abbreviation
+  const legendItems = useMemo(() => {
+    const seen = new Map<string, { abbrev: string; name: string; color: string }>();
+    for (const p of workPlans) {
+      const name = p.workTypeName ?? p.workType ?? '';
+      if (!name || seen.has(name)) continue;
+      seen.set(name, {
+        abbrev: name.slice(0, 3).toUpperCase(),
+        name,
+        color: p.workTypeColor ?? wtColorMap.get(name) ?? '#94a3b8',
+      });
+    }
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  }, [workPlans, wtColorMap]);
+
   // ── Fetch data ──────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -460,6 +475,61 @@ export default function ShiftAssistantMatrix({
         <div className="text-[10px] text-slate-400 font-medium hidden sm:block">
           {employees.length} {t('zaměstnanců', 'employees')} · {allDays.length} {t('dnů', 'days')}
         </div>
+      </div>
+
+      {/* ── Legend ───────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-x-3 gap-y-1 flex-wrap px-4 py-1.5 border-b border-slate-200 bg-white shrink-0">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+          {t('Legenda', 'Legend')}
+        </span>
+        {legendItems.map(item => (
+          <span key={item.name} className="flex items-center gap-1 shrink-0">
+            <span
+              className="inline-flex items-center justify-center rounded text-[8px] font-bold px-1 leading-none"
+              style={{
+                background: item.color + '22',
+                borderLeft: `2px solid ${item.color}`,
+                color: item.color,
+                height: '14px',
+              }}
+            >
+              {item.abbrev}
+            </span>
+            <span className="text-[10px] text-slate-500">{item.name}</span>
+          </span>
+        ))}
+        <span className="w-px h-3.5 bg-slate-200 shrink-0" />
+        <span className="flex items-center gap-1 shrink-0">
+          <span
+            className="inline-flex items-center justify-center rounded text-[8px] font-extrabold px-1 leading-none"
+            style={{
+              background: DRAFT_COLORS.FULL_DAY_STORE + '2e',
+              border: `1.5px dashed ${DRAFT_COLORS.FULL_DAY_STORE}`,
+              color: DRAFT_COLORS.FULL_DAY_STORE,
+              height: '14px',
+            }}
+          >
+            PRO
+          </span>
+          <span className="text-[10px] text-slate-500">{t('AI návrh — směna na prodejně', 'AI draft — store shift')}</span>
+        </span>
+        <span className="flex items-center gap-1 shrink-0">
+          <span
+            className="inline-flex items-center justify-center rounded text-[8px] font-extrabold px-1 leading-none"
+            style={{
+              background: DRAFT_COLORS.CLOSING_ASSIST + '2a',
+              border: `1.5px dashed ${DRAFT_COLORS.CLOSING_ASSIST}`,
+              color: DRAFT_COLORS.CLOSING_ASSIST,
+              height: '14px',
+            }}
+          >
+            +CA
+          </span>
+          <span className="text-[10px] text-slate-500">{t('AI návrh — prodloužení do večerní', 'AI draft — evening extension')}</span>
+        </span>
+        <span className="text-[10px] text-slate-400 ml-auto hidden lg:block">
+          {t('Přerušovaný rámeček = zatím neuložený návrh', 'Dashed outline = unsaved draft')}
+        </span>
       </div>
 
       {/* ── Body: matrix + sidepanel ─────────────────────────────────────────── */}
@@ -891,8 +961,8 @@ export default function ShiftAssistantMatrix({
                 <div className="space-y-2">
                   {[
                     { color: '#2563EB', label: t('Potvrzená směna', 'Confirmed shift'), dashed: false },
-                    { color: '#7C3AED', label: t('AI návrh (CA)', 'AI draft (closing)'), dashed: true },
-                    { color: '#2563EB', label: t('AI návrh (FDS)', 'AI draft (full day)'), dashed: true },
+                    { color: '#7C3AED', label: t('AI návrh — večerní výpomoc', 'AI draft — evening assist'), dashed: true },
+                    { color: '#2563EB', label: t('AI návrh — směna na prodejně', 'AI draft — store shift'), dashed: true },
                     { color: '#ef4444', label: t('Krizový den', 'Crisis day'), isSquare: true },
                   ].map(item => (
                     <div key={item.label} className="flex items-center gap-2">
