@@ -1,5 +1,5 @@
--- Evidence bonusů — měsíční bonusy od vedoucího
--- Jeden řádek na zaměstnance a měsíc; historie zůstává, každý měsíc začíná od nuly.
+-- Evidence bonusů — žurnál bonusů od vedoucího
+-- Libovolný počet záznamů na zaměstnance a měsíc; historie zůstává navždy.
 
 create table if not exists employee_bonuses (
   id uuid primary key default gen_random_uuid(),
@@ -10,9 +10,13 @@ create table if not exists employee_bonuses (
   note text,
   granted_by text,                            -- jméno manažera, který bonus zadal
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (organization_id, employee_id, month)
+  updated_at timestamptz not null default now()
 );
+
+-- Pokud tabulka vznikla starší verzí migrace s unique constraintem, odstraň ho
+-- (žurnál povoluje více bonusů na osobu a měsíc)
+alter table employee_bonuses
+  drop constraint if exists employee_bonuses_organization_id_employee_id_month_key;
 
 create index if not exists idx_employee_bonuses_org_month
   on employee_bonuses (organization_id, month);

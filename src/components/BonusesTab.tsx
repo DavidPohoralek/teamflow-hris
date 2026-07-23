@@ -10,14 +10,20 @@ interface Employee {
   department: string | null
 }
 
-interface BonusRow {
+interface BonusEntry {
   id: string
   employee_id: string
   month: string
   amount: number
   note: string | null
   granted_by: string | null
-  updated_at: string
+  created_at: string
+}
+
+interface MonthSummary {
+  month: string
+  total: number
+  count: number
 }
 
 function currentMonth(): string {
@@ -30,22 +36,26 @@ function shiftMonth(month: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-function monthLabel(month: string, lang: string): string {
-  return new Date(month + '-15T00:00:00').toLocaleDateString(lang === 'en' ? 'en-GB' : 'cs-CZ', { month: 'long', year: 'numeric' })
+function monthLabel(month: string): string {
+  return new Date(month + '-15T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })
 }
+
+const fmtCZK = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })
 
 export default function BonusesTab() {
   const t = useT()
   const [month, setMonth] = useState(currentMonth())
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [bonuses, setBonuses] = useState<Map<string, BonusRow>>(new Map())
+  const [entries, setEntries] = useState<BonusEntry[]>([])
+  const [summary, setSummary] = useState<MonthSummary[]>([])
   const [loading, setLoading] = useState(true)
-  // Draft inputs keyed by employee id
+  // Add-form drafts keyed by employee id
   const [drafts, setDrafts] = useState<Map<string, { amount: string; note: string }>>(new Map())
   const [savingId, setSavingId] = useState<string | null>(null)
-  const [savedId, setSavedId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [showHistory, setShowHistory] = useState(false)
 
   const isCurrentMonth = month === currentMonth()
 
@@ -57,17 +67,14 @@ export default function BonusesTab() {
       .catch(() => {})
   }, [])
 
-  const fetchBonuses = useCallback(async () => {
+  const fetchEntries = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await managerFetch(`/api/manager/bonuses?month=${month}`)
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Chyba načítání')
-      const map = new Map<string, BonusRow>()
-      for (const b of (d.bonuses ?? []) as BonusRow[]) map.set(b.employee_id, b)
-      setBonuses(map)
-      setDrafts(new Map())
+      setEntries((d.bonuses ?? []) as BonusEntry[])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Chyba načítání')
     } finally {
@@ -75,13 +82,28 @@ export default function BonusesTab() {
     }
   }, [month])
 
-  useEffect(() => { fetchBonuses() }, [fetchBonuses])
+  const fetchSummary = useCallback(async () => {
+    try {
+      const res = await managerFetch('/api/manager/bonuses?summary=1')
+      const d = await res.json()
+      if (res.ok) setSummary((d.summary ?? []) as MonthSummary[])
+    } catch { /* non-critical */ }
+  }, [])
+
+  useEffect(() => { fetchEntries() }, [fetchEntries])
+  useEffect(() => { fetchSummary() }, [fetchSummary])
+
+  const entriesByEmployee = useMemo(() => {
+    const map = new Map<string, BonusEntry[]>()
+    for (const e of entries) {
+      if (!map.has(e.employee_id)) map.set(e.employee_id, [])
+      map.get(e.employee_id)!.push(e)
+    }
+    return map
+  }, [entries])
 
   function draftFor(empId: string): { amount: string; note: string } {
-    const d = drafts.get(empId)
-    if (d) return d
-    const saved = bonuses.get(empId)
-    return { amount: saved ? String(saved.amount) : '', note: saved?.note ?? '' }
+    return drafts.get(empId) ?? { amount: '', note: '' }
   }
 
   function setDraft(empId: string, patch: Partial<{ amount: string; note: string }>) {
@@ -92,44 +114,45 @@ export default function BonusesTab() {
     })
   }
 
-  function isDirty(empId: string): boolean {
-    const d = drafts.get(empId)
-    if (!d) return false
-    const saved = bonuses.get(empId)
-    const savedAmount = saved ? String(saved.amount) : ''
-    const savedNote = saved?.note ?? ''
-    return d.amount !== savedAmount || d.note !== savedNote
-  }
-
-  async function save(empId: string) {
+  async function addBonus(empId: string) {
     const d = draftFor(empId)
-    const amount = d.amount.trim() === '' ? 0 : Number(d.amount.replace(',', '.'))
-    if (isNaN(amount) || amount < 0) {
-      setError(t('Částka musí být nezáporné číslo.', 'Amount must be a non-negative number.'))
+    const amount = Number(d.amount.replace(',', '.'))
+    if (!d.amount.trim() || isNaN(amount) || amount <= 0) {
+      setError(t('Zadejte kladnou částku.', 'Enter a positive amount.'))
       return
     }
     setSavingId(empId)
     setError(null)
     try {
       const res = await managerFetch('/api/manager/bonuses', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({ employee_id: empId, month, amount, note: d.note }),
       })
       const resp = await res.json()
       if (!res.ok) throw new Error(resp.error ?? 'Uložení selhalo')
-      setBonuses(prev => {
-        const next = new Map(prev)
-        if (resp.cleared) next.delete(empId)
-        else next.set(empId, resp.bonus as BonusRow)
-        return next
-      })
+      setEntries(prev => [...prev, resp.bonus as BonusEntry])
       setDrafts(prev => { const next = new Map(prev); next.delete(empId); return next })
-      setSavedId(empId)
-      setTimeout(() => setSavedId(s => (s === empId ? null : s)), 1800)
+      fetchSummary()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Uložení selhalo')
     } finally {
       setSavingId(null)
+    }
+  }
+
+  async function deleteEntry(entryId: string) {
+    setDeletingId(entryId)
+    setError(null)
+    try {
+      const res = await managerFetch(`/api/manager/bonuses?id=${entryId}`, { method: 'DELETE' })
+      const resp = await res.json()
+      if (!res.ok) throw new Error(resp.error ?? 'Smazání selhalo')
+      setEntries(prev => prev.filter(e => e.id !== entryId))
+      fetchSummary()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Smazání selhalo')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -139,11 +162,7 @@ export default function BonusesTab() {
     return employees.filter(e => e.name.toLowerCase().includes(q) || (e.department ?? '').toLowerCase().includes(q))
   }, [employees, search])
 
-  const total = useMemo(() => {
-    let sum = 0
-    for (const b of Array.from(bonuses.values())) sum += b.amount
-    return sum
-  }, [bonuses])
+  const monthTotal = useMemo(() => entries.reduce((s, e) => s + (Number(e.amount) || 0), 0), [entries])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Employee[]>()
@@ -154,8 +173,6 @@ export default function BonusesTab() {
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'cs'))
   }, [filtered, t])
-
-  const fmtCZK = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })
 
   return (
     <div className="p-6 max-w-4xl">
@@ -170,7 +187,7 @@ export default function BonusesTab() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[150px] text-center capitalize">{monthLabel(month, 'cs')}</span>
+          <span className="text-sm font-semibold text-gray-700 min-w-[150px] text-center capitalize">{monthLabel(month)}</span>
           <button
             onClick={() => setMonth(m => shiftMonth(m, 1))}
             disabled={isCurrentMonth}
@@ -190,6 +207,15 @@ export default function BonusesTab() {
           )}
         </div>
 
+        <button
+          onClick={() => setShowHistory(v => !v)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+            showHistory ? 'bg-slate-700 text-white border-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          📊 {t('Historie', 'History')}
+        </button>
+
         <div className="relative ml-auto">
           <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -203,13 +229,41 @@ export default function BonusesTab() {
       </div>
 
       <p className="text-xs text-gray-400 mb-4">
-        {t('Měsíční bonusy pro podřízené. Každý měsíc začíná od nuly, historii najdete šipkou zpět. Bonus se propíše do exportu jako „Bonus od vedoucího“.',
-           'Monthly bonuses for your people. Each month starts from zero; use the arrows for history. Bonuses appear in the export as "Manager bonus".')}
+        {t('Bonusy pro podřízené — jednomu člověku lze přidat i více bonusů za měsíc. Bonusy se propíší do exportu jako „Bonus od vedoucího“.',
+           'Bonuses for your people — one person can receive multiple bonuses per month. Bonuses appear in the export as "Manager bonus".')}
       </p>
+
+      {/* Month-by-month history */}
+      {showHistory && (
+        <div className="mb-5 border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-widest">
+            {t('Historie po měsících', 'Month-by-month history')}
+          </div>
+          {summary.length === 0 ? (
+            <div className="px-4 py-4 text-sm text-gray-400">{t('Zatím žádné bonusy.', 'No bonuses yet.')}</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {summary.map(s => (
+                <button
+                  key={s.month}
+                  onClick={() => { setMonth(s.month); setShowHistory(false) }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors ${s.month === month ? 'bg-blue-50/60' : 'bg-white'}`}
+                >
+                  <span className="font-medium text-slate-700 capitalize">{monthLabel(s.month)}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400">{s.count}× {t('bonus', 'bonus')}</span>
+                    <span className="font-bold text-slate-800">{fmtCZK(s.total)} Kč</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {!isCurrentMonth && (
         <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
-          🕐 {t('Prohlížíte historii —', 'Viewing history —')} {monthLabel(month, 'cs')}
+          🕐 {t('Prohlížíte historii —', 'Viewing history —')} {monthLabel(month)}
         </div>
       )}
 
@@ -231,49 +285,74 @@ export default function BonusesTab() {
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{dept}</h3>
               <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
                 {emps.map(emp => {
-                  const saved = bonuses.get(emp.id)
+                  const empEntries = entriesByEmployee.get(emp.id) ?? []
+                  const empTotal = empEntries.reduce((s, e) => s + (Number(e.amount) || 0), 0)
                   const d = draftFor(emp.id)
-                  const dirty = isDirty(emp.id)
                   return (
-                    <div key={emp.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-white hover:bg-slate-50 transition-colors">
-                      <div className="w-44 min-w-0">
-                        <div className="text-sm font-medium text-slate-800 truncate">{emp.name}</div>
-                        {saved?.granted_by && (
-                          <div className="text-[10px] text-slate-400">{t('Zadal/a', 'By')}: {saved.granted_by}</div>
-                        )}
-                      </div>
-                      <div className="relative">
+                    <div key={emp.id} className="px-4 py-2.5 bg-white hover:bg-slate-50/60 transition-colors">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="w-44 min-w-0">
+                          <div className="text-sm font-medium text-slate-800 truncate">{emp.name}</div>
+                          {empTotal > 0 && (
+                            <div className="text-[11px] font-semibold text-emerald-600">{fmtCZK(empTotal)} Kč</div>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text" inputMode="decimal"
+                            value={d.amount}
+                            onChange={e => setDraft(emp.id, { amount: e.target.value.replace(/[^0-9.,]/g, '') })}
+                            onKeyDown={e => { if (e.key === 'Enter') addBonus(emp.id) }}
+                            placeholder="0"
+                            className="w-28 pl-3 pr-9 py-1.5 rounded-lg text-sm text-right border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">Kč</span>
+                        </div>
                         <input
-                          type="text" inputMode="decimal"
-                          value={d.amount}
-                          onChange={e => setDraft(emp.id, { amount: e.target.value.replace(/[^0-9.,]/g, '') })}
-                          onKeyDown={e => { if (e.key === 'Enter') save(emp.id) }}
-                          placeholder="0"
-                          className="w-28 pl-3 pr-9 py-1.5 rounded-lg text-sm text-right border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          type="text"
+                          value={d.note}
+                          onChange={e => setDraft(emp.id, { note: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') addBonus(emp.id) }}
+                          placeholder={t('Poznámka (nepovinné)', 'Note (optional)')}
+                          className="flex-1 min-w-[140px] px-3 py-1.5 rounded-lg text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">Kč</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={d.note}
-                        onChange={e => setDraft(emp.id, { note: e.target.value })}
-                        onKeyDown={e => { if (e.key === 'Enter') save(emp.id) }}
-                        placeholder={t('Poznámka (nepovinné)', 'Note (optional)')}
-                        className="flex-1 min-w-[140px] px-3 py-1.5 rounded-lg text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      />
-                      <button
-                        onClick={() => save(emp.id)}
-                        disabled={!dirty || savingId === emp.id}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                          savedId === emp.id
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : dirty
+                        <button
+                          onClick={() => addBonus(emp.id)}
+                          disabled={savingId === emp.id || !d.amount.trim()}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                            d.amount.trim()
                               ? 'bg-blue-600 text-white hover:bg-blue-700'
                               : 'bg-slate-100 text-slate-400'
-                        }`}
-                      >
-                        {savingId === emp.id ? '…' : savedId === emp.id ? `✓ ${t('Uloženo', 'Saved')}` : t('Uložit', 'Save')}
-                      </button>
+                          }`}
+                        >
+                          {savingId === emp.id ? '…' : `＋ ${t('Přidat', 'Add')}`}
+                        </button>
+                      </div>
+
+                      {/* Existing entries for the month */}
+                      {empEntries.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-1">
+                          {empEntries.map(entry => (
+                            <div key={entry.id} className="flex items-center gap-2 pl-1 text-xs text-slate-500">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                              <span className="font-semibold text-slate-700">{fmtCZK(Number(entry.amount))} Kč</span>
+                              {entry.note && <span className="text-slate-400 truncate">— {entry.note}</span>}
+                              <span className="text-slate-300 ml-auto shrink-0">
+                                {entry.granted_by ? `${entry.granted_by} · ` : ''}
+                                {new Date(entry.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                              </span>
+                              <button
+                                onClick={() => deleteEntry(entry.id)}
+                                disabled={deletingId === entry.id}
+                                title={t('Smazat bonus', 'Delete bonus')}
+                                className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -288,9 +367,9 @@ export default function BonusesTab() {
           {/* Summary */}
           <div className="mt-6 flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 border border-slate-200">
             <span className="text-sm font-medium text-slate-600">
-              {t('Celkem za', 'Total for')} {monthLabel(month, 'cs')}
+              {t('Celkem za', 'Total for')} {monthLabel(month)}
             </span>
-            <span className="text-base font-bold text-slate-800">{fmtCZK(total)} Kč</span>
+            <span className="text-base font-bold text-slate-800">{fmtCZK(monthTotal)} Kč</span>
           </div>
         </>
       )}

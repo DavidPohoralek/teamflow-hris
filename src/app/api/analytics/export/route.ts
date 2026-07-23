@@ -76,10 +76,12 @@ export async function GET(req: NextRequest) {
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
   const benefitLogs: { employee_id: string; benefit_key: string; count: number }[] = benefitLogsRes.data ?? [];
-  // Manager-granted monthly bonuses (CZK) — table may not exist yet, then the map stays empty
-  const managerBonusMap = new Map<string, number>(
-    ((bonusRes?.data ?? []) as { employee_id: string; amount: number }[]).map((b) => [b.employee_id, Number(b.amount) || 0])
-  );
+  // Manager-granted monthly bonuses (CZK) — multiple entries per employee are summed;
+  // table may not exist yet, then the map stays empty
+  const managerBonusMap = new Map<string, number>();
+  for (const b of (bonusRes?.data ?? []) as { employee_id: string; amount: number }[]) {
+    managerBonusMap.set(b.employee_id, (managerBonusMap.get(b.employee_id) ?? 0) + (Number(b.amount) || 0));
+  }
 
   function isSat(dateStr: string) { return new Date(dateStr + 'T00:00:00').getDay() === 6; }
 
