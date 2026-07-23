@@ -28,7 +28,8 @@ async function notifyDoctorVisit(
       .select('employment_type')
       .eq('id', employee.id)
       .maybeSingle()
-    if ((emp as { employment_type?: string } | null)?.employment_type !== 'hpp') return
+    const employmentType = ((emp as { employment_type?: string } | null)?.employment_type ?? '').toLowerCase()
+    if (employmentType !== 'hpp') return
 
     const message = `${employee.name} si zaznamenal/a návštěvu lékaře (${date}). Požádejte o předložení potvrzení od lékaře.`
 
