@@ -99,6 +99,14 @@ function shiftMonth(month: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+// "09:00" → "9", "09:30" → "9:30" — compact time for the tiny matrix chips
+function fmtChipTime(time: string | null): string {
+  if (!time) return '';
+  const [h, m] = time.split(':');
+  if (h == null || m == null) return time;
+  return m === '00' ? String(Number(h)) : `${Number(h)}:${m}`;
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
@@ -228,6 +236,17 @@ export default function ShiftAssistantMatrix({
     }
     return map;
   }, [workTypes]);
+
+  // Sort employees by department (then name); no-department employees go last
+  const sortedEmployees = useMemo(() => {
+    return [...employees].sort((a, b) => {
+      const da = a.department ?? '￿';
+      const db = b.department ?? '￿';
+      const c = da.localeCompare(db, 'cs');
+      if (c !== 0) return c;
+      return a.name.localeCompare(b.name, 'cs');
+    });
+  }, [employees]);
 
   // Legend: work types actually used this month, with their 3-letter chip abbreviation
   const legendItems = useMemo(() => {
@@ -612,8 +631,9 @@ export default function ShiftAssistantMatrix({
                   </td>
                 </tr>
               )}
-              {employees.map((emp, ri) => {
+              {sortedEmployees.map((emp, ri) => {
                 const deptColor = emp.department ? deptColorMap.get(emp.department) : null;
+                const isNewDept = ri > 0 && (sortedEmployees[ri - 1].department ?? '') !== (emp.department ?? '');
 
                 return (
                   <tr
@@ -621,6 +641,7 @@ export default function ShiftAssistantMatrix({
                     className={`border-b border-slate-100 group transition-colors duration-75 ${
                       ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
                     } hover:bg-blue-50/50`}
+                    style={isNewDept ? { borderTop: '2px solid #cbd5e1' } : undefined}
                   >
                     {/* Sticky name column */}
                     <td className="sticky left-0 z-10 px-2 py-0.5 border-r border-slate-200 bg-inherit group-hover:bg-blue-50/60 transition-colors duration-75">
@@ -657,7 +678,7 @@ export default function ShiftAssistantMatrix({
                           className={`px-0.5 py-0.5 border-r border-slate-100 align-middle transition-colors duration-75 group-hover:bg-blue-50/20 ${
                             isCrisis ? 'bg-red-50/20' : isWeekend ? 'bg-slate-50/60' : ''
                           }`}
-                          style={{ height: '28px' }}
+                          style={{ height: '34px' }}
                         >
                           <div className="flex flex-col gap-0.5 h-full justify-center">
                             {entries.map(entry => {
@@ -668,14 +689,15 @@ export default function ShiftAssistantMatrix({
                               const label = (entry.workTypeName ?? entry.workType ?? '?')
                                 .slice(0, 3)
                                 .toUpperCase();
+                              const hasTime = Boolean(entry.startTime && entry.endTime);
                               return (
                                 <div
                                   key={entry.id}
-                                  className="flex items-center justify-center rounded leading-none"
+                                  className="flex flex-col items-center justify-center rounded leading-none"
                                   style={{
                                     background: color + '22',
                                     borderLeft: `2px solid ${color}`,
-                                    minHeight: '18px',
+                                    minHeight: hasTime ? '26px' : '18px',
                                   }}
                                   title={`${entry.workTypeName ?? entry.workType}${entry.startTime ? ` ${entry.startTime}–${entry.endTime}` : ''}`}
                                 >
@@ -685,6 +707,14 @@ export default function ShiftAssistantMatrix({
                                   >
                                     {label}
                                   </span>
+                                  {hasTime && (
+                                    <span
+                                      className="text-[7px] font-semibold px-0.5 whitespace-nowrap"
+                                      style={{ color, opacity: 0.75, marginTop: '1px' }}
+                                    >
+                                      {fmtChipTime(entry.startTime)}–{fmtChipTime(entry.endTime)}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
