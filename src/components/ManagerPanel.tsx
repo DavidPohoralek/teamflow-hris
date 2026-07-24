@@ -7,6 +7,7 @@ import OrgLogoUpload from './OrgLogoUpload';
 import ThemeSelector from './ThemeSelector';
 import NotificationsPanel from './NotificationsPanel';
 import BonusesTab from './BonusesTab';
+import OpenSessionsTab from './OpenSessionsTab';
 import { useT } from '@/lib/i18n';
 
 // ─── ManagerTour ──────────────────────────────────────────────────────────────
@@ -348,9 +349,10 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
 
 export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }: ManagerPanelProps & { initialTab?: 'notifications' }) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice' | 'bonuses'>(initialTab ?? 'employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'work-types' | 'requests' | 'settings' | 'notifications' | 'homeoffice' | 'bonuses' | 'open-sessions'>(initialTab ?? 'employees');
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [openSessionCount, setOpenSessionCount] = useState(0);
   const [showTour, setShowTour] = useState(false);
   const [tourLang, setTourLang] = useState<'cs' | 'en' | null>(null);
 
@@ -363,6 +365,10 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
       .then((r) => r.json())
       .then((d) => setUnreadCount((d.notifications ?? []).filter((n: { read: boolean }) => !n.read).length))
       .catch(() => {});
+    managerFetch('/api/manager/open-sessions')
+      .then((r) => r.json())
+      .then((d) => setOpenSessionCount((d.sessions ?? []).length))
+      .catch(() => {});
   }, []);
 
   const isAdmin = scope?.isAdmin !== false;
@@ -373,6 +379,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
     { id: 'requests' as const, label: t('Žádosti', 'Requests'), icon: '📋' },
     { id: 'homeoffice' as const, label: t('HomeOffice', 'Home Office'), icon: '🏠' },
     { id: 'bonuses' as const, label: t('Evidence bonusů', 'Bonus records'), icon: '💰' },
+    { id: 'open-sessions' as const, label: t('Otevřené směny', 'Open sessions'), icon: '⏱️' },
     { id: 'notifications' as const, label: t('Notifikace', 'Notifications'), icon: '🔔' },
     ...(isAdmin ? [{ id: 'settings' as const, label: t('Nastavení', 'Settings'), icon: '⚙️' }] : []),
   ];
@@ -407,6 +414,11 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
               {tab.id === 'notifications' && unreadCount > 0 && (
                 <span className="flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">
                   {unreadCount}
+                </span>
+              )}
+              {tab.id === 'open-sessions' && openSessionCount > 0 && (
+                <span className="flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold">
+                  {openSessionCount}
                 </span>
               )}
             </button>
@@ -470,6 +482,7 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
           {activeTab === 'requests' && <RequestsTab onCountChange={(n) => setPendingCount(n)} isAdmin={isAdmin} />}
           {activeTab === 'homeoffice' && <HomeOfficeTab />}
           {activeTab === 'bonuses' && <BonusesTab />}
+          {activeTab === 'open-sessions' && <OpenSessionsTab onCountChange={setOpenSessionCount} />}
           {activeTab === 'notifications' && <NotificationsTab onRead={() => setUnreadCount(0)} />}
           {activeTab === 'settings' && isAdmin && <SettingsTab />}
         </div>
