@@ -591,6 +591,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   // Context menu + edit + bulk
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: WorkPlanEntry } | null>(null);
+  // Copied shift — while set, clicking cells pastes it (Sheets-style paint mode)
+  const [clipboard, setClipboard] = useState<{
+    workTypeId: string | null;
+    workTypeName: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    isEvening: boolean;
+  } | null>(null);
   const [editEntry, setEditEntry] = useState<WorkPlanEntry | null>(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
 
@@ -984,6 +992,55 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         return `${first.getDate()}. ${first.getMonth() + 1}.–${last.getDate()}. ${last.getMonth() + 1}. ${last.getFullYear()}`;
       })();
 
+  // ── Copy & paste shifts ───────────────────────────────────────────────────
+  const handleCopyEntry = useCallback((entry: WorkPlanEntry) => {
+    setClipboard({
+      workTypeId: entry.workTypeId,
+      workTypeName: entry.workTypeName,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      isEvening: entry.isEvening ?? false,
+    });
+    setToast(t('Směna zkopírována — klikni na buňku pro vložení', 'Shift copied — click a cell to paste'));
+  }, [t]);
+
+  // Esc cancels paste mode
+  useEffect(() => {
+    if (!clipboard) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setClipboard(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [clipboard]);
+
+  const handlePaste = useCallback(async (employeeId: string, date: string) => {
+    if (!clipboard) return;
+    try {
+      const payload: Record<string, unknown> = {
+        orgId,
+        employeeId,
+        date,
+        workTypeId: clipboard.workTypeId ?? undefined,
+        startTime: clipboard.startTime || undefined,
+        endTime: clipboard.endTime || undefined,
+        isEvening: clipboard.isEvening,
+      };
+      const res = isManagerMode
+        ? await managerFetch('/api/public/work-plans', { method: 'POST', body: JSON.stringify(payload) })
+        : await fetch('/api/public/work-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, pin: sessionPin }),
+          });
+      if (res.ok) {
+        setToast(`✓ ${t('Vloženo na', 'Pasted to')} ${date.slice(8)}. ${parseInt(date.slice(5, 7), 10)}.`);
+        fetchPlans();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setToast(d.error ?? t('Vložení selhalo', 'Paste failed'));
+      }
+    } catch { /* ignore */ }
+  }, [clipboard, orgId, isManagerMode, sessionPin, fetchPlans, t]);
+
   // ── Delete entry ──────────────────────────────────────────────────────────
   const handleDeleteEntry = useCallback(async (entry: WorkPlanEntry) => {
     if (!confirm(t('Smazat tuto směnu?', 'Delete this shift?'))) return;
@@ -1186,10 +1243,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               <td key={date}
                 className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${isClosed ? 'bg-gray-100/60' : !isToday && isDimmed ? 'bg-slate-50/60' : ''}`}
                 onClick={() => {
-                  if (isManagerMode) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
-                  else if (sessionEmployee && sessionEmployee.id === emp.id) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
+                  const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
+                  if (!canInteract) return;
+                  if (clipboard) { handlePaste(emp.id, date); return; }
+                  setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true);
                 }}
-                style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? 'pointer' : 'default' }}
+                style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default' }}
               >
                 {renderCell(emp, date, dataMap)}
               </td>
@@ -1588,7 +1647,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
       {/* Context menu */}
       {contextMenu && (() => {
-        const MENU_H = 90, MENU_W = 168;
+        const MENU_H = 128, MENU_W = 168;
         const top = contextMenu.y + MENU_H > window.innerHeight ? contextMenu.y - MENU_H : contextMenu.y;
         const left = contextMenu.x + MENU_W > window.innerWidth ? contextMenu.x - MENU_W : contextMenu.x;
         return (
@@ -1604,6 +1663,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               ✏️ {t('Upravit', 'Edit')}
             </button>
             <button
+              onClick={() => { handleCopyEntry(contextMenu.entry); setContextMenu(null); }}
+              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+            >
+              📋 {t('Kopírovat', 'Copy')}
+            </button>
+            <button
               onClick={() => { handleDeleteEntry(contextMenu.entry); setContextMenu(null); }}
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
             >
@@ -1612,6 +1677,24 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           </div>
         );
       })()}
+
+      {/* Paste-mode indicator */}
+      {clipboard && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-800 text-white rounded-full pl-4 pr-2 py-2 shadow-xl">
+          <span className="text-sm">
+            📋 {clipboard.workTypeName ?? t('Směna', 'Shift')}
+            {clipboard.startTime && clipboard.endTime ? ` ${formatTime(clipboard.startTime)}–${formatTime(clipboard.endTime)}` : ''}
+            {' — '}{t('klikáním vkládej do buněk', 'click cells to paste')}
+          </span>
+          <button
+            onClick={() => setClipboard(null)}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-600 hover:bg-slate-500 text-xs font-bold transition-colors"
+            title={t('Ukončit vkládání (Esc)', 'Stop pasting (Esc)')}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {showBulkModal && (
         <BulkShiftModal
