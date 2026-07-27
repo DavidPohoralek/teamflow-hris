@@ -164,11 +164,13 @@ export async function GET(req: NextRequest) {
     const deptMatches = (allowed: string[], logDept: string): boolean =>
       allowed.length === 0 || allowed.includes(empDept) || allowed.includes(logDept)
 
-    // Returns total special-day bonus pct for a given date (sums all matching rules)
+    // Returns total special-day bonus pct for a given date (sums all matching rules).
+    // Matches ONLY the work type the employee checked in under — not their home
+    // department (e.g. a Prodejna employee logged under HomeOffice gets nothing).
     const specialPctFor = (dateStr: string, logDept: string): number =>
       specialDays.reduce((sum, rule) => {
         if (dateStr < rule.dateFrom || dateStr > rule.dateTo) return sum
-        if (!deptMatches(rule.departments, logDept)) return sum
+        if (rule.departments.length > 0 && !rule.departments.includes(logDept)) return sum
         return sum + rule.pct
       }, 0)
 

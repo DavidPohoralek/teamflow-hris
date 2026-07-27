@@ -278,6 +278,7 @@ interface WorkType {
   category: 'shift' | 'presence' | 'absence' | 'activity';
   sort_order?: number;
   benefit_key?: string | null;
+  icon?: string | null; // repurposed: chip pattern ('stripes' | 'dots' | null = solid)
 }
 
 interface Request {
@@ -1611,6 +1612,7 @@ function WorkTypeForm({ workType, onClose, onSaved }: WorkTypeFormProps) {
     category: (workType?.category ?? 'shift') as 'shift' | 'presence' | 'absence' | 'activity',
     sort_order: workType?.sort_order ?? 0,
     benefit_key: workType?.benefit_key ?? '' as string,
+    icon: workType?.icon ?? '' as string, // pattern: '' solid | 'stripes' | 'dots'
   });
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState('');
@@ -1653,9 +1655,48 @@ function WorkTypeForm({ workType, onClose, onSaved }: WorkTypeFormProps) {
             <input className={inputCls(nameError)} value={form.name} onChange={(e) => { setNameError(''); set('name', e.target.value); }} placeholder="Ranní směna" />
           </FormField>
           <FormField label={t('Barva', 'Color')}>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {['#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d', '#ca8a04', '#ea580c', '#dc2626', '#e11d48', '#db2777', '#c026d3', '#9333ea', '#7c3aed', '#4f46e5', '#64748b', '#334155'].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => set('color', c)}
+                  className={`w-7 h-7 rounded-lg transition-transform hover:scale-110 ${form.color.toLowerCase() === c ? 'ring-2 ring-offset-1 ring-slate-700' : ''}`}
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
+            </div>
             <div className="flex items-center gap-3">
               <input type="color" value={form.color} onChange={(e) => set('color', e.target.value)} className="h-9 w-16 rounded border border-gray-300 cursor-pointer p-0.5" />
               <span className="text-sm text-gray-500 font-mono">{form.color}</span>
+              <span className="text-xs text-gray-400">{t('vlastní barva', 'custom color')}</span>
+            </div>
+          </FormField>
+          <FormField label={t('Vzor směny v gridu', 'Chip pattern in the grid')}>
+            <div className="flex gap-2">
+              {([
+                { key: '', labelCs: 'Plná', labelEn: 'Solid' },
+                { key: 'stripes', labelCs: 'Šrafovaná', labelEn: 'Striped' },
+                { key: 'dots', labelCs: 'Tečkovaná', labelEn: 'Dotted' },
+              ] as const).map((p) => {
+                const bgStyle = p.key === 'stripes'
+                  ? { backgroundImage: `repeating-linear-gradient(-45deg, ${form.color}30 0px, ${form.color}30 6px, ${form.color}60 6px, ${form.color}60 9px)` }
+                  : p.key === 'dots'
+                    ? { backgroundImage: `radial-gradient(${form.color}70 1.5px, ${form.color}25 1.5px)`, backgroundSize: '7px 7px' }
+                    : { background: form.color + '30' };
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => set('icon', p.key)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${form.icon === p.key ? 'border-slate-700 ring-1 ring-slate-700' : 'border-gray-200 hover:border-gray-400'}`}
+                    style={bgStyle}
+                  >
+                    {t(p.labelCs, p.labelEn)}
+                  </button>
+                );
+              })}
             </div>
           </FormField>
           <FormField label={t('Kategorie', 'Category')}>

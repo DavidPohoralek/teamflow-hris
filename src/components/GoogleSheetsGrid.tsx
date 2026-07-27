@@ -569,6 +569,20 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const [vacationSet, setVacationSet] = useState<Set<string>>(new Set());
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
+  // Operating hours per day-of-week (index 0 = Sunday); null = not configured
+  const [dayHours, setDayHours] = useState<(string | null)[]>([null, null, null, null, null, null, null]);
+  const [weekendOpen, setWeekendOpen] = useState(false);
+
+  // A day counts as "open" (dark header) when the store operates that day:
+  // explicit closed_dates win; then hours_<dow> ('' = closed); fallback = weekdays
+  // open, weekends per weekend_open toggle.
+  const isOpenDay = useCallback((date: string): boolean => {
+    if (closedDates.has(date)) return false;
+    const dow = new Date(date + 'T00:00:00').getDay();
+    const hours = dayHours[dow];
+    if (hours !== null) return hours.trim() !== '';
+    return (dow !== 0 && dow !== 6) || weekendOpen;
+  }, [closedDates, dayHours, weekendOpen]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalDate, setAddModalDate] = useState('');
@@ -664,8 +678,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
       .then((d: Record<string, unknown>) => {
+        // closed_dates is stored either as an array or a comma-separated string
         const raw = d['closed_dates'];
         if (Array.isArray(raw)) setClosedDates(new Set(raw as string[]));
+        else if (typeof raw === 'string' && raw.trim()) {
+          setClosedDates(new Set(raw.split(',').map((s) => s.trim()).filter(Boolean)));
+        }
+        // Operating days: hours_<dow> ('' = closed, non-empty = open, undefined = not configured)
+        const HOURS_KEYS = ['hours_sun', 'hours_mon', 'hours_tue', 'hours_wed', 'hours_thu', 'hours_fri', 'hours_sat'];
+        setDayHours(HOURS_KEYS.map((k) => (typeof d[k] === 'string' ? (d[k] as string) : null)));
+        setWeekendOpen(Boolean(d['weekend_open']));
       })
       .catch(() => {});
   }, [orgId]);
@@ -979,15 +1001,47 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const DOV_HATCH = 'repeating-linear-gradient(-45deg, #eff6ff 0px, #eff6ff 5px, #dbeafe 5px, #dbeafe 7px)';
   const XXX_HATCH = 'repeating-linear-gradient(-45deg, #f9fafb 0px, #f9fafb 6px, #e9eef5 6px, #e9eef5 8px)';
 
+  // Chip pattern per work type — stored in work_types.icon ('stripes' | 'dots')
+  const wtPatternMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const wt of workTypes) {
+      if (wt.icon === 'stripes' || wt.icon === 'dots') {
+        m.set(wt.name, wt.icon);
+        m.set(wt.id, wt.icon);
+      }
+    }
+    return m;
+  }, [workTypes]);
+
+  function chipPatternStyle(entry: WorkPlanEntry, pastelBg: string): React.CSSProperties {
+    const pattern = wtPatternMap.get(entry.workTypeName ?? '') ?? wtPatternMap.get(entry.workTypeId ?? '');
+    const raw = entry.workTypeColor ?? '#94a3b8';
+    if (pattern === 'stripes') {
+      return {
+        backgroundColor: pastelBg,
+        backgroundImage: `repeating-linear-gradient(-45deg, transparent 0px, transparent 6px, ${raw}2b 6px, ${raw}2b 9px)`,
+      };
+    }
+    if (pattern === 'dots') {
+      return {
+        backgroundColor: pastelBg,
+        backgroundImage: `radial-gradient(${raw}55 1.3px, transparent 1.3px)`,
+        backgroundSize: '6px 6px',
+      };
+    }
+    return { backgroundColor: pastelBg };
+  }
+
   function renderCell(emp: Employee, date: string, dataMap: Map<string, WorkPlanEntry[]> = plansMap) {
     const key = `${emp.id}|${date}`;
     const rawEntries = dataMap.get(key);
 
     let entries: WorkPlanEntry[] | undefined = rawEntries;
-    if (rawEntries && rawEntries.length > 0 && (deptFilters.length > 0 || activityFilter)) {
-      const matching = rawEntries.filter((e) =>
-        deptFilters.length > 0 ? deptFilters.includes(e.workTypeName ?? '') : activityDepts.includes(e.workTypeName ?? '')
-      );
+    if (rawEntries && rawEntries.length > 0 && (deptFilters.length > 0 || activityFilter || eveningFilter)) {
+      let matching = rawEntries;
+      if (deptFilters.length > 0) matching = matching.filter((e) => deptFilters.includes(e.workTypeName ?? ''));
+      else if (activityFilter) matching = matching.filter((e) => activityDepts.includes(e.workTypeName ?? ''));
+      if (eveningFilter) matching = matching.filter((e) => e.isEvening);
       entries = matching.length > 0 ? matching : undefined;
     }
 
@@ -1022,7 +1076,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             <div
               key={e.id}
               title={[e.workTypeName, e.startTime && e.endTime ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}` : null, e.note ? `📝 ${e.note}` : null].filter(Boolean).join(' · ')}
-              style={{ backgroundColor: bg, color: text, borderRadius: '7px' }}
+              style={{ ...chipPatternStyle(e, bg), color: text, borderRadius: '7px' }}
               className="w-full text-[11px] font-semibold px-1.5 py-[3px] leading-tight flex items-center justify-center gap-0.5 min-w-0"
               onContextMenu={(ev) => {
                 if (!canInteract) return;
@@ -1032,7 +1086,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               }}
             >
               <span className="truncate">{label}</span>
-              {e.isEvening && <span className="shrink-0 text-[9px] opacity-70">🌙</span>}
+              {e.isEvening && (
+                <span
+                  className="shrink-0 inline-flex items-center justify-center rounded-full"
+                  style={{ background: '#4338ca', width: '13px', height: '13px' }}
+                  title={t('Večerní směna', 'Evening shift')}
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="#fde68a">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                </span>
+              )}
               {e.note && <span className="shrink-0 text-[9px] opacity-70">📝</span>}
             </div>
           );
@@ -1116,11 +1180,11 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               return <td key={date} className="border-r border-gray-100 last:border-r-0 bg-gray-50/20" />;
             }
             const isClosed = closedDates.has(date);
-            const isWeekend = di >= 5;
+            const isDimmed = !isOpenDay(date);
             const isToday = date === today;
             return (
               <td key={date}
-                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${isClosed ? 'bg-gray-100/60' : !isToday && isWeekend ? 'bg-slate-50/60' : ''}`}
+                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${isClosed ? 'bg-gray-100/60' : !isToday && isDimmed ? 'bg-slate-50/60' : ''}`}
                 onClick={() => {
                   if (isManagerMode) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
                   else if (sessionEmployee && sessionEmployee.id === emp.id) { setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true); }
@@ -1370,16 +1434,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     const dayNum = new Date(d + 'T00:00:00').getDate();
                     const isToday = d === today;
                     const isClosed = closedDates.has(d);
-                    const isWeekend = i >= 5;
-                    const bg = isClosed ? '#475569' : isWeekend ? '#3d4f63' : '#334155';
+                    const isDimmed = !isOpenDay(d);
+                    const bg = isClosed ? '#475569' : isDimmed ? '#3d4f63' : '#334155';
                     return (
                       <th key={d} className="py-2 text-center border-r border-slate-500 last:border-r-0 font-normal" style={{ background: bg }}>
                         <div className="flex flex-col items-center gap-0.5">
-                          <span className={`text-[9px] uppercase tracking-wider font-semibold ${isWeekend || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
+                          <span className={`text-[9px] uppercase tracking-wider font-semibold ${isDimmed || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
                             {DAY_NAMES[i]}
                           </span>
                           <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
-                            isToday ? 'bg-blue-500 text-white' : isWeekend || isClosed ? 'text-slate-500' : 'text-slate-200'
+                            isToday ? 'bg-blue-500 text-white' : isDimmed || isClosed ? 'text-slate-500' : 'text-slate-200'
                           }`}>
                             {dayNum}
                           </span>
@@ -1397,11 +1461,11 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     const date = weekDays[i];
                     const isClosed = closedDates.has(date);
                     const isToday = date === today;
-                    const isWeekend = i >= 5;
+                    const isDimmed = !isOpenDay(date);
                     const dayNum = new Date(date + 'T00:00:00').getDate();
                     return (
                       <th key={i}
-                        className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed ? 'bg-gray-100 text-gray-400' : isWeekend ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
+                        className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed ? 'bg-gray-100 text-gray-400' : isDimmed ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
                       >
                         <div className="inline-flex flex-col items-center gap-0.5">
                           <span className="text-[10px] uppercase tracking-wider">{name}</span>
@@ -1493,16 +1557,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         const dayNum = new Date(d + 'T00:00:00').getDate();
                         const isToday = d === today;
                         const isClosed = closedDates.has(d);
-                        const isWeekend = i >= 5;
-                        const bg = isClosed ? '#475569' : isWeekend ? '#3d4f63' : '#334155';
+                        const isDimmed = !isOpenDay(d);
+                        const bg = isClosed ? '#475569' : isDimmed ? '#3d4f63' : '#334155';
                         return (
                           <td key={d} className="py-2 text-center border-r border-slate-500 last:border-r-0" style={{ background: bg }}>
                             <div className="flex flex-col items-center gap-0.5">
-                              <span className={`text-[9px] uppercase tracking-wider font-semibold ${isWeekend || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
+                              <span className={`text-[9px] uppercase tracking-wider font-semibold ${isDimmed || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
                                 {DAY_NAMES[i]}
                               </span>
                               <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
-                                isToday ? 'bg-blue-500 text-white' : isWeekend || isClosed ? 'text-slate-500' : 'text-slate-200'
+                                isToday ? 'bg-blue-500 text-white' : isDimmed || isClosed ? 'text-slate-500' : 'text-slate-200'
                               }`}>
                                 {dayNum}
                               </span>
