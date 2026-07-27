@@ -185,44 +185,52 @@ export async function GET(req: NextRequest) {
 
   // ── Build header/row arrays (shared for CSV and XLSX) ────────────────────────
   type CellValue = string | number | null;
+  type ColDef = { key: string; label: string };
 
-  const headers: string[] = [
-    isEn ? 'Name' : 'Jméno',
-    ...(col('employmentType') ? [isEn ? 'Employment type' : 'Pracovní poměr'] : []),
-    ...(col('source')         ? [isEn ? 'Data source'     : 'Zdroj dat']      : []),
-    ...(col('workedHours')    ? [isEn ? 'Hours worked'    : 'Odpracováno (h)'] : []),
-    ...(col('saturdayHours')  ? [isEn ? 'Of which Saturday' : 'Z toho soboty (h)'] : []),
-    ...(col('satBonusHours')  ? [isEn ? 'Saturday bonus (h)' : 'Bonus soboty (h)'] : []),
-    ...(col('otBonusHours')   ? [isEn ? 'Overtime bonus (h)' : 'Bonus přesčas (h)'] : []),
-    ...(includeBenefits ? activeBenefits.map((b) => isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)`) : []),
-    ...(col('totalBonusHours') ? [isEn ? 'Total bonus (h)' : 'Bonus celkem (h)'] : []),
-    ...(col('finalHours')     ? [isEn ? 'Final total (h)' : 'Výsledek (h)']    : []),
-    ...(col('targetHours')    ? [isEn ? 'Target hours'    : 'Fond hodin (h)']  : []),
-    ...(col('delta')          ? [isEn ? 'Difference'      : 'Rozdíl (h)']      : []),
-    ...(col('vacDays')        ? [isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)'] : []),
-    ...(col('managerBonus')   ? [isEn ? 'Manager bonus (CZK)' : 'Bonus od vedoucího (Kč)'] : []),
-    ...(includeRate           ? [isEn ? 'Hourly rate (CZK)' : 'Sazba (Kč/h)']  : []),
-    ...(includeRate           ? [isEn ? 'Billable total (CZK)' : 'Mzdový náklad (Kč)'] : []),
-  ];
+  const colDefs: ColDef[] = [{ key: 'name', label: isEn ? 'Name' : 'Jméno' }];
+  if (col('employmentType')) colDefs.push({ key: 'employmentType', label: isEn ? 'Employment type' : 'Pracovní poměr' });
+  if (col('source'))         colDefs.push({ key: 'source', label: isEn ? 'Data source' : 'Zdroj dat' });
+  if (col('workedHours'))    colDefs.push({ key: 'workedHours', label: isEn ? 'Hours worked' : 'Odpracováno (h)' });
+  if (col('saturdayHours'))  colDefs.push({ key: 'saturdayHours', label: isEn ? 'Of which Saturday' : 'Z toho soboty (h)' });
+  if (col('satBonusHours'))  colDefs.push({ key: 'satBonusHours', label: isEn ? 'Saturday bonus (h)' : 'Bonus soboty (h)' });
+  if (col('otBonusHours'))   colDefs.push({ key: 'otBonusHours', label: isEn ? 'Overtime bonus (h)' : 'Bonus přesčas (h)' });
+  if (includeBenefits) for (const b of activeBenefits) colDefs.push({ key: `benefit_${b.key}`, label: isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)` });
+  if (col('totalBonusHours')) colDefs.push({ key: 'totalBonusHours', label: isEn ? 'Total bonus (h)' : 'Bonus celkem (h)' });
+  if (col('finalHours'))     colDefs.push({ key: 'finalHours', label: isEn ? 'Final total (h)' : 'Výsledek (h)' });
+  if (col('targetHours'))    colDefs.push({ key: 'targetHours', label: isEn ? 'Target hours' : 'Fond hodin (h)' });
+  if (col('delta'))          colDefs.push({ key: 'delta', label: isEn ? 'Difference' : 'Rozdíl (h)' });
+  if (col('vacDays'))        colDefs.push({ key: 'vacHours', label: isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)' });
+  if (col('managerBonus'))   colDefs.push({ key: 'managerBonus', label: isEn ? 'Manager bonus (CZK)' : 'Bonus od vedoucího (Kč)' });
+  if (includeRate) {
+    colDefs.push({ key: 'hourlyRate', label: isEn ? 'Hourly rate (CZK)' : 'Sazba (Kč/h)' });
+    colDefs.push({ key: 'billableTotal', label: isEn ? 'Billable total (CZK)' : 'Mzdový náklad (Kč)' });
+  }
 
-  const dataRows: CellValue[][] = rows.map((r) => [
-    r.name,
-    ...(col('employmentType') ? [r.employmentType]        : []),
-    ...(col('source')         ? [r.source]                : []),
-    ...(col('workedHours')    ? [r.workedHours]            : []),
-    ...(col('saturdayHours')  ? [r.saturdayHours]          : []),
-    ...(col('satBonusHours')  ? [r.satBonusHours]          : []),
-    ...(col('otBonusHours')   ? [r.otBonusHours]           : []),
-    ...(includeBenefits ? activeBenefits.map((b) => r.benefitHours[b.key] ?? 0) : []),
-    ...(col('totalBonusHours') ? [r.totalBonusHours]       : []),
-    ...(col('finalHours')     ? [r.finalHours]             : []),
-    ...(col('targetHours')    ? [r.targetHours]            : []),
-    ...(col('delta')          ? [r.delta]                  : []),
-    ...(col('vacDays')        ? [r.vacHours]               : []),
-    ...(col('managerBonus')   ? [r.managerBonus]           : []),
-    ...(includeRate           ? [r.hourlyRate]             : []),
-    ...(includeRate           ? [r.billableTotal]          : []),
-  ]);
+  type ExportRow = (typeof rows)[number];
+  const valueFor = (r: ExportRow, key: string): CellValue => {
+    if (key.startsWith('benefit_')) return r.benefitHours[key.slice(8)] ?? 0;
+    switch (key) {
+      case 'name': return r.name;
+      case 'employmentType': return r.employmentType;
+      case 'source': return r.source;
+      case 'workedHours': return r.workedHours;
+      case 'saturdayHours': return r.saturdayHours;
+      case 'satBonusHours': return r.satBonusHours;
+      case 'otBonusHours': return r.otBonusHours;
+      case 'totalBonusHours': return r.totalBonusHours;
+      case 'finalHours': return r.finalHours;
+      case 'targetHours': return r.targetHours;
+      case 'delta': return r.delta;
+      case 'vacHours': return r.vacHours;
+      case 'managerBonus': return r.managerBonus;
+      case 'hourlyRate': return r.hourlyRate;
+      case 'billableTotal': return r.billableTotal;
+      default: return null;
+    }
+  };
+
+  const headers: string[] = colDefs.map((c) => c.label);
+  const dataRows: CellValue[][] = rows.map((r) => colDefs.map((c) => valueFor(r, c.key)));
 
   const baseName = `export-${month}${isEn ? '-en' : ''}`;
 
@@ -233,6 +241,61 @@ export async function GET(req: NextRequest) {
 
     // Column widths
     ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 12) }));
+
+    // ── Live formulas ─────────────────────────────────────────────────────────
+    // Derived columns become real Excel formulas referencing the input columns,
+    // so editing e.g. the English-lessons hours recalculates everything.
+    // When a referenced column is deselected, its computed value is inlined as
+    // a constant so the formula stays correct.
+    const colIdx = new Map(colDefs.map((c, i) => [c.key, i]));
+    const cellRef = (key: string, row: number) => `${XLSX.utils.encode_col(colIdx.get(key)!)}${row}`;
+    const refOrConst = (key: string, row: number, constVal: number) =>
+      colIdx.has(key) ? cellRef(key, row) : String(Math.round(constVal * 100) / 100);
+
+    rows.forEach((r, i) => {
+      const excelRow = i + 2; // 1-based + header row
+      const setFormula = (key: string, formula: string, cached: number) => {
+        const idx = colIdx.get(key);
+        if (idx == null) return;
+        ws[`${XLSX.utils.encode_col(idx)}${excelRow}`] = { t: 'n', v: cached, f: formula };
+      };
+
+      if (colIdx.has('workedHours')) {
+        const worked = cellRef('workedHours', excelRow);
+
+        if (overtimeThreshold > 0) {
+          setFormula(
+            'otBonusHours',
+            `ROUND(MAX(0,${worked}-${overtimeThreshold})*${overtimeBonusPct / 100},2)`,
+            r.otBonusHours,
+          );
+        }
+
+        const satB = refOrConst('satBonusHours', excelRow, r.satBonusHours);
+        const otB = refOrConst('otBonusHours', excelRow, r.otBonusHours);
+        const benefitTerm = (bKey: string) =>
+          colIdx.has(`benefit_${bKey}`) ? cellRef(`benefit_${bKey}`, excelRow) : String(r.benefitHours[bKey] ?? 0);
+
+        if (activeBenefits.length > 0 || colIdx.has('satBonusHours') || colIdx.has('otBonusHours')) {
+          const parts = [satB, otB, ...activeBenefits.map((b) => benefitTerm(b.key))];
+          setFormula('totalBonusHours', `ROUND(${parts.join('+')},2)`, r.totalBonusHours);
+        }
+
+        let finalExpr = `${worked}+${satB}+${otB}`;
+        if (activeBenefits.some((b) => b.key === 'blood'))   finalExpr += `+${benefitTerm('blood')}`;
+        if (activeBenefits.some((b) => b.key === 'gym'))     finalExpr += `-${benefitTerm('gym')}`;
+        if (activeBenefits.some((b) => b.key === 'english')) finalExpr += `-${benefitTerm('english')}`;
+        setFormula('finalHours', `ROUND(${finalExpr},2)`, r.finalHours);
+
+        setFormula('delta', `ROUND(${worked}-${refOrConst('targetHours', excelRow, r.targetHours)},2)`, r.delta);
+      }
+
+      if (colIdx.has('billableTotal') && r.hourlyRate != null) {
+        const fh = colIdx.has('finalHours') ? cellRef('finalHours', excelRow) : String(r.finalHours);
+        const mb = refOrConst('managerBonus', excelRow, r.managerBonus);
+        setFormula('billableTotal', `ROUND(${fh}*${cellRef('hourlyRate', excelRow)}+${mb},2)`, r.billableTotal ?? 0);
+      }
+    });
 
     XLSX.utils.book_append_sheet(wb, ws, isEn ? 'Export' : 'Export');
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
