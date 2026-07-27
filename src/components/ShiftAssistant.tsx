@@ -76,8 +76,9 @@ interface AssistantResult {
 }
 
 // ─── Notify modal ─────────────────────────────────────────────────────────────
+// Exported — reused by ShiftAssistantMatrix for Slack/email outreach.
 
-interface NotifyTarget {
+export interface NotifyTarget {
   employeeId: string;
   employeeName: string;
   shift: { date: string; dayName: string; startTime?: string; endTime?: string };
@@ -88,7 +89,7 @@ interface NotifyModalProps {
   onClose: () => void;
 }
 
-function NotifyModal({ target, onClose }: NotifyModalProps) {
+export function NotifyModal({ target, onClose }: NotifyModalProps) {
   const t = useT();
   const [channel, setChannel] = useState<'slack' | 'email' | 'both'>('email');
   const [customMessage, setCustomMessage] = useState('');

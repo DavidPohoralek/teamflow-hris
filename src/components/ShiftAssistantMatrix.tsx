@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
+import { NotifyModal, type NotifyTarget } from './ShiftAssistant';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -331,6 +332,44 @@ export default function ShiftAssistantMatrix({
       setAnalyzing(false);
     }
   }, [month, t, saveDraftsToStorage]);
+
+  // ── Custom pick: manager adds their own candidate to a crisis day ────────────
+  // Injected into analyzeResult.suggestions + recommendedSuggestionIds, so the
+  // existing render/apply/dismiss/persistence flow handles it with no changes.
+  const handleAddCustomPick = useCallback((date: string, empId: string) => {
+    if (!empId || !analyzeResult) return;
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const suggId = `${date}__${empId}__CUSTOM`;
+
+    const updated: AssistantResult = {
+      ...analyzeResult,
+      problemDays: analyzeResult.problemDays.map(d => {
+        if (d.date !== date) return d;
+        if (d.recommendedSuggestionIds.includes(suggId)) return d;
+        return {
+          ...d,
+          suggestions: [
+            ...d.suggestions,
+            { id: suggId, employeeName: emp.name, timeLabel: '', suggestionType: 'FULL_DAY_STORE' as const, score: 0 },
+          ],
+          recommendedSuggestionIds: [...d.recommendedSuggestionIds, suggId],
+        };
+      }),
+    };
+    setAnalyzeResult(updated);
+
+    setPendingDrafts(prev => {
+      const next = new Map(prev);
+      const key = `${empId}|${date}`;
+      if (!next.has(key)) next.set(key, { suggId, timeLabel: '', type: 'FULL_DAY_STORE' });
+      saveDraftsToStorage(updated, next);
+      return next;
+    });
+  }, [analyzeResult, employees, saveDraftsToStorage]);
+
+  // ── Notify (Slack / email) ───────────────────────────────────────────────────
+  const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
 
   // ── Apply a single suggestion ────────────────────────────────────────────────
   const [applyingSingle, setApplyingSingle] = useState<string | null>(null);
@@ -931,6 +970,28 @@ export default function ShiftAssistantMatrix({
                                         ? (sugg.timeLabel || '17–19')
                                         : 'PRO'}
                                     </span>
+                                    {/* Notify (Slack/email) button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const empId = sugg.id.split('__')[1];
+                                        if (!empId) return;
+                                        setNotifyTarget({
+                                          employeeId: empId,
+                                          employeeName: sugg.employeeName,
+                                          shift: {
+                                            date: day.date,
+                                            dayName: DAY_ABBREVS[new Date(day.date + 'T00:00:00').getDay()],
+                                          },
+                                        });
+                                      }}
+                                      className="w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors flex-shrink-0"
+                                      title={t('Oslovit (Slack / e-mail)', 'Notify (Slack / email)')}
+                                    >
+                                      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                      </svg>
+                                    </button>
                                     {/* Dismiss button */}
                                     <button
                                       type="button"
@@ -963,6 +1024,26 @@ export default function ShiftAssistantMatrix({
                               })}
                             </div>
                           )}
+                          {/* Custom pick — manager chooses anyone from the list */}
+                          <div className="border-t border-slate-100 px-2.5 py-1.5">
+                            <select
+                              value=""
+                              onChange={(e) => { handleAddCustomPick(day.date, e.target.value); e.target.value = ''; }}
+                              className="w-full text-[10px] text-slate-500 border border-dashed border-slate-200 rounded-md px-1.5 py-1 bg-white hover:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-300 cursor-pointer"
+                            >
+                              <option value="">＋ {t('Přidat vlastní výběr…', 'Add your own pick…')}</option>
+                              {sortedEmployees
+                                .filter(emp =>
+                                  !(plansMap.get(`${emp.id}|${day.date}`)?.length) &&
+                                  !pendingDrafts.has(`${emp.id}|${day.date}`)
+                                )
+                                .map(emp => (
+                                  <option key={emp.id} value={emp.id}>
+                                    {emp.name}{emp.department ? ` (${emp.department})` : ''}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
                         </div>
                         );
                       })}
@@ -1021,6 +1102,9 @@ export default function ShiftAssistantMatrix({
               </div>
             )}
           </div>
+
+          {/* Notify modal — Slack / email outreach via org webhook */}
+          {notifyTarget && <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />}
 
           {/* Notifications button */}
           {onOpenNotifications && (
