@@ -120,7 +120,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Žádost nenalezena.' }, { status: 404 });
   }
 
-  // For approved vacations, remove the attendance_log rows that were auto-inserted
+  // For approved vacations, remove any auto-inserted attendance_log rows.
+  // Matched by note (attendance_logs has no `type` column) — a no-op when the
+  // vacation never produced logs.
   if (existing.status === 'approved' && existing.type === 'vacation') {
     const dateFrom = existing.date_from as string;
     const dateTo = (existing.date_to as string | null) ?? dateFrom;
@@ -129,7 +131,7 @@ export async function DELETE(
       .delete()
       .eq('organization_id', orgId)
       .eq('employee_id', existing.employee_id)
-      .eq('type', 'vacation')
+      .eq('note', 'Placená dovolená')
       .gte('date', dateFrom)
       .lte('date', dateTo);
     if (logError) {

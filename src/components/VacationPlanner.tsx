@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { managerFetch } from '@/lib/managerFetch';
+import { managerFetch, getManagerScope } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
 
 interface VacationRequest {
@@ -516,6 +516,10 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [myRequests, setMyRequests] = useState<VacationRequest[]>([]);
   const [myRequestsLoading, setMyRequestsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Admin-only: expand an employee row to manage/delete their individual vacations
+  const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
+  const [adminDeletingId, setAdminDeletingId] = useState<string | null>(null);
+  const isAdmin = isManagerMode && getManagerScope()?.isAdmin !== false;
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
   const portalRootRef = useRef<HTMLElement | null>(null);
@@ -711,6 +715,22 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       }
     } catch { /* ignore */ }
     finally { setDeletingId(null); }
+  };
+
+  // Admin: delete any vacation (incl. past) — removes the request + auto-inserted
+  // attendance_logs. Server enforces admin-only.
+  const handleAdminDeleteVacation = async (requestId: string) => {
+    setAdminDeletingId(requestId);
+    try {
+      const res = await managerFetch(`/api/requests/${requestId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Nepodařilo se smazat dovolenou.');
+      }
+    } catch { alert('Chyba sítě.'); }
+    finally { setAdminDeletingId(null); }
   };
 
   return (
@@ -1061,14 +1081,18 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       {/* Employee vacation summary */}
       {isManagerMode && employees.length > 0 && (
         <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700">{t('Přehled dovolených —', 'Vacation overview —')} {year}</h3>
+            {isAdmin && <span className="text-[11px] text-slate-400">{t('Rozklikni jméno pro správu dovolených', 'Click a name to manage vacations')}</span>}
           </div>
           <div className="divide-y divide-slate-50">
             {employees.map((emp) => {
               const total = emp.vacation_days_per_year ?? 20;
-              const used = requests
-                .filter((r) => r.employee_id === emp.id && r.status === 'approved')
+              const empVacs = requests
+                .filter((r) => r.employee_id === emp.id && (!r.type || r.type === 'vacation'))
+                .sort((a, b) => b.date_from.localeCompare(a.date_from));
+              const used = empVacs
+                .filter((r) => r.status === 'approved')
                 .reduce((acc, r) => {
                   if (r.date_to && r.date_to > r.date_from) {
                     return acc + Math.round((new Date(r.date_to).getTime() - new Date(r.date_from).getTime()) / 86400000) + 1;
@@ -1077,19 +1101,78 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                 }, 0);
               const remaining = Math.max(0, total - used);
               const pct = Math.min(100, (used / total) * 100);
+              const isExpanded = expandedEmp === emp.id;
+              const todayStr = new Date().toISOString().slice(0, 10);
 
               return (
-                <div key={emp.id} className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-3">
-                  <span className="text-sm font-medium text-slate-800 w-24 sm:w-32 shrink-0 truncate">{emp.name}</span>
-                  <div className="flex-1">
-                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct}%` }} />
+                <div key={emp.id}>
+                  <div
+                    className={`flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-3 ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                    onClick={() => isAdmin && setExpandedEmp(isExpanded ? null : emp.id)}
+                  >
+                    {isAdmin && (
+                      <svg className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className="text-sm font-medium text-slate-800 w-24 sm:w-32 shrink-0 truncate">{emp.name}</span>
+                    <div className="flex-1">
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
+                    <span className="text-xs text-slate-500 whitespace-nowrap shrink-0">
+                      <span className="font-semibold text-slate-700">{used}</span> / {total} {t('dní', 'days')}
+                      {remaining > 0 && <span className="text-emerald-600 ml-1">({remaining} {t('zbývá', 'remaining')})</span>}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-500 whitespace-nowrap shrink-0">
-                    <span className="font-semibold text-slate-700">{used}</span> / {total} {t('dní', 'days')}
-                    {remaining > 0 && <span className="text-emerald-600 ml-1">({remaining} {t('zbývá', 'remaining')})</span>}
-                  </span>
+
+                  {/* Admin: individual vacations with delete (incl. past) */}
+                  {isAdmin && isExpanded && (
+                    <div className="bg-slate-50/70 px-3 sm:px-5 py-2 border-t border-slate-100">
+                      {empVacs.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-2">{t('Žádné dovolené', 'No vacations')}</p>
+                      ) : (
+                        <div className="flex flex-col gap-1.5 py-1">
+                          {empVacs.map((r) => {
+                            const from = new Date(r.date_from + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+                            const to = r.date_to && r.date_to !== r.date_from
+                              ? new Date(r.date_to + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
+                              : null;
+                            const isPast = (r.date_to ?? r.date_from) < todayStr;
+                            const statusStyle = r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : r.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700';
+                            const statusLabel = r.status === 'approved' ? t('Schváleno', 'Approved') : r.status === 'rejected' ? t('Zamítnuto', 'Rejected') : t('Čeká', 'Pending');
+                            return (
+                              <div key={r.id} className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-2">
+                                <span className="text-sm shrink-0">🏖️</span>
+                                <span className="text-xs font-medium text-slate-700 flex-1 min-w-0">
+                                  {from}{to ? ` – ${to}` : ''}
+                                  {isPast && <span className="ml-1.5 text-[10px] text-slate-400">({t('proběhlá', 'past')})</span>}
+                                </span>
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${statusStyle}`}>{statusLabel}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(t('Opravdu smazat tuto dovolenou? Odstraní se i z docházky.', 'Delete this vacation? It will also be removed from attendance.'))) {
+                                      handleAdminDeleteVacation(r.id);
+                                    }
+                                  }}
+                                  disabled={adminDeletingId === r.id}
+                                  className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                                  title={t('Smazat dovolenou', 'Delete vacation')}
+                                >
+                                  {adminDeletingId === r.id
+                                    ? <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
+                                    : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+                                  }
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
