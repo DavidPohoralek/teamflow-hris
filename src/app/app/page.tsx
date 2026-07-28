@@ -37,7 +37,7 @@ const MANAGER_TABS: { id: Tab; labelCs: string; labelEn: string; icon: string }[
 ]
 
 const MANAGER_SESSION_KEY = 'hris_manager_session'
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
+const SESSION_DURATION_MS = 12 * 60 * 60 * 1000 // 12 hours
 
 function isManagerSessionValid(): boolean {
   try {

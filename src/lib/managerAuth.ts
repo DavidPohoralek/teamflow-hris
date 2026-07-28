@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
+const SESSION_DURATION_MS = 12 * 60 * 60 * 1000 // 12 hours
 
 export type TokenResult =
   | { valid: false }
