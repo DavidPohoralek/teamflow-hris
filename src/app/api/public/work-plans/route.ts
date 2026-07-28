@@ -44,12 +44,6 @@ export async function GET(req: NextRequest) {
 // POST /api/public/work-plans
 // Body: { orgId, employeeId, workTypeId, date, startTime?, endTime?, note? }
 export async function POST(req: NextRequest) {
-  const rawToken = req.headers.get('Manager-Token')
-  const tokenResult = isTokenValid(rawToken ?? '')
-  if (!tokenResult.valid) {
-    return NextResponse.json({ error: 'Neplatný nebo expirovaný token.' }, { status: 401 })
-  }
-
   let body: {
     orgId: string
     employeeId: string
@@ -59,6 +53,7 @@ export async function POST(req: NextRequest) {
     endTime?: string
     note?: string
     isEvening?: boolean
+    pin?: string
   }
   try {
     body = await req.json()
@@ -66,17 +61,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neplatné tělo požadavku.' }, { status: 400 })
   }
 
-  const { orgId, employeeId, workTypeId, date, startTime, endTime, note, isEvening } = body
+  const { orgId, employeeId, workTypeId, date, startTime, endTime, note, isEvening, pin } = body
 
   if (!orgId || !employeeId || !workTypeId || !date) {
     return NextResponse.json({ error: 'Chybí povinné parametry.' }, { status: 400 })
   }
 
-  if (tokenResult.orgId !== orgId) {
-    return NextResponse.json({ error: 'Token neodpovídá organizaci.' }, { status: 403 })
-  }
-
   const supabase = getServiceClient()
+
+  // Auth: manager token OR employee PIN (PIN may only create shifts for its own row)
+  const rawToken = req.headers.get('Manager-Token')
+  const tokenResult = isTokenValid(rawToken ?? '')
+  if (tokenResult.valid) {
+    if (tokenResult.orgId !== orgId) {
+      return NextResponse.json({ error: 'Token neodpovídá organizaci.' }, { status: 403 })
+    }
+  } else if (pin) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: pinEmp } = await (supabase as any)
+      .from('employees')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('active', true)
+      .eq('pin_code', pin)
+      .maybeSingle()
+    if (!pinEmp) {
+      return NextResponse.json({ error: 'Neplatný PIN kód.' }, { status: 401 })
+    }
+    if (pinEmp.id !== employeeId) {
+      return NextResponse.json({ error: 'Směnu můžete přidat jen sobě.' }, { status: 403 })
+    }
+  } else {
+    return NextResponse.json({ error: 'Neplatný nebo expirovaný token.' }, { status: 401 })
+  }
 
   // Look up work type name
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

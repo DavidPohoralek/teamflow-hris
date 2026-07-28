@@ -1086,8 +1086,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           : `✓ ${ok} ${t('směn vloženo', 'shifts pasted')}`);
         cancelPasteMode();
         fetchPlans();
-      } else if (got401) {
-        // Session expired → managerFetch already opened the re-login modal.
+      } else if (got401 && hasManagerToken) {
+        // Manager session expired → managerFetch already opened the re-login modal.
         // Keep the staged cells and auto-save once the manager is back.
         pendingSaveRetry.current = true;
         setToast(t('Relace vypršela — po přihlášení se automaticky uloží.', 'Session expired — will save after login.'));
