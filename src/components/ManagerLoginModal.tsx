@@ -7,6 +7,8 @@ interface ManagerLoginModalProps {
   orgId: string;
   onSuccess: () => void;
   onClose: () => void;
+  /** Shown when the modal was reopened because the session expired mid-work */
+  expired?: boolean;
 }
 
 const MANAGER_SESSION_KEY = 'hris_manager_session';
@@ -223,7 +225,7 @@ function ManagerPinForm({ orgId, onSuccess }: { orgId: string; onSuccess: () => 
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 
-export default function ManagerLoginModal({ orgId, onSuccess, onClose }: ManagerLoginModalProps) {
+export default function ManagerLoginModal({ orgId, onSuccess, onClose, expired = false }: ManagerLoginModalProps) {
   const t = useT();
   const [showAdmin, setShowAdmin] = useState(false);
 
@@ -237,6 +239,12 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose }: Manager
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
         </div>
+
+        {expired && (
+          <div className="mx-6 mb-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
+            ⏱️ {t('Vaše manažerská relace vypršela (8 h). Přihlaste se prosím znovu, aby změny šly ukládat.', 'Your manager session expired (8 h). Please log in again so changes can be saved.')}
+          </div>
+        )}
 
         {/* Content */}
         <div className="px-6 pb-4">

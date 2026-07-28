@@ -77,6 +77,7 @@ export default function HomePage() {
   const [isManagerMode, setIsManagerMode] = useState(false)
   const [managerScope, setManagerScope] = useState<ManagerScope | null>(null)
   const [showManagerLogin, setShowManagerLogin] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
   const [showManagerPanel, setShowManagerPanel] = useState(false)
   const [managerPanelTab, setManagerPanelTab] = useState<'notifications' | undefined>(undefined)
   const [showTourSelect, setShowTourSelect] = useState(false)
@@ -106,6 +107,19 @@ export default function HomePage() {
     const handler = (e: Event) => setShiftViewMode((e as CustomEvent).detail as 'teamflow' | 'googlesheets')
     window.addEventListener('tf:shift-view-change', handler)
     return () => window.removeEventListener('tf:shift-view-change', handler)
+  }, [])
+
+  // Manager token expired mid-session (fired by managerFetch on 401) →
+  // drop manager mode and reopen the login so actions stop silently failing.
+  useEffect(() => {
+    const handler = () => {
+      setIsManagerMode(false)
+      setManagerScope(null)
+      setSessionExpired(true)
+      setShowManagerLogin(true)
+    }
+    window.addEventListener('tf:manager-session-expired', handler)
+    return () => window.removeEventListener('tf:manager-session-expired', handler)
   }, [])
 
   // Check subscription status — drives tour gate and paywall
@@ -235,7 +249,12 @@ export default function HomePage() {
     setIsManagerMode(true)
     setManagerScope(getManagerScope())
     setShowManagerLogin(false)
-    setActiveTab('management')
+    // Re-login after an expiry: stay where the user was working, don't jump to Management
+    if (sessionExpired) {
+      setSessionExpired(false)
+    } else {
+      setActiveTab('management')
+    }
   }
 
   async function handleSaveLayout(newLayout: LayoutConfig) {
@@ -549,7 +568,8 @@ export default function HomePage() {
         <ManagerLoginModal
           orgId={orgId}
           onSuccess={handleManagerSuccess}
-          onClose={() => setShowManagerLogin(false)}
+          onClose={() => { setShowManagerLogin(false); setSessionExpired(false); }}
+          expired={sessionExpired}
         />
       )}
 

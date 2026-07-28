@@ -55,5 +55,14 @@ export async function managerFetch(url: string, options: RequestInit = {}): Prom
   if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json'
   }
-  return fetch(url, { ...options, headers })
+  const res = await fetch(url, { ...options, headers })
+
+  // Manager token expired/invalid mid-session → surface it once so the UI can
+  // clear manager mode and prompt a fresh login (otherwise every action silently
+  // fails with "Neplatný nebo expirovaný token").
+  if (res.status === 401 && token && typeof window !== 'undefined') {
+    try { localStorage.removeItem(MANAGER_SESSION_KEY) } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('tf:manager-session-expired'))
+  }
+  return res
 }
