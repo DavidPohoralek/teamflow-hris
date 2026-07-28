@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
-const BOT_SERVICE_URL = process.env.BOT_SERVICE_URL ?? 'http://localhost:3001';
-const APP_BASE_URL    = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 async function getOrgDlcToken(supabase: unknown, orgId: string): Promise<string | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,27 +93,65 @@ export async function POST(req: NextRequest) {
     ? `${body.customMessage}\n\nPotvrdit / odmítnout směnu: ${confirmUrl}`
     : defaultMessage;
 
-  // Call bot-service for actual sending
-  const botRes = await fetch(`${BOT_SERVICE_URL}/notify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      token: dlcToken,
-      channel: body.channel,
-      employee: {
-        ...body.employee,
-        email: employeeEmail,
-      },
-      shift: body.shift,
-      integrations,
-      customMessage: messageWithLink,
-    }),
-  });
+  // Send directly — Slack incoming webhook + Resend e-mail.
+  // (Dřív šlo přes externí bot-service na Railway, ten už neexistuje.)
+  const wantSlack = body.channel === 'slack' || body.channel === 'both';
+  const wantEmail = body.channel === 'email' || body.channel === 'both';
+  const results: { channel: string; ok: boolean; error?: string }[] = [];
 
-  const data = await botRes.json();
+  if (wantSlack) {
+    if (!integrations.slackWebhookUrl) {
+      results.push({ channel: 'slack', ok: false, error: 'Slack webhook není nastaven (Nastavení → Integrace).' });
+    } else {
+      try {
+        const r = await fetch(integrations.slackWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: `*Nabídka směny — ${body.employee.name}*\n${messageWithLink}` }),
+        });
+        if (r.ok) results.push({ channel: 'slack', ok: true });
+        else results.push({ channel: 'slack', ok: false, error: `Slack odmítl zprávu (${r.status}). Zkontrolujte webhook URL.` });
+      } catch {
+        results.push({ channel: 'slack', ok: false, error: 'Slack webhook nedostupný.' });
+      }
+    }
+  }
+
+  if (wantEmail) {
+    if (!integrations.resendApiKey) {
+      results.push({ channel: 'email', ok: false, error: 'Resend API klíč není nastaven (Nastavení → Integrace).' });
+    } else if (!employeeEmail) {
+      results.push({ channel: 'email', ok: false, error: 'Zaměstnanec nemá vyplněný e-mail.' });
+    } else {
+      try {
+        const r = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${integrations.resendApiKey}`,
+          },
+          body: JSON.stringify({
+            from: integrations.emailFrom,
+            to: employeeEmail,
+            subject: `Nabídka směny ${body.shift.dayName} ${body.shift.date}`,
+            text: messageWithLink,
+          }),
+        });
+        if (r.ok) results.push({ channel: 'email', ok: true });
+        else {
+          const err = await r.json().catch(() => ({} as { message?: string }));
+          results.push({ channel: 'email', ok: false, error: `E-mail se nepodařilo odeslat (${(err as { message?: string }).message ?? r.status}).` });
+        }
+      } catch {
+        results.push({ channel: 'email', ok: false, error: 'E-mailová služba nedostupná.' });
+      }
+    }
+  }
+
+  const allOk = results.length > 0 && results.every((r) => r.ok);
   return NextResponse.json({
-    ...data,
+    results,
     offerToken: offerData.token,
     confirmUrl,
-  }, { status: botRes.ok ? 200 : 207 });
+  }, { status: allOk ? 200 : 207 });
 }

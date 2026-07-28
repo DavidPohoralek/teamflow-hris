@@ -112,11 +112,17 @@ export function NotifyModal({ target, onClose }: NotifyModalProps) {
       });
       const data = await res.json();
       const results: { channel: string; ok: boolean; error?: string }[] = data.results ?? [];
-      const failed = results.filter(r => !r.ok);
-      if (failed.length === 0) {
-        setResult({ ok: true, text: `${t('Zpráva odeslána přes', 'Message sent via')} ${results.map(r => r.channel).join(' a ')}` });
+      if (data.error) {
+        setResult({ ok: false, text: data.error });
+      } else if (results.length === 0) {
+        setResult({ ok: false, text: t('Nic se neodeslalo — zkontrolujte integrace v Nastavení.', 'Nothing was sent — check integrations in Settings.') });
       } else {
-        setResult({ ok: false, text: failed.map(r => `${r.channel}: ${r.error}`).join('; ') });
+        const failed = results.filter(r => !r.ok);
+        if (failed.length === 0) {
+          setResult({ ok: true, text: `${t('Zpráva odeslána přes', 'Message sent via')} ${results.map(r => r.channel).join(' a ')}` });
+        } else {
+          setResult({ ok: false, text: failed.map(r => `${r.channel}: ${r.error}`).join('; ') });
+        }
       }
     } catch {
       setResult({ ok: false, text: t('Chyba sítě', 'Network error') });
