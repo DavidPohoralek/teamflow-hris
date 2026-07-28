@@ -87,8 +87,10 @@ export async function POST(req: NextRequest) {
 
   const integrations = await getOrgIntegrations(supabase, orgId);
 
-  // Build message with confirmation link
-  const defaultMessage = `Ahoj ${body.employee.name.split(' ')[0]}, manažer tě oslovuje ohledně směny ${body.shift.dayName} ${body.shift.date}.\n\nPro přijetí nebo odmítnutí klikni na odkaz:\n${confirmUrl}`;
+  // Build message with confirmation link.
+  // Names are stored "Příjmení Jméno" → first name is the LAST word.
+  const firstName = body.employee.name.trim().split(/\s+/).pop() ?? body.employee.name;
+  const defaultMessage = `Ahoj ${firstName}, manažer tě oslovuje ohledně směny ${body.shift.dayName} ${body.shift.date}.\n\nPro přijetí nebo odmítnutí klikni na odkaz:\n${confirmUrl}`;
 
   const messageWithLink = body.customMessage
     ? `${body.customMessage}\n\nPotvrdit / odmítnout směnu: ${confirmUrl}`

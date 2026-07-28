@@ -177,7 +177,7 @@ export function NotifyModal({ target, onClose }: NotifyModalProps) {
             value={customMessage}
             onChange={e => setCustomMessage(e.target.value)}
             rows={3}
-            placeholder={`Ahoj ${target.employeeName.split(' ')[0]}, můžeš nastoupit na směnu ${target.shift.date}?`}
+            placeholder={`Ahoj ${target.employeeName.trim().split(/\s+/).pop()}, můžeš nastoupit na směnu ${target.shift.date}?`}
             className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none text-slate-700 placeholder:text-slate-300"
           />
         </div>

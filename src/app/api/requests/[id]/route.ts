@@ -46,7 +46,8 @@ async function sendApprovalEmail(opts: {
     ? `${formatDate(dateFrom)} – ${formatDate(dateTo)}`
     : formatDate(dateFrom);
 
-  const firstName = employeeName.split(' ')[0];
+  // Names are stored "Příjmení Jméno" → first name is the LAST word
+  const firstName = employeeName.trim().split(/\s+/).pop() ?? employeeName;
   const subject = `Vaše žádost (${typeLabel}) byla ${isApproved ? 'schválena' : 'zamítnuta'}`;
 
   const html = `
