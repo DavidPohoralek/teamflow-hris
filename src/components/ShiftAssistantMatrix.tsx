@@ -238,12 +238,19 @@ export default function ShiftAssistantMatrix({
     return map;
   }, [workTypes]);
 
-  // Sort employees by department (then name); no-department employees go last
+  // Sort: Prodejna always on top, then other departments alphabetically,
+  // no-department employees last; inside a department by name.
   const sortedEmployees = useMemo(() => {
+    const rank = (d: string | null) => {
+      if (!d) return 2;
+      if (d.trim().toLowerCase() === 'prodejna') return 0;
+      return 1;
+    };
     return [...employees].sort((a, b) => {
-      const da = a.department ?? '￿';
-      const db = b.department ?? '￿';
-      const c = da.localeCompare(db, 'cs');
+      const ra = rank(a.department);
+      const rb = rank(b.department);
+      if (ra !== rb) return ra - rb;
+      const c = (a.department ?? '').localeCompare(b.department ?? '', 'cs');
       if (c !== 0) return c;
       return a.name.localeCompare(b.name, 'cs');
     });
@@ -371,6 +378,90 @@ export default function ShiftAssistantMatrix({
   // ── Notify (Slack / email) ───────────────────────────────────────────────────
   const [notifyTarget, setNotifyTarget] = useState<NotifyTarget | null>(null);
 
+  // ── Notification bell (kdo přijal/odmítl směnu apod.) ────────────────────────
+  const [bellOpen, setBellOpen] = useState(false);
+  const [bellItems, setBellItems] = useState<{ id: string; title: string; message: string; read: boolean; created_at: string }[]>([]);
+
+  const fetchBell = useCallback(() => {
+    managerFetch('/api/notifications')
+      .then(r => r.json())
+      .then(d => setBellItems(d.notifications ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchBell();
+    const iv = setInterval(fetchBell, 60_000);
+    return () => clearInterval(iv);
+  }, [fetchBell]);
+
+  const unreadBellCount = bellItems.filter(n => !n.read).length;
+
+  const markBellRead = useCallback(async () => {
+    try {
+      await managerFetch('/api/notifications', { method: 'PATCH' });
+      setBellItems(prev => prev.map(n => ({ ...n, read: true })));
+    } catch { /* ignore */ }
+  }, []);
+
+  // ── Panel ↔ matrix linking ───────────────────────────────────────────────────
+  // Hover/click on a crisis-day card focuses its column + relevant employee rows.
+  const [focusedDay, setFocusedDay] = useState<string | null>(null);
+
+  const focusedEmployeeIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!focusedDay || !analyzeResult) return set;
+    const day = analyzeResult.problemDays.find(d => d.date === focusedDay);
+    for (const suggId of day?.recommendedSuggestionIds ?? []) {
+      const empId = suggId.split('__')[1];
+      if (empId) set.add(empId);
+    }
+    for (const [key] of Array.from(pendingDrafts.entries())) {
+      const [empId, date] = key.split('|');
+      if (date === focusedDay) set.add(empId);
+    }
+    return set;
+  }, [focusedDay, analyzeResult, pendingDrafts]);
+
+  // Focus mode: while the assistant has results, regular confirmed shifts are
+  // dimmed so crisis days and AI drafts stand out.
+  const focusMode = analyzeResult !== null;
+
+  // Click on a crisis card scrolls its column into view
+  const scrollToDay = useCallback((date: string) => {
+    const dayIdx = allDays.indexOf(date);
+    if (dayIdx < 0) return;
+    const scroller = document.querySelector<HTMLElement>('[data-matrix-scroll]');
+    if (!scroller) return;
+    scroller.scrollTo({ left: Math.max(0, 168 + dayIdx * 46 - scroller.clientWidth / 2), behavior: 'smooth' });
+  }, [allDays]);
+
+  // Optimistic insert: show the applied shift in the matrix immediately,
+  // fetchData() reconciles with the server right after.
+  const optimisticInsert = useCallback((suggIds: string[]) => {
+    const color = wtColorMap.get('Prodejna') ?? '#ec4899';
+    setWorkPlans(prev => {
+      const additions: WorkPlanEntry[] = [];
+      for (const id of suggIds) {
+        const [date, empId] = id.split('__');
+        if (!date || !empId) continue;
+        const draft = pendingDrafts.get(`${empId}|${date}`);
+        const m = (draft?.timeLabel ?? '').match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);
+        additions.push({
+          id: `optimistic-${id}`,
+          date,
+          employeeId: empId,
+          workType: 'Prodejna',
+          workTypeName: 'Prodejna',
+          workTypeColor: color,
+          startTime: m?.[1] ?? null,
+          endTime: m?.[2] ?? null,
+        });
+      }
+      return [...prev, ...additions];
+    });
+  }, [wtColorMap, pendingDrafts]);
+
   // ── Apply a single suggestion ────────────────────────────────────────────────
   const [applyingSingle, setApplyingSingle] = useState<string | null>(null);
 
@@ -389,6 +480,7 @@ export default function ShiftAssistantMatrix({
         return;
       }
       setToast(t('Směna přidána', 'Shift added'));
+      optimisticInsert([suggId]);
       // Remove this single draft from state
       setPendingDrafts(prev => {
         const next = new Map(prev);
@@ -413,7 +505,7 @@ export default function ShiftAssistantMatrix({
     } finally {
       setApplyingSingle(null);
     }
-  }, [t, analyzeResult, saveDraftsToStorage, fetchData]);
+  }, [t, analyzeResult, saveDraftsToStorage, fetchData, optimisticInsert]);
 
   // ── Remove a single draft (dismiss without applying) ─────────────────────────
   const handleDismissSingle = useCallback((suggId: string) => {
@@ -455,6 +547,7 @@ export default function ShiftAssistantMatrix({
       }
       const appliedCount: number = Array.isArray(data.applied) ? data.applied.length : ids.length;
       setToast(`${appliedCount} ${t('směn přidáno', 'shifts added')}`);
+      optimisticInsert(ids);
       setAnalyzeResult(null);
       setPendingDrafts(new Map());
       try { localStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
@@ -464,7 +557,7 @@ export default function ShiftAssistantMatrix({
     } finally {
       setApplying(false);
     }
-  }, [analyzeResult, pendingDrafts, t, fetchData, draftStorageKey]);
+  }, [analyzeResult, pendingDrafts, t, fetchData, draftStorageKey, optimisticInsert]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -530,6 +623,65 @@ export default function ShiftAssistantMatrix({
           </div>
         )}
 
+        {/* Notification bell */}
+        <div className="relative">
+          <button
+            onClick={() => setBellOpen(v => !v)}
+            className="relative p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition-colors"
+            title={t('Notifikace — reakce na nabídky směn', 'Notifications — shift offer responses')}
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {unreadBellCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none">
+                {unreadBellCount}
+              </span>
+            )}
+          </button>
+
+          {bellOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+                <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-slate-50">
+                  <span className="text-xs font-bold text-slate-600">🔔 {t('Notifikace', 'Notifications')}</span>
+                  {unreadBellCount > 0 && (
+                    <button onClick={markBellRead} className="text-[10px] text-blue-600 hover:underline font-medium">
+                      {t('Označit vše jako přečtené', 'Mark all read')}
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                  {bellItems.length === 0 ? (
+                    <div className="px-3.5 py-6 text-center text-xs text-slate-400">
+                      {t('Zatím žádné notifikace', 'No notifications yet')}
+                    </div>
+                  ) : (
+                    bellItems.slice(0, 10).map(n => (
+                      <div key={n.id} className={`px-3.5 py-2.5 ${n.read ? 'bg-white' : 'bg-amber-50/70'}`}>
+                        <div className="text-[11px] font-semibold text-slate-700 leading-tight">{n.title}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 leading-snug">{n.message}</div>
+                        <div className="text-[9px] text-slate-300 mt-1">
+                          {new Date(n.created_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {onOpenNotifications && (
+                  <button
+                    onClick={() => { setBellOpen(false); onOpenNotifications(); }}
+                    className="w-full px-3.5 py-2 text-[10px] font-semibold text-slate-500 hover:bg-slate-50 border-t border-slate-100 transition-colors"
+                  >
+                    {t('Otevřít všechny ve Správě →', 'Open all in Management →')}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="text-[10px] text-slate-400 font-medium hidden sm:block">
           {employees.length} {t('zaměstnanců', 'employees')} · {allDays.length} {t('dnů', 'days')}
         </div>
@@ -594,7 +746,7 @@ export default function ShiftAssistantMatrix({
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Scrollable matrix ──────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" data-matrix-scroll>
           <table
             className="border-collapse text-xs"
             style={{ tableLayout: 'fixed', minWidth: `${168 + allDays.length * 46}px` }}
@@ -628,11 +780,14 @@ export default function ShiftAssistantMatrix({
                   const totalMissing = crisis ? crisis.missing + crisis.eveningMissing : 0;
                   const crisisBadge = totalMissing > 0 ? `−${totalMissing}` : null;
 
+                  const isFocused = focusedDay === date;
                   return (
                     <th
                       key={date}
                       className={`sticky top-0 z-20 px-0.5 py-1 text-center border-r border-b font-medium transition-colors ${
-                        isCrisis
+                        isFocused
+                          ? 'bg-amber-100 border-amber-300 ring-2 ring-inset ring-amber-400'
+                          : isCrisis
                           ? 'bg-red-50 border-slate-200'
                           : isToday
                           ? 'bg-blue-50 border-slate-200'
@@ -673,12 +828,13 @@ export default function ShiftAssistantMatrix({
               {sortedEmployees.map((emp, ri) => {
                 const deptColor = emp.department ? deptColorMap.get(emp.department) : null;
                 const isNewDept = ri > 0 && (sortedEmployees[ri - 1].department ?? '') !== (emp.department ?? '');
+                const isFocusedRow = focusedEmployeeIds.has(emp.id);
 
                 return (
                   <tr
                     key={emp.id}
                     className={`border-b border-slate-100 group transition-colors duration-75 ${
-                      ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
+                      isFocusedRow ? 'bg-amber-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
                     } hover:bg-blue-50/50`}
                     style={isNewDept ? { borderTop: '2px solid #cbd5e1' } : undefined}
                   >
@@ -711,11 +867,16 @@ export default function ShiftAssistantMatrix({
                       const dow = new Date(date + 'T00:00:00').getDay();
                       const isWeekend = dow === 0 || dow === 6;
 
+                      const isFocusedCol = focusedDay === date;
+                      // Focus mode: dim confirmed shifts outside crisis/focused columns
+                      const dimChips = focusMode && !isCrisis && !isFocusedCol;
                       return (
                         <td
                           key={date}
-                          className={`px-0.5 py-0.5 border-r border-slate-100 align-middle transition-colors duration-75 group-hover:bg-blue-50/20 ${
-                            isCrisis ? 'bg-red-50/20' : isWeekend ? 'bg-slate-50/60' : ''
+                          className={`px-0.5 py-0.5 border-r align-middle transition-colors duration-75 group-hover:bg-blue-50/20 ${
+                            isFocusedCol
+                              ? 'bg-amber-50/80 border-amber-200'
+                              : isCrisis ? 'bg-red-50/20 border-slate-100' : isWeekend ? 'bg-slate-50/60 border-slate-100' : 'border-slate-100'
                           }`}
                           style={{ height: '34px' }}
                         >
@@ -732,11 +893,12 @@ export default function ShiftAssistantMatrix({
                               return (
                                 <div
                                   key={entry.id}
-                                  className="flex flex-col items-center justify-center rounded leading-none"
+                                  className="flex flex-col items-center justify-center rounded leading-none transition-opacity duration-200"
                                   style={{
                                     background: color + '22',
                                     borderLeft: `2px solid ${color}`,
                                     minHeight: hasTime ? '26px' : '18px',
+                                    opacity: dimChips ? 0.35 : 1,
                                   }}
                                   title={`${entry.workTypeName ?? entry.workType}${entry.startTime ? ` ${entry.startTime}–${entry.endTime}` : ''}`}
                                 >
@@ -761,12 +923,13 @@ export default function ShiftAssistantMatrix({
                             {/* Draft overlay — empty cell (FDS) or alongside existing shift (CA) */}
                             {entries.length === 0 && draft && (
                               <div
-                                className="flex flex-col items-center justify-center rounded leading-none gap-0"
+                                className="flex flex-col items-center justify-center rounded leading-none gap-0 animate-pulse"
                                 style={{
                                   background: DRAFT_COLORS[draft.type] + '2e',
                                   border: `2px dashed ${DRAFT_COLORS[draft.type]}`,
                                   boxShadow: `inset 0 0 0 1px ${DRAFT_COLORS[draft.type]}18`,
                                   minHeight: '22px',
+                                  animationDuration: '2.5s',
                                 }}
                                 title={`AI ${draft.type === 'CLOSING_ASSIST' ? 'Večerní' : 'Prodejna'}: ${draft.timeLabel || ''}`}
                               >
@@ -774,7 +937,7 @@ export default function ShiftAssistantMatrix({
                                   className="text-[8px] font-extrabold leading-none"
                                   style={{ color: DRAFT_COLORS[draft.type] }}
                                 >
-                                  {draft.type === 'CLOSING_ASSIST' ? 'CA' : 'PRO'}
+                                  ✨{draft.type === 'CLOSING_ASSIST' ? 'CA' : 'PRO'}
                                 </span>
                                 {draft.timeLabel && (
                                   <span className="text-[7px] leading-none mt-0.5" style={{ color: DRAFT_COLORS[draft.type] + 'cc' }}>
@@ -786,16 +949,17 @@ export default function ShiftAssistantMatrix({
                             {/* CA draft badge on top of existing shift (employee extending into evening) */}
                             {entries.length > 0 && draft?.type === 'CLOSING_ASSIST' && (
                               <div
-                                className="flex items-center justify-center rounded-sm leading-none"
+                                className="flex items-center justify-center rounded-sm leading-none animate-pulse"
                                 style={{
                                   background: DRAFT_COLORS.CLOSING_ASSIST + '2a',
                                   border: `1.5px dashed ${DRAFT_COLORS.CLOSING_ASSIST}`,
                                   minHeight: '10px',
+                                  animationDuration: '2.5s',
                                 }}
                                 title={`AI Večerní: ${draft.timeLabel}`}
                               >
                                 <span className="text-[6px] font-extrabold" style={{ color: DRAFT_COLORS.CLOSING_ASSIST }}>
-                                  +CA
+                                  ✨+CA
                                 </span>
                               </div>
                             )}
@@ -919,7 +1083,12 @@ export default function ShiftAssistantMatrix({
                         return (
                         <div
                           key={day.date}
-                          className="bg-white rounded-lg border border-red-100 overflow-hidden"
+                          onMouseEnter={() => setFocusedDay(day.date)}
+                          onMouseLeave={() => setFocusedDay(prev => (prev === day.date ? null : prev))}
+                          onClick={() => { setFocusedDay(day.date); scrollToDay(day.date); }}
+                          className={`bg-white rounded-lg border overflow-hidden cursor-pointer transition-shadow ${
+                            focusedDay === day.date ? 'border-amber-300 shadow-md ring-1 ring-amber-300' : 'border-red-100'
+                          }`}
                         >
                           {/* Day header */}
                           <div className="flex items-start gap-2 px-2.5 py-2">
