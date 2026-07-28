@@ -724,7 +724,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
     try {
       const res = await managerFetch(`/api/requests/${requestId}`, { method: 'DELETE' });
       if (res.ok) {
+        // Optimistic remove + full refetch so the calendar overview also updates
         setRequests((prev) => prev.filter((r) => r.id !== requestId));
+        fetchData();
       } else {
         const d = await res.json().catch(() => ({}));
         alert(d.error ?? 'Nepodařilo se smazat dovolenou.');
