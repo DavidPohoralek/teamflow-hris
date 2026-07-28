@@ -591,14 +591,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   // Context menu + edit + bulk
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: WorkPlanEntry } | null>(null);
-  // Copied shift — while set, clicking cells pastes it (Sheets-style paint mode)
+  // Copied shift — while set, clicking cells stages a paste (batch, saved at the end)
   const [clipboard, setClipboard] = useState<{
     workTypeId: string | null;
     workTypeName: string | null;
+    workTypeColor: string | null;
     startTime: string | null;
     endTime: string | null;
     isEvening: boolean;
   } | null>(null);
+  // Cells staged for paste — keyed by `${employeeId}|${date}`. Nothing is sent
+  // until the user clicks "Uložit" (one batch → far fewer requests).
+  const [stagedPastes, setStagedPastes] = useState<Set<string>>(new Set());
+  const [savingPastes, setSavingPastes] = useState(false);
   const [editEntry, setEditEntry] = useState<WorkPlanEntry | null>(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
 
@@ -992,54 +997,92 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         return `${first.getDate()}. ${first.getMonth() + 1}.–${last.getDate()}. ${last.getMonth() + 1}. ${last.getFullYear()}`;
       })();
 
-  // ── Copy & paste shifts ───────────────────────────────────────────────────
+  // ── Copy & batch paste shifts ─────────────────────────────────────────────
+  const cancelPasteMode = useCallback(() => {
+    setClipboard(null);
+    setStagedPastes(new Set());
+  }, []);
+
   const handleCopyEntry = useCallback((entry: WorkPlanEntry) => {
+    // Resolve workTypeId from the name if the entry only stored the name
+    const wtId = entry.workTypeId
+      ?? workTypes.find((w) => w.name === entry.workTypeName)?.id
+      ?? null;
     setClipboard({
-      workTypeId: entry.workTypeId,
+      workTypeId: wtId,
       workTypeName: entry.workTypeName,
+      workTypeColor: entry.workTypeColor,
       startTime: entry.startTime,
       endTime: entry.endTime,
       isEvening: entry.isEvening ?? false,
     });
-    setToast(t('Směna zkopírována — klikni na buňku pro vložení', 'Shift copied — click a cell to paste'));
-  }, [t]);
+    setStagedPastes(new Set());
+    setToast(t('Směna zkopírována — klikej do buněk, na konci Ulož', 'Shift copied — click cells, then Save'));
+  }, [t, workTypes]);
 
   // Esc cancels paste mode
   useEffect(() => {
     if (!clipboard) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setClipboard(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancelPasteMode(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [clipboard]);
+  }, [clipboard, cancelPasteMode]);
 
-  const handlePaste = useCallback(async (employeeId: string, date: string) => {
-    if (!clipboard) return;
+  // Click a cell in paste mode → toggle it in the staged set (no request yet)
+  const toggleStagedPaste = useCallback((employeeId: string, date: string) => {
+    const key = `${employeeId}|${date}`;
+    setStagedPastes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Save all staged cells in one go
+  const handleSaveStaged = useCallback(async () => {
+    if (!clipboard || stagedPastes.size === 0) return;
+    if (!clipboard.workTypeId) { setToast(t('U zkopírované směny chybí typ práce.', 'Copied shift has no work type.')); return; }
+    setSavingPastes(true);
+    const cells = Array.from(stagedPastes);
+    let ok = 0;
+    let firstErr: string | null = null;
     try {
-      const payload: Record<string, unknown> = {
-        orgId,
-        employeeId,
-        date,
-        workTypeId: clipboard.workTypeId ?? undefined,
-        startTime: clipboard.startTime || undefined,
-        endTime: clipboard.endTime || undefined,
-        isEvening: clipboard.isEvening,
-      };
-      const res = isManagerMode
-        ? await managerFetch('/api/public/work-plans', { method: 'POST', body: JSON.stringify(payload) })
-        : await fetch('/api/public/work-plans', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...payload, pin: sessionPin }),
-          });
-      if (res.ok) {
-        setToast(`✓ ${t('Vloženo na', 'Pasted to')} ${date.slice(8)}. ${parseInt(date.slice(5, 7), 10)}.`);
+      const results = await Promise.all(cells.map(async (key) => {
+        const [employeeId, date] = key.split('|');
+        const payload: Record<string, unknown> = {
+          orgId, employeeId, date,
+          workTypeId: clipboard.workTypeId,
+          startTime: clipboard.startTime || undefined,
+          endTime: clipboard.endTime || undefined,
+          isEvening: clipboard.isEvening,
+        };
+        const res = isManagerMode
+          ? await managerFetch('/api/public/work-plans', { method: 'POST', body: JSON.stringify(payload) })
+          : await fetch('/api/public/work-plans', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...payload, pin: sessionPin }),
+            });
+        if (res.ok) return true;
+        if (!firstErr) { const d = await res.json().catch(() => ({})); firstErr = d.error ?? null; }
+        return false;
+      }));
+      ok = results.filter(Boolean).length;
+    } catch { /* ignore */ }
+    finally {
+      setSavingPastes(false);
+      const failed = cells.length - ok;
+      if (ok > 0) {
+        setToast(failed > 0
+          ? `✓ ${ok} ${t('vloženo', 'pasted')}, ${failed} ${t('přeskočeno', 'skipped')}${firstErr ? ` (${firstErr})` : ''}`
+          : `✓ ${ok} ${t('směn vloženo', 'shifts pasted')}`);
+        cancelPasteMode();
         fetchPlans();
       } else {
-        const d = await res.json().catch(() => ({}));
-        setToast(d.error ?? t('Vložení selhalo', 'Paste failed'));
+        setToast(firstErr ?? t('Vložení selhalo', 'Paste failed'));
       }
-    } catch { /* ignore */ }
-  }, [clipboard, orgId, isManagerMode, sessionPin, fetchPlans, t]);
+    }
+  }, [clipboard, stagedPastes, orgId, isManagerMode, sessionPin, fetchPlans, cancelPasteMode, t]);
 
   // ── Delete entry ──────────────────────────────────────────────────────────
   const handleDeleteEntry = useCallback(async (entry: WorkPlanEntry) => {
@@ -1239,18 +1282,33 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isClosed = closedDates.has(date);
             const isDimmed = !isOpenDay(date);
             const isToday = date === today;
+            const isStaged = clipboard != null && stagedPastes.has(`${emp.id}|${date}`);
             return (
               <td key={date}
-                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${isClosed ? 'bg-gray-100/60' : !isToday && isDimmed ? 'bg-slate-50/60' : ''}`}
+                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${isClosed && !isStaged ? 'bg-gray-100/60' : !isToday && isDimmed && !isStaged ? 'bg-slate-50/60' : ''}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
-                  if (clipboard) { handlePaste(emp.id, date); return; }
+                  if (clipboard) { toggleStagedPaste(emp.id, date); return; }
                   setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true);
                 }}
                 style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default' }}
               >
-                {renderCell(emp, date, dataMap)}
+                {isStaged
+                  ? (
+                    <div
+                      className="w-full text-[11px] font-semibold px-1.5 py-[3px] leading-tight flex items-center justify-center gap-0.5 rounded-[7px] border-2 border-dashed"
+                      style={{ borderColor: (clipboard!.workTypeColor ?? '#3b82f6'), color: (clipboard!.workTypeColor ?? '#3b82f6'), background: (clipboard!.workTypeColor ?? '#3b82f6') + '18' }}
+                      title={t('Naplánováno k vložení — ulož tlačítkem dole', 'Staged — save with the button below')}
+                    >
+                      <span className="truncate">
+                        {clipboard!.startTime && clipboard!.endTime
+                          ? `${formatTime(clipboard!.startTime)}–${formatTime(clipboard!.endTime)}`
+                          : (clipboard!.workTypeName ?? '')}
+                      </span>
+                    </div>
+                  )
+                  : renderCell(emp, date, dataMap)}
               </td>
             );
           })}
@@ -1678,18 +1736,28 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         );
       })()}
 
-      {/* Paste-mode indicator */}
+      {/* Paste-mode bar — batch: click cells to stage, then Save once */}
       {clipboard && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-800 text-white rounded-full pl-4 pr-2 py-2 shadow-xl">
-          <span className="text-sm">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-800 text-white rounded-full pl-4 pr-2 py-2 shadow-xl">
+          <span className="text-sm whitespace-nowrap">
             📋 {clipboard.workTypeName ?? t('Směna', 'Shift')}
             {clipboard.startTime && clipboard.endTime ? ` ${formatTime(clipboard.startTime)}–${formatTime(clipboard.endTime)}` : ''}
-            {' — '}{t('klikáním vkládej do buněk', 'click cells to paste')}
+            {' — '}
+            {stagedPastes.size === 0
+              ? t('klikej do buněk', 'click cells')
+              : `${stagedPastes.size} ${t('vybráno', 'selected')}`}
           </span>
           <button
-            onClick={() => setClipboard(null)}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-600 hover:bg-slate-500 text-xs font-bold transition-colors"
-            title={t('Ukončit vkládání (Esc)', 'Stop pasting (Esc)')}
+            onClick={handleSaveStaged}
+            disabled={stagedPastes.size === 0 || savingPastes}
+            className="px-3 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors whitespace-nowrap"
+          >
+            {savingPastes ? t('Ukládám…', 'Saving…') : `✓ ${t('Uložit', 'Save')}${stagedPastes.size > 0 ? ` (${stagedPastes.size})` : ''}`}
+          </button>
+          <button
+            onClick={cancelPasteMode}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-600 hover:bg-slate-500 text-xs font-bold transition-colors shrink-0"
+            title={t('Zrušit (Esc)', 'Cancel (Esc)')}
           >
             ✕
           </button>
