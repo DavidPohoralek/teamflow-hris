@@ -145,11 +145,13 @@ export async function GET(req: NextRequest) {
     totalBenefitHours = Math.round(totalBenefitHours * 100) / 100;
 
     const totalBonusHours = Math.round((satBonusHours + otBonusHours + totalBenefitHours) * 100) / 100;
+    // Benefit hours carry their own sign (blood +8/unit, gym/english −1/unit),
+    // so everything is ADDED — subtracting a negative would double-count.
     const finalHours = Math.round((
       workedHours + satBonusHours + otBonusHours
       + (benefitHours['blood'] ?? 0)
-      - (benefitHours['gym'] ?? 0)
-      - (benefitHours['english'] ?? 0)
+      + (benefitHours['gym'] ?? 0)
+      + (benefitHours['english'] ?? 0)
     ) * 100) / 100;
 
     const managerBonus = managerBonusMap.get(emp.id) ?? 0;
@@ -281,10 +283,11 @@ export async function GET(req: NextRequest) {
           setFormula('totalBonusHours', `ROUND(${parts.join('+')},2)`, r.totalBonusHours);
         }
 
+        // Benefit columns carry their own sign (gym/english are negative) → always +
         let finalExpr = `${worked}+${satB}+${otB}`;
         if (activeBenefits.some((b) => b.key === 'blood'))   finalExpr += `+${benefitTerm('blood')}`;
-        if (activeBenefits.some((b) => b.key === 'gym'))     finalExpr += `-${benefitTerm('gym')}`;
-        if (activeBenefits.some((b) => b.key === 'english')) finalExpr += `-${benefitTerm('english')}`;
+        if (activeBenefits.some((b) => b.key === 'gym'))     finalExpr += `+${benefitTerm('gym')}`;
+        if (activeBenefits.some((b) => b.key === 'english')) finalExpr += `+${benefitTerm('english')}`;
         setFormula('finalHours', `ROUND(${finalExpr},2)`, r.finalHours);
 
         setFormula('delta', `ROUND(${worked}-${refOrConst('targetHours', excelRow, r.targetHours)},2)`, r.delta);
