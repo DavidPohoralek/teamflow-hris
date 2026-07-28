@@ -57,6 +57,7 @@ export async function PUT(
     name,
     email,
     phone,
+    slack_id,
     department,
     position,
     labels,
@@ -85,6 +86,7 @@ export async function PUT(
   if (name !== undefined) update.name = (name as string).trim();
   if (email !== undefined) update.email = typeof email === 'string' ? email.trim() || null : null;
   if (phone !== undefined) update.phone = typeof phone === 'string' ? phone.trim() || null : null;
+  if (slack_id !== undefined) update.slack_id = typeof slack_id === 'string' ? slack_id.trim() || null : null;
   if (department !== undefined)
     update.department = typeof department === 'string' ? department.trim() || null : null;
   if (position !== undefined)

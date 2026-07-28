@@ -52,15 +52,16 @@ export async function POST(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  // Fetch employee email
+  // Fetch employee email + Slack member ID
   const { data: empData } = await sb
     .from('employees')
-    .select('email')
+    .select('email, slack_id')
     .eq('id', body.employee.id)
     .eq('organization_id', orgId)
     .maybeSingle();
 
   const employeeEmail: string = empData?.email ?? '';
+  const employeeSlackId: string = (empData?.slack_id ?? '').trim();
 
   // ── Create a shift offer in DB ────────────────────────────────────────────
   const { data: offerData, error: offerErr } = await sb
@@ -104,10 +105,12 @@ export async function POST(req: NextRequest) {
       results.push({ channel: 'slack', ok: false, error: 'Slack webhook není nastaven (Nastavení → Integrace).' });
     } else {
       try {
+        // <@U…> pings the employee directly when their Slack member ID is filled in
+        const slackAddress = employeeSlackId ? `<@${employeeSlackId}>` : body.employee.name;
         const r = await fetch(integrations.slackWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: `*Nabídka směny — ${body.employee.name}*\n${messageWithLink}` }),
+          body: JSON.stringify({ text: `*Nabídka směny* — ${slackAddress}\n${messageWithLink}` }),
         });
         if (r.ok) results.push({ channel: 'slack', ok: true });
         else results.push({ channel: 'slack', ok: false, error: `Slack odmítl zprávu (${r.status}). Zkontrolujte webhook URL.` });

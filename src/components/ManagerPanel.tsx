@@ -255,6 +255,7 @@ interface Employee {
   pin_code?: string;
   email?: string;
   phone?: string;
+  slack_id?: string | null;
   department?: string;
   position?: string;
   labels?: string[];
@@ -1114,6 +1115,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
     pin: employee?.pin_code ?? employee?.pin ?? '',
     email: employee?.email ?? '',
     phone: employee?.phone ?? '',
+    slack_id: employee?.slack_id ?? '',
     department: employee?.department ?? '',
     position: employee?.position ?? '',
     labels: employee?.labels ?? [],
@@ -1214,6 +1216,13 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
               <input className={inputCls()} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+420..." />
             </FormField>
           </div>
+          <FormField label="Slack ID">
+            <input className={inputCls()} value={form.slack_id} onChange={(e) => set('slack_id', e.target.value)} placeholder="U03ABC123" />
+            <p className="text-[11px] text-slate-400 mt-1">
+              {t('Slack → profil člověka → ⋮ → „Copy member ID". Zprávy z Asistenta ho pak označí jako @jméno.',
+                 'Slack → person’s profile → ⋮ → “Copy member ID”. Assistant messages will then mention them as @name.')}
+            </p>
+          </FormField>
           <FormField label={t('Pracovní poměr', 'Employment type')}>
             <select
               className={inputCls()}
