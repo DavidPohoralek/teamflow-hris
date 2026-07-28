@@ -242,7 +242,7 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose, expired =
 
         {expired && (
           <div className="mx-6 mb-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
-            ⏱️ {t('Vaše manažerská relace vypršela (8 h). Přihlaste se prosím znovu, aby změny šly ukládat.', 'Your manager session expired (8 h). Please log in again so changes can be saved.')}
+            ⏱️ {t('Vaše manažerská relace vypršela. Přihlaste se prosím znovu — rozpracované změny se pak uloží.', 'Your manager session expired. Please log in again — your pending changes will then be saved.')}
           </div>
         )}
 

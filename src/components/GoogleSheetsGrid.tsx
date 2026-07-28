@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { managerFetch } from '@/lib/managerFetch';
+import { managerFetch, getManagerToken } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1039,14 +1039,21 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     });
   }, []);
 
+  // Set when a save hit a 401 — retried automatically once the manager re-logs in
+  const pendingSaveRetry = useRef(false);
+
   // Save all staged cells in one go
   const handleSaveStaged = useCallback(async () => {
     if (!clipboard || stagedPastes.size === 0) return;
     if (!clipboard.workTypeId) { setToast(t('U zkopírované směny chybí typ práce.', 'Copied shift has no work type.')); return; }
     setSavingPastes(true);
     const cells = Array.from(stagedPastes);
+    // Prefer the manager token when one exists — robust against isManagerMode being
+    // transiently reset (e.g. right after a session-expiry event).
+    const hasManagerToken = getManagerToken() != null;
     let ok = 0;
     let firstErr: string | null = null;
+    let got401 = false;
     try {
       const results = await Promise.all(cells.map(async (key) => {
         const [employeeId, date] = key.split('|');
@@ -1057,13 +1064,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           endTime: clipboard.endTime || undefined,
           isEvening: clipboard.isEvening,
         };
-        const res = isManagerMode
+        const res = hasManagerToken
           ? await managerFetch('/api/public/work-plans', { method: 'POST', body: JSON.stringify(payload) })
           : await fetch('/api/public/work-plans', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ...payload, pin: sessionPin }),
             });
         if (res.ok) return true;
+        if (res.status === 401) got401 = true;
         if (!firstErr) { const d = await res.json().catch(() => ({})); firstErr = d.error ?? null; }
         return false;
       }));
@@ -1078,11 +1086,28 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           : `✓ ${ok} ${t('směn vloženo', 'shifts pasted')}`);
         cancelPasteMode();
         fetchPlans();
+      } else if (got401) {
+        // Session expired → managerFetch already opened the re-login modal.
+        // Keep the staged cells and auto-save once the manager is back.
+        pendingSaveRetry.current = true;
+        setToast(t('Relace vypršela — po přihlášení se automaticky uloží.', 'Session expired — will save after login.'));
       } else {
         setToast(firstErr ?? t('Vložení selhalo', 'Paste failed'));
       }
     }
-  }, [clipboard, stagedPastes, orgId, isManagerMode, sessionPin, fetchPlans, cancelPasteMode, t]);
+  }, [clipboard, stagedPastes, orgId, sessionPin, fetchPlans, cancelPasteMode, t]);
+
+  // After a fresh manager login, auto-retry a save that was blocked by expiry
+  useEffect(() => {
+    const onRelogin = () => {
+      if (pendingSaveRetry.current && clipboard && stagedPastes.size > 0) {
+        pendingSaveRetry.current = false;
+        handleSaveStaged();
+      }
+    };
+    window.addEventListener('tf:manager-relogged-in', onRelogin);
+    return () => window.removeEventListener('tf:manager-relogged-in', onRelogin);
+  }, [clipboard, stagedPastes, handleSaveStaged]);
 
   // ── Delete entry ──────────────────────────────────────────────────────────
   const handleDeleteEntry = useCallback(async (entry: WorkPlanEntry) => {

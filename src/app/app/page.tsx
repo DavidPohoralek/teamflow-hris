@@ -252,6 +252,8 @@ export default function HomePage() {
     // Re-login after an expiry: stay where the user was working, don't jump to Management
     if (sessionExpired) {
       setSessionExpired(false)
+      // Let components (e.g. the shift grid) auto-retry the action that was blocked
+      window.dispatchEvent(new CustomEvent('tf:manager-relogged-in'))
     } else {
       setActiveTab('management')
     }
