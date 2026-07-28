@@ -26,57 +26,56 @@ export async function GET(req: NextRequest) {
     allowedEmpIds = (deptEmps ?? []).map((e: { id: string }) => e.id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = (supabase as any)
-    .from('requests')
-    .select(
-      `
-      id,
-      organization_id,
-      employee_id,
-      type,
-      date_from,
-      date_to,
-      note,
-      hours,
-      status,
-      resolved_by,
-      resolved_at,
-      created_at,
-      employees!requests_employee_id_fkey (
+  // bonus_pct may not be migrated yet — build the select with it, retry without on error
+  const buildQuery = (withBonus: boolean) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q = (supabase as any)
+      .from('requests')
+      .select(
+        `
         id,
-        name,
-        department,
-        position
+        organization_id,
+        employee_id,
+        type,
+        date_from,
+        date_to,
+        note,
+        hours,
+        ${withBonus ? 'bonus_pct,' : ''}
+        status,
+        resolved_by,
+        resolved_at,
+        created_at,
+        employees!requests_employee_id_fkey (
+          id,
+          name,
+          department,
+          position
+        )
+        `
       )
-      `
-    )
-    .eq('organization_id', orgId)
-    .order('created_at', { ascending: false });
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false });
 
-  if (allowedEmpIds !== null) {
-    query = query.in('employee_id', allowedEmpIds);
+    if (allowedEmpIds !== null) q = q.in('employee_id', allowedEmpIds);
+    if (statusFilter && ['pending', 'approved', 'rejected'].includes(statusFilter)) q = q.eq('status', statusFilter);
+    if (monthFilter && /^\d{4}-\d{2}$/.test(monthFilter)) {
+      const [year, month] = monthFilter.split('-').map(Number);
+      const firstDay = `${monthFilter}-01`;
+      const lastDay = new Date(year, month, 0).toISOString().slice(0, 10);
+      q = q.gte('date_from', firstDay).lte('date_from', lastDay);
+    } else {
+      const fence = new Date();
+      fence.setFullYear(fence.getFullYear() - 1);
+      q = q.gte('date_from', fence.toISOString().slice(0, 10));
+    }
+    return q.limit(500);
+  };
+
+  let { data, error } = await buildQuery(true);
+  if (error && /bonus_pct/.test(error.message ?? '')) {
+    ({ data, error } = await buildQuery(false));
   }
-
-  if (statusFilter && ['pending', 'approved', 'rejected'].includes(statusFilter)) {
-    query = query.eq('status', statusFilter);
-  }
-
-  if (monthFilter && /^\d{4}-\d{2}$/.test(monthFilter)) {
-    const [year, month] = monthFilter.split('-').map(Number);
-    const firstDay = `${monthFilter}-01`;
-    const lastDay = new Date(year, month, 0).toISOString().slice(0, 10);
-    query = query.gte('date_from', firstDay).lte('date_from', lastDay);
-  } else {
-    // Bez month parametru omez na posledních 13 měsíců
-    const fence = new Date();
-    fence.setFullYear(fence.getFullYear() - 1);
-    query = query.gte('date_from', fence.toISOString().slice(0, 10));
-  }
-
-  query = query.limit(500);
-
-  const { data, error } = await query;
 
   if (error) {
     console.error('GET /api/requests error:', error);

@@ -5,6 +5,7 @@ import { resolveOrgId } from '@/lib/resolveOrg';
 const EXTRA_KEYS = [
   'closed_dates',
   'bonus_saturday_pct',
+  'bonus_sunday_pct',
   'bonus_overtime_threshold',
   'bonus_overtime_pct',
   'sick_leave_pct',

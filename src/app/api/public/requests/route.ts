@@ -17,7 +17,7 @@ function getServiceClient() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { orgId, pin, type, dateFrom, dateTo, note, hours, timeIn, timeOut, correctionField, linkedLogId } = body as {
+    const { orgId, pin, type, dateFrom, dateTo, note, hours, bonus_pct, timeIn, timeOut, correctionField, linkedLogId } = body as {
       orgId: string;
       pin: string;
       type: RequestType;
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       dateTo?: string;
       note?: string;
       hours?: number;
+      bonus_pct?: number;
       timeIn?: string;
       timeOut?: string;
       correctionField?: 'check_in' | 'check_out' | 'both';
@@ -85,19 +86,30 @@ export async function POST(req: NextRequest) {
       status: 'pending',
     };
     if (hours != null) insertPayload.hours = hours;
+    if (type === 'other' && bonus_pct != null) insertPayload.bonus_pct = bonus_pct;
 
-    const { data: newRequest, error: insertError } = await supabase
+    let { data: newRequest, error: insertError } = await supabase
       .from('requests')
       .insert(insertPayload)
       .select('id')
       .single();
+
+    // Graceful fallback if the bonus_pct column hasn't been migrated yet
+    if (insertError && 'bonus_pct' in insertPayload && /bonus_pct/.test(insertError.message ?? '')) {
+      delete insertPayload.bonus_pct;
+      ({ data: newRequest, error: insertError } = await supabase
+        .from('requests')
+        .insert(insertPayload)
+        .select('id')
+        .single());
+    }
 
     if (insertError) {
       console.error('POST /api/public/requests - insert error:', insertError);
       return NextResponse.json({ error: 'Nepodařilo se vytvořit žádost.' }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, requestId: newRequest.id }, { status: 201 });
+    return NextResponse.json({ ok: true, requestId: newRequest?.id }, { status: 201 });
   } catch (err) {
     console.error('POST /api/public/requests error:', err);
     return NextResponse.json({ error: 'Interní chyba serveru.' }, { status: 500 });

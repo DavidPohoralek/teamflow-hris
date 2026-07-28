@@ -59,6 +59,9 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
   const [timeIn, setTimeIn] = useState('');
   const [timeOut, setTimeOut] = useState('');
   const [note, setNote] = useState('');
+  // "Ostatní" — výjimečná událost s hodinami + bonusem
+  const [otherHours, setOtherHours] = useState('');
+  const [otherBonusPct, setOtherBonusPct] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -71,6 +74,14 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
 
   const showDateTo = selectedType === 'sick';
   const isCorrection = selectedType === 'correction';
+  const isOther = selectedType === 'other';
+
+  const otherHoursNum = parseFloat(otherHours.replace(',', '.'));
+  const otherBonusNum = otherBonusPct.trim() === '' ? 0 : parseFloat(otherBonusPct.replace(',', '.'));
+  const otherValid = !isOther || (!isNaN(otherHoursNum) && otherHoursNum > 0 && otherHoursNum <= 24 && !isNaN(otherBonusNum) && otherBonusNum >= 0);
+  const otherCredited = !isNaN(otherHoursNum) && otherHoursNum > 0
+    ? Math.round(otherHoursNum * (1 + (isNaN(otherBonusNum) ? 0 : otherBonusNum) / 100) * 100) / 100
+    : 0;
 
   // Fetch employee's own logs for the selected date (correction mode only)
   useEffect(() => {
@@ -129,6 +140,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
     e.preventDefault();
     if (!selectedType || !dateFrom) return;
     if (isCorrection && !correctionValid) return;
+    if (isOther && !otherValid) { setError('Zadejte platný počet hodin (1–24) a bonus (0 a více %).'); return; }
 
     setLoading(true);
     setError('');
@@ -144,6 +156,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
           dateFrom,
           dateTo: showDateTo ? dateTo || undefined : undefined,
           note: note || undefined,
+          ...(isOther ? { hours: otherHoursNum, bonus_pct: otherBonusNum } : {}),
           ...(isCorrection ? {
             correctionField,
             timeIn: (correctionField === 'check_in' || correctionField === 'both') && timeIn
@@ -223,6 +236,9 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                     setCorrectionField('both');
                     setTimeIn('');
                     setTimeOut('');
+                    setOtherHours('');
+                    setOtherBonusPct('');
+                    setError('');
                   }}
                   className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border-2 font-semibold text-sm transition-all ${
                     selectedType === type ? selected : color
@@ -395,6 +411,45 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
             </>
           )}
 
+          {/* Other — exceptional event: hours + bonus % */}
+          {isOther && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 flex flex-col gap-3">
+              <p className="text-xs text-slate-500 -mb-1">
+                Výjimečná událost (např. veletrh). Zadejte odpracované hodiny a případný bonus. Manažer obojí schválí.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Počet hodin <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text" inputMode="decimal" value={otherHours}
+                    onChange={(e) => setOtherHours(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    placeholder="8"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Bonus (%) <span className="text-slate-400 text-xs font-normal">(volitelné)</span>
+                  </label>
+                  <input
+                    type="text" inputMode="decimal" value={otherBonusPct}
+                    onChange={(e) => setOtherBonusPct(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    placeholder="0"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm"
+                  />
+                </div>
+              </div>
+              {otherCredited > 0 && (
+                <div className="text-xs text-slate-500 bg-white rounded-lg px-3 py-2 border border-slate-200">
+                  K připsání: <strong className="text-slate-800">{otherHoursNum} h</strong>
+                  {otherBonusNum > 0 && <> + {otherBonusNum} % bonus = <strong className="text-emerald-600">{otherCredited} h</strong></>}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Date to — only for vacation/sick */}
           {showDateTo && (
             <div>
@@ -446,7 +501,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
           <button
             type="submit"
             form=""
-            disabled={loading || !selectedType || !dateFrom || (isCorrection && !correctionValid)}
+            disabled={loading || !selectedType || !dateFrom || (isCorrection && !correctionValid) || (isOther && !otherValid)}
             onClick={handleSubmit}
             className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition flex items-center justify-center gap-2"
           >

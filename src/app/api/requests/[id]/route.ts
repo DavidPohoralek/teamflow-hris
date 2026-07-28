@@ -162,7 +162,8 @@ export async function PUT(
   const { orgId, supabase } = resolved;
 
   const body = await req.json();
-  const { status, note } = body;
+  // hours/bonus_pct: optional manager overrides when approving an "other" request
+  const { status, note, hours: overrideHours, bonus_pct: overrideBonus } = body;
 
   if (!status || !['approved', 'rejected'].includes(status)) {
     return NextResponse.json(
@@ -174,9 +175,12 @@ export async function PUT(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
+  // Note: bonus_pct is NOT selected here — the column may not be migrated yet and
+  // an unknown column breaks the whole query. The manager's approval dialog always
+  // sends hours + bonus_pct in the request body, so we read them from there.
   const { data: existing, error: fetchError } = await sb
     .from('requests')
-    .select('id, type, status, organization_id, employee_id, date_from, date_to, note')
+    .select('id, type, status, organization_id, employee_id, date_from, date_to, note, hours')
     .eq('id', params.id)
     .eq('organization_id', orgId)
     .single();
@@ -194,12 +198,33 @@ export async function PUT(
 
   const resolvedAt = new Date().toISOString();
 
-  const { data: updated, error: updateError } = await sb
+  // Manager may adjust hours / bonus of an "other" request before approving
+  const finalHours = typeof overrideHours === 'number' && overrideHours > 0 ? overrideHours : (existing.hours ?? null);
+  const finalBonus = typeof overrideBonus === 'number' && overrideBonus >= 0 ? overrideBonus : null;
+
+  const updatePayload: Record<string, unknown> = { status, note: note ?? existing.note, resolved_at: resolvedAt };
+  if (existing.type === 'other' && status === 'approved') {
+    if (finalHours != null) updatePayload.hours = finalHours;
+    if (finalBonus != null) updatePayload.bonus_pct = finalBonus;
+  }
+
+  let { data: updated, error: updateError } = await sb
     .from('requests')
-    .update({ status, note: note ?? existing.note, resolved_at: resolvedAt })
+    .update(updatePayload)
     .eq('id', params.id)
     .select()
     .single();
+
+  // Graceful fallback if bonus_pct column isn't migrated yet
+  if (updateError && 'bonus_pct' in updatePayload && /bonus_pct/.test(updateError.message ?? '')) {
+    delete updatePayload.bonus_pct;
+    ({ data: updated, error: updateError } = await sb
+      .from('requests')
+      .update(updatePayload)
+      .eq('id', params.id)
+      .select()
+      .single());
+  }
 
   if (updateError) {
     console.error('PUT /api/requests/[id] error:', updateError);
@@ -310,6 +335,37 @@ export async function PUT(
           console.error('Correction attendance_log insert error:', logError.message, logError);
         }
       }
+    }
+  }
+
+  // When an "other" (exceptional event) request is approved → insert an attendance_log
+  // crediting the hours plus the bonus (hours × (1 + bonus%/100)).
+  if (status === 'approved' && existing.type === 'other' && finalHours != null && finalHours > 0) {
+    try {
+      const svc = getServiceClient();
+      const credited = Math.round(finalHours * (1 + (finalBonus ?? 0) / 100) * 100) / 100;
+      const date: string = existing.date_from;
+      // Naive local-time strings (same convention as vacation logs) so duration
+      // is consistent everywhere: start 09:00, end = 09:00 + credited hours.
+      const endTotalMin = Math.min(9 * 60 + Math.round(credited * 60), 23 * 60 + 59);
+      const eh = String(Math.floor(endTotalMin / 60)).padStart(2, '0');
+      const em = String(endTotalMin % 60).padStart(2, '0');
+      const label = (existing.note ?? '').toString().trim().slice(0, 80) || 'Výjimečná událost';
+      const bonusNote = (finalBonus ?? 0) > 0
+        ? `${label} — ${finalHours} h + ${finalBonus}% bonus = ${credited} h (schváleno)`
+        : `${label} — ${finalHours} h (schváleno)`;
+      const { error: logError } = await svc.from('attendance_logs').insert({
+        organization_id: orgId,
+        employee_id: existing.employee_id,
+        date,
+        check_in: `${date}T09:00:00`,
+        check_out: `${date}T${eh}:${em}:00`,
+        note: bonusNote,
+        work_type_name: 'Ostatní',
+      });
+      if (logError) console.error('Other-event attendance_log insert error:', logError.message);
+    } catch (err) {
+      console.error('Other-event block error:', err);
     }
   }
 

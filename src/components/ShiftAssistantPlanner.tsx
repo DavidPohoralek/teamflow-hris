@@ -130,6 +130,9 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workPlans, setWorkPlans] = useState<WorkPlanEntry[]>([]);
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
+  // date → set of employeeIds on approved vacation that day
+  const [vacationByDay, setVacationByDay] = useState<Map<string, Set<string>>>(new Map());
+  const [vacationNames, setVacationNames] = useState<Map<string, string>>(new Map());
 
   const [analyzeResult, setAnalyzeResult] = useState<AssistantResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -172,14 +175,35 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
   // ── Data fetch ─────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     try {
-      const [empRes, plansRes, wtRes] = await Promise.all([
+      const [empRes, plansRes, wtRes, vacRes] = await Promise.all([
         managerFetch('/api/employees').then(r => r.json()),
         fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(month)}`).then(r => r.json()),
         fetch(`/api/public/work-types?orgId=${encodeURIComponent(orgId)}`).then(r => r.json()),
+        fetch(`/api/public/vacation-calendar?orgId=${encodeURIComponent(orgId)}`).then(r => r.json()),
       ]);
       setEmployees(Array.isArray(empRes) ? empRes : (empRes.employees ?? []));
       setWorkPlans(plansRes.workPlans ?? []);
       setWorkTypes(wtRes.workTypes ?? []);
+
+      // Build vacation map (approved only) — expand each request over its date range
+      const byDay = new Map<string, Set<string>>();
+      const names = new Map<string, string>();
+      type VacReq = { employee_id: string; date_from: string; date_to: string | null; status: string; employees?: { name?: string } | null };
+      for (const r of (vacRes.requests ?? []) as VacReq[]) {
+        if (r.status !== 'approved') continue;
+        if (r.employees?.name) names.set(r.employee_id, r.employees.name);
+        const from = new Date(r.date_from + 'T00:00:00');
+        const to = r.date_to ? new Date(r.date_to + 'T00:00:00') : new Date(from);
+        const cur = new Date(from);
+        while (cur <= to) {
+          const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+          if (!byDay.has(key)) byDay.set(key, new Set());
+          byDay.get(key)!.add(r.employee_id);
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+      setVacationByDay(byDay);
+      setVacationNames(names);
     } catch { /* ignore */ }
   }, [orgId, month]);
 
@@ -607,11 +631,15 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
             const dow = new Date(day.date + 'T00:00:00').getDay();
             const recommended = day.suggestions.filter(s => day.recommendedSuggestionIds.includes(s.id));
             const staff = staffByDay.get(day.date) ?? [];
+            const onVacation = vacationByDay.get(day.date) ?? new Set<string>();
             const usedIds = new Set(staff.map(s => s.employeeId));
             for (const [key] of Array.from(pendingDrafts.entries())) {
               const [empId, d] = key.split('|');
               if (d === day.date) usedIds.add(empId);
             }
+            // People on vacation can't cover — exclude from custom pick too
+            for (const id of Array.from(onVacation)) usedIds.add(id);
+            const vacationList = Array.from(onVacation).map(id => vacationNames.get(id) ?? '—');
 
             return (
               <div key={day.date} id={`plan-day-${day.date}`} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm scroll-mt-4">
@@ -713,6 +741,20 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
                     </select>
                   </div>
                 </div>
+
+                {/* On vacation that day — can't cover */}
+                {vacationList.length > 0 && (
+                  <div className="border-t border-amber-100 bg-amber-50/50 px-4 py-2.5">
+                    <div className="text-[11px] font-semibold text-amber-700 mb-1.5">🏖️ {t('Na dovolené', 'On vacation')} ({vacationList.length})</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {vacationList.map((name, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-white border border-amber-200 text-amber-800">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Current staffing */}
                 <details className="border-t border-slate-100 group">

@@ -290,6 +290,7 @@ interface Request {
   date_to?: string;
   note?: string;
   hours?: number | null;
+  bonus_pct?: number | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   employees?: { id: string; name: string; department?: string; position?: string };
@@ -1901,12 +1902,15 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
 
   useEffect(() => { setSelectedIds(new Set()); fetchRequests(subTab); }, [subTab, fetchRequests]);
 
-  const handleAction = async (id: string, status: 'approved' | 'rejected') => {
+  // "Ostatní" approval dialog — manager confirms/edits hours + bonus before approving
+  const [otherApproval, setOtherApproval] = useState<{ req: Request; hours: string; bonus: string } | null>(null);
+
+  const handleAction = async (id: string, status: 'approved' | 'rejected', extra?: { hours?: number; bonus_pct?: number }) => {
     try {
       const res = await managerFetch(`/api/requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...extra }),
       });
       if (!res.ok) throw new Error('Nepodařilo se zpracovat žádost.');
       fetchRequests(subTab);
@@ -1914,6 +1918,15 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
       managerFetch('/api/requests?status=pending').then((r) => r.json()).then((d) => onCountChange?.((d.requests ?? []).length)).catch(() => {});
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Chyba');
+    }
+  };
+
+  // Approve button: "other" opens the confirm dialog, everything else approves directly
+  const handleApproveClick = (req: Request) => {
+    if (req.type === 'other') {
+      setOtherApproval({ req, hours: String(req.hours ?? ''), bonus: String(req.bonus_pct ?? 0) });
+    } else {
+      handleAction(req.id, 'approved');
     }
   };
 
@@ -2046,7 +2059,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
                     />
                   </th>
                 )}
-                {[t('Zaměstnanec', 'Employee'), t('Typ', 'Type'), t('Od', 'From'), t('Do', 'To'), t('Hodiny', 'Hours'), t('Poznámka', 'Note'), t('Datum podání', 'Submitted'), t('Akce', 'Actions')].map((h) => (
+                {[t('Zaměstnanec', 'Employee'), t('Typ', 'Type'), t('Od', 'From'), t('Do', 'To'), t('Hodiny', 'Hours'), t('Bonus', 'Bonus'), t('Poznámka', 'Note'), t('Datum podání', 'Submitted'), t('Akce', 'Actions')].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -2054,7 +2067,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
             <tbody className="bg-white divide-y divide-gray-200">
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={subTab === 'pending' ? 9 : 8} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={subTab === 'pending' ? 10 : 9} className="px-4 py-8 text-center text-sm text-gray-400">
                     {t('Žádné žádosti', 'No requests')}
                   </td>
                 </tr>
@@ -2087,6 +2100,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.date_from}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.date_to ?? '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.hours ? `${req.hours}h` : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{req.bonus_pct ? `+${req.bonus_pct}%` : '—'}</td>
                     <td
                       className="px-4 py-3 text-sm text-gray-500 max-w-xs cursor-context-menu"
                       onContextMenu={(e) => {
@@ -2106,7 +2120,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
                         {subTab === 'pending' && (
                           <>
                             <button
-                              onClick={() => handleAction(req.id, 'approved')}
+                              onClick={() => handleApproveClick(req)}
                               className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700 hover:bg-green-200 text-base"
                               title={t('Schválit', 'Approve')}
                             >
@@ -2180,6 +2194,67 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
           </div>
         </div>
       )}
+
+      {/* "Ostatní" approval — confirm/edit hours + bonus */}
+      {otherApproval && (() => {
+        const h = parseFloat(otherApproval.hours.replace(',', '.'));
+        const b = otherApproval.bonus.trim() === '' ? 0 : parseFloat(otherApproval.bonus.replace(',', '.'));
+        const valid = !isNaN(h) && h > 0 && h <= 24 && !isNaN(b) && b >= 0;
+        const credited = valid ? Math.round(h * (1 + b / 100) * 100) / 100 : 0;
+        return (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => setOtherApproval(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-800">{t('Schválit výjimečnou událost', 'Approve exceptional event')}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {otherApproval.req.employees?.name} · {otherApproval.req.date_from}
+                </p>
+              </div>
+              <div className="px-6 py-5 flex flex-col gap-4">
+                {otherApproval.req.note && (
+                  <div className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                    {(() => { const { full } = formatRequestNote(otherApproval.req.note); return full || otherApproval.req.note; })()}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Počet hodin', 'Hours')}</label>
+                    <input
+                      type="text" inputMode="decimal" value={otherApproval.hours}
+                      onChange={(e) => setOtherApproval(prev => prev && ({ ...prev, hours: e.target.value.replace(/[^0-9.,]/g, '') }))}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t('Bonus (%)', 'Bonus (%)')}</label>
+                    <input
+                      type="text" inputMode="decimal" value={otherApproval.bonus}
+                      onChange={(e) => setOtherApproval(prev => prev && ({ ...prev, bonus: e.target.value.replace(/[^0-9.,]/g, '') }))}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="text-sm text-slate-500 bg-emerald-50 rounded-lg px-3 py-2.5 border border-emerald-200">
+                  {t('K připsání do docházky', 'Will be credited')}: <strong className="text-emerald-700">{credited} h</strong>
+                  {b > 0 && <span className="text-slate-400"> ({h} h + {b} %)</span>}
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+                <button onClick={() => setOtherApproval(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+                  {t('Zrušit', 'Cancel')}
+                </button>
+                <button
+                  disabled={!valid}
+                  onClick={() => { handleAction(otherApproval.req.id, 'approved', { hours: h, bonus_pct: b }); setOtherApproval(null); }}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold transition"
+                >
+                  ✓ {t('Schválit', 'Approve')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
