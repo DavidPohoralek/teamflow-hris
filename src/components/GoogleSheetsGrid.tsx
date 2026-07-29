@@ -605,14 +605,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   // Sticky month-view header
   const [stickyWeekKey, setStickyWeekKey] = useState<string | null>(null);
   const weekSepRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
-  // Scroll sync: header div scrollLeft follows body div (split-table sticky approach)
+  // Split-table sticky approach: header table in overflow:hidden, body in overflow-x:auto
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
   // Sticky toolbar
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarHeight, setToolbarHeight] = useState(56);
-  const [scrollbarWidth, setScrollbarWidth] = useState(0);
-  const [bodyTableWidth, setBodyTableWidth] = useState(0);
+  const [colWidths, setColWidths] = useState<number[]>([]);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
@@ -807,14 +806,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return () => ro.disconnect();
   }, []);
 
-  // ── Measure body table width + scrollbar for pixel-perfect header alignment
+  // ── Measure body column widths for pixel-perfect header alignment ─────────
   useEffect(() => {
     const el = bodyScrollRef.current;
     if (!el) return;
     const measure = () => {
-      setScrollbarWidth(el.offsetWidth - el.clientWidth);
-      const table = el.querySelector('table');
-      if (table) setBodyTableWidth(table.offsetWidth);
+      const firstRow = el.querySelector('table tr');
+      if (!firstRow) return;
+      const cells = firstRow.querySelectorAll('td, th');
+      if (cells.length >= 8) {
+        setColWidths(Array.from(cells).slice(0, 8).map(c => c.getBoundingClientRect().width));
+      }
     };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -832,7 +834,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     const getThreshold = () =>
       headerScrollRef.current
         ? headerScrollRef.current.getBoundingClientRect().bottom
-        : 113; // nav ~65 + table header ~48
+        : 113;
 
     const handler = () => {
       const threshold = getThreshold();
@@ -840,18 +842,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       let activeTop = -Infinity;
       for (const [key, row] of Array.from(weekSepRowRefs.current.entries())) {
         const top = row.getBoundingClientRect().top;
-        // +2px epsilon — at scroll-top the first divider sits exactly at the threshold
         if (top <= threshold + 2 && top > activeTop) { activeKey = key; activeTop = top; }
       }
       setStickyWeekKey(activeKey);
     };
 
-    // Listen both on window (capture) and on the actual scroll container
     const scrollContainer = bodyScrollRef.current?.closest<HTMLElement>('.overflow-auto') ?? null;
     window.addEventListener('scroll', handler, { passive: true, capture: true });
     scrollContainer?.addEventListener('scroll', handler, { passive: true });
-
-    // Wait one frame for the DOM to lay out before computing initial state
     const raf = requestAnimationFrame(handler);
 
     return () => {
@@ -983,8 +981,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     const key = toISO(getWeekStart(new Date()));
     let tries = 0;
     const attempt = () => {
-      const scrollContainer = bodyScrollRef.current?.closest<HTMLElement>('.overflow-auto');
-      // Today in the first week of the month → no divider exists, the sticky header covers it
+      const scrollContainer = bodyScrollRef.current?.closest<HTMLElement>('.overflow-auto') ?? null;
       if (scrollContainer && monthWeeks[0] && toISO(monthWeeks[0]) === key) {
         scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => scrollContainer.dispatchEvent(new Event('scroll')), 650);
@@ -994,7 +991,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       if (row && scrollContainer) {
         const threshold = headerScrollRef.current?.getBoundingClientRect().bottom ?? 110;
         scrollContainer.scrollBy({ top: row.getBoundingClientRect().top - threshold, behavior: 'smooth' });
-        // Programmatic scrolls don't always reach the sticky-week listener — nudge it
         setTimeout(() => scrollContainer.dispatchEvent(new Event('scroll')), 650);
       } else if (++tries < 120) {
         requestAnimationFrame(attempt);
@@ -1543,27 +1539,32 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       </div>
 
       <div className="px-4 md:px-6 pb-4 md:pb-6 pt-4">
-      {/* Grid — split into sticky header + scrollable body so position:sticky works
-           (overflow-x:auto on any ancestor breaks sticky; the header div has no overflow) */}
+      {/* Grid — split into sticky header + scrollable body; header uses measured column
+           widths from the body table so borders align pixel-perfectly */}
       <div className="rounded-xl border border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
 
-        {/* Sticky header div — no overflow here, so position:sticky works vs. the window */}
+        {/* Sticky header — uses exact column widths measured from the body table */}
         <div
           ref={headerScrollRef}
-          style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden', paddingRight: scrollbarWidth > 0 ? scrollbarWidth : undefined }}
+          style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden' }}
           className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-gray-50 border-b-2 border-gray-200 rounded-t-xl'}
         >
-          <table className="min-w-full text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, width: bodyTableWidth > 0 ? bodyTableWidth : undefined }}>
-            <colgroup>
-              <col style={{ width: '160px', minWidth: '140px' }} />
-              {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
-            </colgroup>
+          <table className="text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, width: colWidths.length === 8 ? colWidths.reduce((a, b) => a + b, 0) : undefined, minWidth: '100%' }}>
+            {colWidths.length === 8 ? (
+              <colgroup>
+                {colWidths.map((w, i) => <col key={i} style={{ width: `${w}px` }} />)}
+              </colgroup>
+            ) : (
+              <colgroup>
+                <col style={{ width: '160px', minWidth: '140px' }} />
+                {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
+              </colgroup>
+            )}
             <thead>
               {viewMode === 'month' ? (
-                /* Month view: the dark week bar IS the header — dates follow the visible week */
                 <tr>
                   <th
-                    className="sticky left-0 z-10 px-3 py-2 text-left border-r border-slate-500"
+                    className="sticky left-0 z-10 px-2 py-2 text-left border-r border-slate-500"
                     style={{ background: 'linear-gradient(to right, #334155, #3b4f66)' }}
                   >
                     {(() => {
@@ -1610,7 +1611,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 </tr>
               ) : (
                 <tr>
-                  <th className="sticky left-0 z-10 px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200 bg-gray-50">
+                  <th className="sticky left-0 z-10 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200 bg-gray-50">
                     {t('Zaměstnanec', 'Employee')}
                   </th>
                   {DAY_NAMES.map((name, i) => {
@@ -1639,7 +1640,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           </table>
         </div>
 
-        {/* Scrollable body — overflow-x:auto here only, header scrollLeft is synced on scroll */}
+        {/* Scrollable body — header scrollLeft is synced on scroll */}
         <div
           ref={bodyScrollRef}
           className="overflow-x-auto"
@@ -1689,8 +1690,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 : f.toLocaleDateString('cs-CZ', { month: 'long' });
               return (
                 <>
-                  {/* Week separator with dates — first week's dates live in the sticky header,
-                       scrolling a separator under the header swaps the sticky dates */}
                   {wi > 0 && (
                     <tr
                       key={`sep-${wDays[0]}`}
@@ -1736,7 +1735,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             })}
           </tbody>
         </table>
-        </div>{/* end overflow-x:auto body scroll div */}
+      </div>{/* end overflow-x-auto body scroll div */}
       </div>{/* end grid outer container */}
       </div>{/* end padded content wrapper */}
 
