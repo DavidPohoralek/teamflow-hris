@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useId } from 'react'
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTES = ['00', '15', '30', '45']
@@ -14,31 +14,63 @@ interface TimeSelectProps {
 }
 
 export default function TimeSelect({ value, onChange, className, dark, selectClassName }: TimeSelectProps) {
-  const [h, m] = (value || '00:00').split(':')
-  const hour = HOURS.includes(h) ? h : '00'
-  const minute = MINUTES.includes(m) ? m : MINUTES.reduce((prev, cur) =>
-    Math.abs(Number(cur) - Number(m || 0)) < Math.abs(Number(prev) - Number(m || 0)) ? cur : prev
-  )
+  const id = useId()
+  const [h, m] = (value || '').split(':')
+  const hour = h ?? ''
+  const minute = m ?? ''
 
-  const set = (newH: string, newM: string) => onChange(`${newH}:${newM}`)
+  const clamp = (v: string, max: number) => {
+    const n = parseInt(v, 10)
+    if (isNaN(n)) return ''
+    return String(Math.max(0, Math.min(max, n))).padStart(2, '0')
+  }
 
-  const selCls = selectClassName ?? (dark
-    ? 'bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-blue-500'
-    : 'border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white')
+  const commit = (newH: string, newM: string) => {
+    const ch = clamp(newH, 23)
+    const cm = clamp(newM, 59)
+    if (ch && cm) onChange(`${ch}:${cm}`)
+    else if (ch) onChange(`${ch}:00`)
+  }
+
+  const inputCls = selectClassName ?? (dark
+    ? 'bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-blue-500 w-16 text-center'
+    : 'border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-14 text-center')
 
   return (
     <div className={`flex items-center gap-1 ${className ?? ''}`}>
-      <select value={hour} onChange={(e) => set(e.target.value, minute)} className={selCls}>
-        {HOURS.map((hh) => (
-          <option key={hh} value={hh}>{hh}</option>
-        ))}
-      </select>
+      <input
+        list={`${id}-h`}
+        value={hour}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, '').slice(0, 2)
+          commit(raw, minute)
+        }}
+        onBlur={() => { if (hour) commit(hour, minute || '00') }}
+        placeholder="HH"
+        inputMode="numeric"
+        maxLength={2}
+        className={inputCls}
+      />
+      <datalist id={`${id}-h`}>
+        {HOURS.map((hh) => <option key={hh} value={hh} />)}
+      </datalist>
       <span className={dark ? 'text-slate-400 font-medium' : 'text-gray-500 font-medium'}>:</span>
-      <select value={minute} onChange={(e) => set(hour, e.target.value)} className={selCls}>
-        {MINUTES.map((mm) => (
-          <option key={mm} value={mm}>{mm}</option>
-        ))}
-      </select>
+      <input
+        list={`${id}-m`}
+        value={minute}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, '').slice(0, 2)
+          commit(hour, raw)
+        }}
+        onBlur={() => { if (minute) commit(hour || '00', minute) }}
+        placeholder="MM"
+        inputMode="numeric"
+        maxLength={2}
+        className={inputCls}
+      />
+      <datalist id={`${id}-m`}>
+        {MINUTES.map((mm) => <option key={mm} value={mm} />)}
+      </datalist>
     </div>
   )
 }
