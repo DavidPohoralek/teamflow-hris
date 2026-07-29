@@ -350,6 +350,7 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
   const handleApplyAll = useCallback(async () => {
     const ids = Array.from(pendingDrafts.values()).map(d => d.suggId);
     if (!ids.length) return;
+    if (!confirm(t(`Opravdu přidat ${ids.length} navržených směn do rozvrhu?`, `Add all ${ids.length} suggested shifts to the schedule?`))) return;
     setApplying(true);
     setApplyError(null);
     try {
@@ -570,15 +571,33 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
           {analyzing ? t('Počítám…', 'Analyzing…') : `🧮 ${t('Dopočítat záskoky', 'Find cover')}`}
         </button>
         {draftCount > 0 && (
-          <button
-            onClick={handleApplyAll}
-            disabled={applying}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              applying ? 'bg-emerald-100 text-emerald-400 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-            }`}
-          >
-            {applying ? t('Aplikuji…', 'Applying…') : `✓ ${t('Schválit všech', 'Apply all')} ${draftCount}`}
-          </button>
+          <>
+            <span className="text-xs text-slate-500 hidden sm:inline">
+              {draftCount} {t('návrhů — zatím neuloženo', 'suggestions — not saved yet')}
+            </span>
+            <button
+              onClick={handleApplyAll}
+              disabled={applying}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                applying ? 'bg-emerald-100 text-emerald-400 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+              }`}
+            >
+              {applying ? t('Ukládám…', 'Saving…') : `✓ ${t('Potvrdit a přidat', 'Confirm & add')} (${draftCount})`}
+            </button>
+            <button
+              onClick={() => {
+                if (confirm(t('Zahodit všechny návrhy? Nic se neuložilo.', 'Discard all suggestions? Nothing was saved.'))) {
+                  setAnalyzeResult(null);
+                  setPendingDrafts(new Map());
+                  try { localStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
+                }
+              }}
+              disabled={applying}
+              className="px-3 py-2 rounded-xl text-sm font-medium text-slate-500 border border-slate-200 hover:bg-slate-100 transition-colors"
+            >
+              ✕ {t('Zrušit návrhy', 'Discard')}
+            </button>
+          </>
         )}
         {(analyzeError || applyError) && (
           <span className="text-xs text-red-600 font-medium">{analyzeError ?? applyError}</span>

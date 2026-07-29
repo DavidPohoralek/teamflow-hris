@@ -532,6 +532,7 @@ export default function ShiftAssistantMatrix({
     if (!analyzeResult) return;
     const ids = Array.from(pendingDrafts.values()).map(d => d.suggId);
     if (!ids.length) return;
+    if (!confirm(t(`Opravdu přidat ${ids.length} navržených směn do rozvrhu?`, `Add all ${ids.length} suggested shifts to the schedule?`))) return;
     setApplying(true);
     setApplyError(null);
     try {
