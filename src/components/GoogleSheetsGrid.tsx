@@ -612,6 +612,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarHeight, setToolbarHeight] = useState(56);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  const [bodyTableWidth, setBodyTableWidth] = useState(0);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
@@ -806,11 +807,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return () => ro.disconnect();
   }, []);
 
-  // ── Scrollbar width tracking for header/body alignment ────────────────────
+  // ── Measure body table width + scrollbar for pixel-perfect header alignment
   useEffect(() => {
     const el = bodyScrollRef.current;
     if (!el) return;
-    const measure = () => setScrollbarWidth(el.offsetWidth - el.clientWidth);
+    const measure = () => {
+      setScrollbarWidth(el.offsetWidth - el.clientWidth);
+      const table = el.querySelector('table');
+      if (table) setBodyTableWidth(table.offsetWidth);
+    };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     measure();
@@ -1548,7 +1553,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden', paddingRight: scrollbarWidth > 0 ? scrollbarWidth : undefined }}
           className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-gray-50 border-b-2 border-gray-200 rounded-t-xl'}
         >
-          <table className="min-w-full text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}>
+          <table className="min-w-full text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, width: bodyTableWidth > 0 ? bodyTableWidth : undefined }}>
             <colgroup>
               <col style={{ width: '160px', minWidth: '140px' }} />
               {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
