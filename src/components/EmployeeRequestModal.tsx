@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import TimeSelect from '@/components/TimeSelect';
 
 interface EmployeeRequestModalProps {
   orgId: string;
@@ -378,13 +379,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                           </span>
                         )}
                       </label>
-                      <input
-                        type="time"
-                        value={timeIn}
-                        onChange={(e) => setTimeIn(e.target.value)}
-                        required
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm"
-                      />
+                      <TimeSelect value={timeIn} onChange={setTimeIn} selectClassName="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm bg-white" />
                     </div>
                   )}
                   {(correctionField === 'check_out' || correctionField === 'both') && (
@@ -397,13 +392,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                           </span>
                         )}
                       </label>
-                      <input
-                        type="time"
-                        value={timeOut}
-                        onChange={(e) => setTimeOut(e.target.value)}
-                        required
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm"
-                      />
+                      <TimeSelect value={timeOut} onChange={setTimeOut} selectClassName="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm bg-white" />
                     </div>
                   )}
                 </div>

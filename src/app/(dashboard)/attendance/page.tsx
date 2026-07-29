@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import TimeSelect from '@/components/TimeSelect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -253,13 +254,7 @@ function CheckInModal({ date, employees, onClose, onSuccess }: CheckInModalProps
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Čas příchodu
             </label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              required
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <TimeSelect value={time} onChange={setTime} />
           </div>
 
           <div>

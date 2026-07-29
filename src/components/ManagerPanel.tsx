@@ -9,6 +9,7 @@ import NotificationsPanel from './NotificationsPanel';
 import BonusesTab from './BonusesTab';
 import OpenSessionsTab from './OpenSessionsTab';
 import { useT } from '@/lib/i18n';
+import TimeSelect from '@/components/TimeSelect';
 
 // ─── ManagerTour ──────────────────────────────────────────────────────────────
 
@@ -693,13 +694,11 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Příchod <span className="text-red-500">*</span></label>
-              <input type="time" value={addCheckIn} onChange={e => setAddCheckIn(e.target.value)} required
-                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <TimeSelect value={addCheckIn} onChange={setAddCheckIn} selectClassName="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Odchod</label>
-              <input type="time" value={addCheckOut} onChange={e => setAddCheckOut(e.target.value)}
-                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <TimeSelect value={addCheckOut} onChange={setAddCheckOut} selectClassName="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
             </div>
             <div className="flex flex-col gap-1 min-w-[140px]">
               <label className="text-xs font-medium text-slate-600">Oddělení</label>
@@ -3617,11 +3616,11 @@ function OperatingHoursSetting() {
             {isOpen && (
               <div className="flex items-center gap-2 ml-2">
                 <span className="text-xs text-gray-400">{t('Od', 'From')}</span>
-                <input type="time" value={fromTime ?? '09:00'} onChange={(e) => setTime(key, 'from', e.target.value)}
-                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <TimeSelect value={fromTime ?? '09:00'} onChange={(v) => setTime(key, 'from', v)}
+                  selectClassName="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
                 <span className="text-xs text-gray-400">{t('Do', 'To')}</span>
-                <input type="time" value={toTime ?? '18:00'} onChange={(e) => setTime(key, 'to', e.target.value)}
-                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <TimeSelect value={toTime ?? '18:00'} onChange={(v) => setTime(key, 'to', v)}
+                  selectClassName="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
               </div>
             )}
           </div>
@@ -3943,13 +3942,13 @@ function EveningShiftSetting() {
           <div className="flex items-center gap-3 flex-wrap">
             <div>
               <p className="text-xs text-gray-500 mb-1">{t('Od', 'From')}</p>
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <TimeSelect value={startTime} onChange={setStartTime}
+                selectClassName="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">{t('Do', 'To')}</p>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <TimeSelect value={endTime} onChange={setEndTime}
+                selectClassName="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">{t('Min. lidí', 'Min. staff')}</p>

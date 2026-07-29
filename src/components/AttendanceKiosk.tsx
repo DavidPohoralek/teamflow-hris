@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PinPad from './PinPad';
+import TimeSelect from '@/components/TimeSelect';
 import { useT } from '@/lib/i18n';
 
 interface WorkType {
@@ -820,12 +821,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                   </p>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-sm">{t('Správný čas příchodu', 'Correct arrival time')}</label>
-                    <input
-                      type="time"
-                      value={correctionTimeIn}
-                      onChange={(e) => setCorrectionTimeIn(e.target.value)}
-                      className="bg-slate-700 text-white rounded-xl px-4 py-3 text-xl font-mono outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
-                    />
+                    <TimeSelect value={correctionTimeIn} onChange={setCorrectionTimeIn} dark />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-sm">{t('Poznámka (volitelné)', 'Note (optional)')}</label>
@@ -946,22 +942,12 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 <div className="flex gap-3 items-center">
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-slate-400 text-xs">{t('Od', 'From')}</span>
-                    <input
-                      type="time"
-                      value={hoFormStart}
-                      onChange={(e) => setHoFormStart(e.target.value)}
-                      className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
-                    />
+                    <TimeSelect value={hoFormStart} onChange={setHoFormStart} dark selectClassName="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <span className="text-slate-500 text-2xl mt-4">–</span>
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-slate-400 text-xs">{t('Do', 'To')}</span>
-                    <input
-                      type="time"
-                      value={hoFormEnd}
-                      onChange={(e) => setHoFormEnd(e.target.value)}
-                      className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
-                    />
+                    <TimeSelect value={hoFormEnd} onChange={setHoFormEnd} dark selectClassName="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 </div>
                 {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (

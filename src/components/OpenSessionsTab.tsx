@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { managerFetch } from '@/lib/managerFetch'
 import { useT } from '@/lib/i18n'
+import TimeSelect from '@/components/TimeSelect'
 
 interface OpenSession {
   id: string
@@ -131,11 +132,10 @@ export default function OpenSessionsTab({ onCountChange }: { onCountChange?: (n:
                     {t('Příchod', 'In')}: <span className="font-semibold text-slate-700">{fmtTime(s.check_in)}</span>
                   </div>
                   <span className="text-slate-300">→</span>
-                  <input
-                    type="time"
+                  <TimeSelect
                     value={times.get(s.id) ?? ''}
-                    onChange={e => setTimes(prev => { const next = new Map(prev); next.set(s.id, e.target.value); return next })}
-                    className="px-2 py-1.5 rounded-lg text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    onChange={v => setTimes(prev => { const next = new Map(prev); next.set(s.id, v); return next })}
+                    selectClassName="px-2 py-1.5 rounded-lg text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
                   />
                   <button
                     onClick={() => closeSession(s)}

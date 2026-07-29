@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import TimeSelect from '@/components/TimeSelect';
 
 const DAY_NAMES = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 const MONTH_NAMES = [
@@ -253,18 +254,16 @@ function DayModal({ dayData, onClose, onSave }: ModalProps) {
                     <span className="text-sm font-medium text-slate-700 flex-1">{emp.name}</span>
                     {assigned && (
                       <div className="flex items-center gap-1 text-xs">
-                        <input
-                          type="time"
+                        <TimeSelect
                           value={assigned.timeFrom}
-                          onChange={e => updateEmployeeTime(emp.id, 'timeFrom', e.target.value)}
-                          className="px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          onChange={v => updateEmployeeTime(emp.id, 'timeFrom', v)}
+                          selectClassName="px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
                         />
                         <span className="text-slate-400">–</span>
-                        <input
-                          type="time"
+                        <TimeSelect
                           value={assigned.timeTo}
-                          onChange={e => updateEmployeeTime(emp.id, 'timeTo', e.target.value)}
-                          className="px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          onChange={v => updateEmployeeTime(emp.id, 'timeTo', v)}
+                          selectClassName="px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
                         />
                       </div>
                     )}

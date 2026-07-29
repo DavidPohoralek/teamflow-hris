@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useT } from '@/lib/i18n';
 import { managerFetch } from '@/lib/managerFetch';
+import TimeSelect from '@/components/TimeSelect';
 
 interface PresenceRecord {
   id: string;
@@ -419,11 +420,11 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <label className="block mb-1 text-gray-500">{t('Příchod', 'Clock in')}</label>
-                            <input type="time" value={editCheckIn} onChange={(e) => setEditCheckIn(e.target.value)} className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" />
+                            <TimeSelect value={editCheckIn} onChange={setEditCheckIn} selectClassName="rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none bg-white" />
                           </div>
                           <div className="flex-1">
                             <label className="block mb-1 text-gray-500">{t('Odchod', 'Clock out')}</label>
-                            <input type="time" value={editCheckOut} onChange={(e) => setEditCheckOut(e.target.value)} className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none" />
+                            <TimeSelect value={editCheckOut} onChange={setEditCheckOut} selectClassName="rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none bg-white" />
                           </div>
                         </div>
                         {editError && <p className="text-red-500">{editError}</p>}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { managerFetch, getManagerToken } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
+import TimeSelect from '@/components/TimeSelect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,13 +224,11 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
-              <input type="time" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
-              <input type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={endTime} onChange={setEndTime} />
             </div>
           </div>
           <div>
@@ -327,13 +326,11 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
-              <input type="time" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
-              <input type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={endTime} onChange={setEndTime} />
             </div>
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -486,13 +483,11 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
-              <input type="time" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
-              <input type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <TimeSelect value={endTime} onChange={setEndTime} />
             </div>
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">

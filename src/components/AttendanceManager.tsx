@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AttendanceKiosk from './AttendanceKiosk';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
+import TimeSelect from '@/components/TimeSelect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -222,24 +223,13 @@ function AddRecordModal({ date: defaultDate, employees, workTypes, onClose, onSu
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 {t('Příchod', 'Clock in')}
               </label>
-              <input
-                type="time"
-                value={checkInTime}
-                onChange={(e) => setCheckInTime(e.target.value)}
-                required
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <TimeSelect value={checkInTime} onChange={setCheckInTime} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 {t('Odchod', 'Clock out')} <span className="text-slate-400 font-normal">{t('(volitelný)', '(optional)')}</span>
               </label>
-              <input
-                type="time"
-                value={checkOutTime}
-                onChange={(e) => setCheckOutTime(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <TimeSelect value={checkOutTime} onChange={setCheckOutTime} />
             </div>
           </div>
 
@@ -409,20 +399,10 @@ function EditRow({ log, date, onCancel, onSaved }: EditRowProps) {
         </div>
       </td>
       <td className="px-4 py-2.5">
-        <input
-          type="time"
-          value={checkIn}
-          onChange={(e) => setCheckIn(e.target.value)}
-          className="border border-blue-300 rounded-md px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
-        />
+        <TimeSelect value={checkIn} onChange={setCheckIn} selectClassName="border border-blue-300 rounded-md px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
       </td>
       <td className="px-4 py-2.5">
-        <input
-          type="time"
-          value={checkOut}
-          onChange={(e) => setCheckOut(e.target.value)}
-          className="border border-slate-200 rounded-md px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
-        />
+        <TimeSelect value={checkOut} onChange={setCheckOut} selectClassName="border border-slate-200 rounded-md px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
       </td>
       {/* Duration — shows preview while editing */}
       <td className="px-4 py-2.5 text-slate-500 text-sm">
