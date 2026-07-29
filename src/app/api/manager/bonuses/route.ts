@@ -35,33 +35,50 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
 
-  // ── Budget for the manager's scope ─────────────────────────────────────────
+  // ── Budget per department ───────────────────────────────────────────────────
   if (searchParams.get('budget') === '1') {
     const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
 
-    // Rate per person from settings (default 500 Kč)
     const { data: settingsRow } = await sb
       .from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle()
     const extra = (settingsRow?.extra_settings ?? {}) as Record<string, unknown>
     const rate = Number(extra['bonus_budget_per_person']) > 0 ? Number(extra['bonus_budget_per_person']) : 500
 
-    // Headcount = active employees in scope, EXCLUDING managers ("vedoucí se nezapočítává")
     const { data: emps } = await sb
       .from('employees').select('id, department, is_manager').eq('organization_id', orgId).eq('active', true)
     const eligible = (emps ?? []).filter((e: { department: string | null; is_manager?: boolean }) =>
       inScope(departments, e.department) && !e.is_manager)
-    const headcount = eligible.length
-    const budget = headcount * rate
 
-    // Spent this month within scope
     const { data: bonusRows } = await sb
       .from('employee_bonuses').select('amount, employees ( department )')
       .eq('organization_id', orgId).eq('month', month)
-    const spent = ((bonusRows ?? []) as { amount: number; employees: { department: string | null } | null }[])
+    const allBonuses = ((bonusRows ?? []) as { amount: number; employees: { department: string | null } | null }[])
       .filter(r => inScope(departments, r.employees?.department))
-      .reduce((s, r) => s + (Number(r.amount) || 0), 0)
 
-    return NextResponse.json({ budget, spent: Math.round(spent * 100) / 100, headcount, rate })
+    // Group by department
+    const deptMap = new Map<string, { headcount: number; spent: number }>()
+    for (const e of eligible) {
+      const dept = e.department ?? ''
+      if (!deptMap.has(dept)) deptMap.set(dept, { headcount: 0, spent: 0 })
+      deptMap.get(dept)!.headcount++
+    }
+    for (const b of allBonuses) {
+      const dept = b.employees?.department ?? ''
+      if (!deptMap.has(dept)) deptMap.set(dept, { headcount: 0, spent: 0 })
+      deptMap.get(dept)!.spent += Number(b.amount) || 0
+    }
+
+    const byDepartment: Record<string, { budget: number; spent: number; headcount: number; rate: number }> = {}
+    Array.from(deptMap.entries()).forEach(([dept, v]) => {
+      byDepartment[dept || '__none__'] = {
+        budget: v.headcount * rate,
+        spent: Math.round(v.spent * 100) / 100,
+        headcount: v.headcount,
+        rate,
+      }
+    })
+
+    return NextResponse.json({ byDepartment, rate })
   }
 
   // ── Owner overview: all bonuses across the org ─────────────────────────────

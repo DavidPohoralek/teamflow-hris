@@ -72,7 +72,8 @@ export default function BonusesTab() {
   // Owner features
   const [isOwner, setIsOwner] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('staff')
-  const [budget, setBudget] = useState<{ budget: number; spent: number; headcount: number; rate: number } | null>(null)
+  const [budgetByDept, setBudgetByDept] = useState<Record<string, { budget: number; spent: number; headcount: number; rate: number }>>({})
+  const [budgetRate, setBudgetRate] = useState(500)
   const [overview, setOverview] = useState<OverviewRow[]>([])
 
   const isCurrentMonth = month === currentMonth()
@@ -98,12 +99,14 @@ export default function BonusesTab() {
       .catch(() => {})
   }, [viewMode])
 
-  // Budget for the manager's scope
   const fetchBudget = useCallback(async () => {
     try {
       const res = await managerFetch(`/api/manager/bonuses?budget=1&month=${month}`)
       const d = await res.json()
-      if (res.ok) setBudget(d)
+      if (res.ok) {
+        setBudgetByDept(d.byDepartment ?? {})
+        if (d.rate) setBudgetRate(d.rate)
+      }
     } catch { /* non-critical */ }
   }, [month])
   useEffect(() => { fetchBudget() }, [fetchBudget])
@@ -226,7 +229,9 @@ export default function BonusesTab() {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'cs'))
   }, [filtered, t])
 
-  const overBudget = budget != null && budget.spent > budget.budget
+  const deptBudgetFor = (dept: string) => {
+    return budgetByDept[dept] ?? budgetByDept['__none__'] ?? null
+  }
 
   return (
     <div className="p-6 max-w-4xl">
@@ -310,37 +315,7 @@ export default function BonusesTab() {
                'Bonuses for your people — one person can receive multiple bonuses per month. Bonuses appear in the export as "Manager bonus".')}
       </p>
 
-      {/* Budget banner — staff mode */}
-      {viewMode === 'staff' && budget != null && budget.budget > 0 && (
-        <div className={`mb-4 rounded-xl border px-4 py-3 ${overBudget ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
-          <div className="flex items-center justify-between text-sm mb-1.5">
-            <span className="font-semibold text-slate-700">
-              💰 {t('Rozpočet oddělení', 'Department budget')}
-              <span className="text-xs font-normal text-slate-400 ml-1">
-                ({fmtCZK(budget.rate)} Kč × {budget.headcount} {t('lidí', 'people')})
-              </span>
-            </span>
-            <span className={`font-bold ${overBudget ? 'text-red-600' : 'text-emerald-700'}`}>
-              {fmtCZK(budget.spent)} / {fmtCZK(budget.budget)} Kč
-            </span>
-          </div>
-          <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-slate-100">
-            <div
-              className={`h-full rounded-full transition-all ${overBudget ? 'bg-red-500' : 'bg-emerald-500'}`}
-              style={{ width: `${Math.min(100, budget.budget > 0 ? (budget.spent / budget.budget) * 100 : 0)}%` }}
-            />
-          </div>
-          {overBudget ? (
-            <p className="text-xs text-red-600 font-medium mt-1.5">
-              ⚠️ {t('Překročeno o', 'Over by')} {fmtCZK(budget.spent - budget.budget)} Kč — {t('rozpočet lze překročit, ale hlídej to.', 'you can exceed it, but keep an eye on it.')}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-400 mt-1.5">
-              {t('Zbývá', 'Remaining')} {fmtCZK(budget.budget - budget.spent)} Kč
-            </p>
-          )}
-        </div>
-      )}
+      {/* Budget banners are now rendered per-department inside the grouped loop */}
 
       {/* Month-by-month history */}
       {showHistory && (
@@ -391,9 +366,35 @@ export default function BonusesTab() {
         </div>
       ) : (
         <>
-          {grouped.map(([dept, emps]) => (
+          {grouped.map(([dept, emps]) => {
+            const db = viewMode === 'staff' ? deptBudgetFor(dept) : null
+            const over = db != null && db.spent > db.budget
+            return (
             <div key={dept} className="mb-5">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{dept}</h3>
+              {db != null && db.budget > 0 && (
+                <div className={`mb-2 rounded-xl border px-4 py-2.5 ${over ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-slate-500 text-xs">
+                      {fmtCZK(db.rate)} Kč × {db.headcount} {t('lidí', 'people')}
+                    </span>
+                    <span className={`font-bold text-xs ${over ? 'text-red-600' : 'text-emerald-700'}`}>
+                      {fmtCZK(db.spent)} / {fmtCZK(db.budget)} Kč
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-white rounded-full overflow-hidden border border-slate-100">
+                    <div
+                      className={`h-full rounded-full transition-all ${over ? 'bg-red-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(100, db.budget > 0 ? (db.spent / db.budget) * 100 : 0)}%` }}
+                    />
+                  </div>
+                  {over && (
+                    <p className="text-[10px] text-red-600 font-medium mt-1">
+                      {t('Překročeno o', 'Over by')} {fmtCZK(db.spent - db.budget)} Kč
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
                 {emps.map(emp => {
                   const empEntries = entriesByEmployee.get(emp.id) ?? []
@@ -469,7 +470,7 @@ export default function BonusesTab() {
                 })}
               </div>
             </div>
-          ))}
+          )})}
 
           {filtered.length === 0 && (
             <div className="py-12 text-center text-gray-400 text-sm">{t('Žádní zaměstnanci.', 'No employees.')}</div>
