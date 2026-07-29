@@ -1548,7 +1548,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden', paddingRight: scrollbarWidth > 0 ? scrollbarWidth : undefined }}
           className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-gray-50 border-b-2 border-gray-200 rounded-t-xl'}
         >
-          <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
+          <table className="min-w-full text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}>
             <colgroup>
               <col style={{ width: '160px', minWidth: '140px' }} />
               {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
@@ -1644,7 +1644,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             }
           }}
         >
-        <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
+        <table className="min-w-full text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}>
           <colgroup>
             <col style={{ width: '160px', minWidth: '140px' }} />
             {DAY_NAMES.map((_, i) => <col key={i} style={{ width: '120px', minWidth: '100px' }} />)}
@@ -1690,12 +1690,39 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     <tr
                       key={`sep-${wDays[0]}`}
                       ref={(el) => { if (el) weekSepRowRefs.current.set(wDays[0], el); else weekSepRowRefs.current.delete(wDays[0]); }}
+                      className="group/sep"
                     >
                       <td
-                        colSpan={8}
-                        className="h-0 p-0"
-                        style={{ background: '#334155', height: '3px', lineHeight: 0, fontSize: 0 }}
-                      />
+                        className="sticky left-0 z-10 px-2 py-0.5 border-r border-slate-500 group-hover/sep:py-1.5 transition-all duration-150"
+                        style={{ background: 'linear-gradient(to right, #334155, #3b4f66)' }}
+                      >
+                        <span className="text-[10px] font-bold text-slate-300 leading-tight">{wLabel}</span>
+                      </td>
+                      {wDays.map((d, i) => {
+                        const isOutside = d.slice(0, 7) !== currentMonth;
+                        if (isOutside) {
+                          return <td key={d} className="border-r border-slate-600 last:border-r-0" style={{ background: '#1e293b' }} />;
+                        }
+                        const dayNum = new Date(d + 'T00:00:00').getDate();
+                        const isToday = d === today;
+                        const isClosed = closedDates.has(d);
+                        const isDimmed = !isOpenDay(d);
+                        const bg = isClosed ? '#475569' : isDimmed ? '#3d4f63' : '#334155';
+                        return (
+                          <td key={d} className="py-0.5 text-center border-r border-slate-500 last:border-r-0 group-hover/sep:py-1 transition-all duration-150" style={{ background: bg }}>
+                            <div className="flex flex-col items-center gap-0">
+                              <span className={`text-[8px] uppercase tracking-wider font-semibold hidden group-hover/sep:block ${isDimmed || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {DAY_NAMES[i]}
+                              </span>
+                              <span className={`text-[10px] font-bold leading-tight ${
+                                isToday ? 'text-blue-400' : isDimmed || isClosed ? 'text-slate-500' : 'text-slate-300'
+                              }`}>
+                                {dayNum}
+                              </span>
+                            </div>
+                          </td>
+                        );
+                      })}
                     </tr>
                   )}
                   {renderEmployeeRows(wDays, fullPlansMap, true)}
