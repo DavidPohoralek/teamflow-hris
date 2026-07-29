@@ -223,12 +223,12 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+              <input type="time" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+              <input type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
@@ -327,12 +327,12 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+              <input type="time" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+              <input type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
@@ -486,12 +486,12 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Začátek', 'Start')}</label>
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+              <input type="time" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Konec', 'End')}</label>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+              <input type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
@@ -726,8 +726,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   }, [orgId]);
 
   // ── Fetch schedule — always fetch full month range so month view has data ──
-  const fetchPlans = useCallback(async () => {
-    setLoading(true);
+  // silent = don't toggle the loading state (keeps the grid rendered so the
+  // scroll position is preserved after adding/editing a shift).
+  const fetchPlans = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const currentMonth = weekDays[3].slice(0, 7);
       const [cy, cm] = currentMonth.split('-').map(Number);
@@ -755,7 +757,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       setMonthPlansMap(buildMap(allPlans, (d) => d.startsWith(currentMonth)));
       setFullPlansMap(buildMap(allPlans));
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [orgId, weekDays.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1085,7 +1087,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           ? `✓ ${ok} ${t('vloženo', 'pasted')}, ${failed} ${t('přeskočeno', 'skipped')}${firstErr ? ` (${firstErr})` : ''}`
           : `✓ ${ok} ${t('směn vloženo', 'shifts pasted')}`);
         cancelPasteMode();
-        fetchPlans();
+        fetchPlans({ silent: true });
       } else if (got401 && hasManagerToken) {
         // Manager session expired → managerFetch already opened the re-login modal.
         // Keep the staged cells and auto-save once the manager is back.
@@ -1117,7 +1119,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       const res = isManagerMode
         ? await managerFetch(`/api/public/work-plans?${params}`, { method: 'DELETE' })
         : await fetch(`/api/public/work-plans?${params}&pin=${encodeURIComponent(sessionPin)}`, { method: 'DELETE' });
-      if (res.ok) { setToast(t('Směna smazána', 'Shift deleted')); fetchPlans(); }
+      if (res.ok) { setToast(t('Směna smazána', 'Shift deleted')); fetchPlans({ silent: true }); }
     } catch { /* ignore */ }
   }, [orgId, isManagerMode, sessionPin, fetchPlans, t]);
 
@@ -1798,7 +1800,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           sessionEmployee={sessionEmployee}
           sessionPin={sessionPin || undefined}
           onClose={() => setShowBulkModal(false)}
-          onSuccess={() => { setToast(t('Směny zadány!', 'Shifts assigned!')); fetchPlans(); }}
+          onSuccess={() => { setToast(t('Směny zadány!', 'Shifts assigned!')); fetchPlans({ silent: true }); }}
         />
       )}
 
@@ -1811,7 +1813,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           sessionPin={sessionPin || undefined}
           defaultEmployeeId={addModalEmployeeId}
           onClose={() => setShowAddModal(false)}
-          onSuccess={() => { setToast(t('Směna přidána!', 'Shift added!')); fetchPlans(); }}
+          onSuccess={() => { setToast(t('Směna přidána!', 'Shift added!')); fetchPlans({ silent: true }); }}
         />
       )}
 
@@ -1823,7 +1825,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           isManagerMode={isManagerMode}
           sessionPin={sessionPin || undefined}
           onClose={() => setEditEntry(null)}
-          onSuccess={() => { setToast(t('Směna upravena!', 'Shift updated!')); fetchPlans(); }}
+          onSuccess={() => { setToast(t('Směna upravena!', 'Shift updated!')); fetchPlans({ silent: true }); }}
         />
       )}
 
