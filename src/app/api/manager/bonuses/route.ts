@@ -13,16 +13,70 @@ function inScope(departments: string[] | null, dept: string | null | undefined):
   return departments.includes(dept ?? '')
 }
 
+// Is the logged-in manager the owner? (owner = employees.is_owner, or an admin)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveIsOwner(sb: any, orgId: string, employeeId: string | null, isAdmin: boolean): Promise<boolean> {
+  if (isAdmin) return true
+  if (!employeeId) return false
+  const { data } = await sb.from('employees').select('is_owner').eq('id', employeeId).eq('organization_id', orgId).maybeSingle()
+  return Boolean(data?.is_owner)
+}
+
 // GET /api/manager/bonuses?month=YYYY-MM   → entries for the month (scoped)
 // GET /api/manager/bonuses?summary=1       → per-month totals for the manager's scope
+// GET /api/manager/bonuses?budget=1&month= → budget for the manager's scope
+// GET /api/manager/bonuses?scope=all&month= → owner: all bonuses + per-department breakdown
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req)
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-  const { orgId, supabase, departments } = resolved
+  const { orgId, supabase, departments, employeeId, isAdmin } = resolved
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any
 
   const { searchParams } = new URL(req.url)
+
+  // ── Budget for the manager's scope ─────────────────────────────────────────
+  if (searchParams.get('budget') === '1') {
+    const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+
+    // Rate per person from settings (default 500 Kč)
+    const { data: settingsRow } = await sb
+      .from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle()
+    const extra = (settingsRow?.extra_settings ?? {}) as Record<string, unknown>
+    const rate = Number(extra['bonus_budget_per_person']) > 0 ? Number(extra['bonus_budget_per_person']) : 500
+
+    // Headcount = active employees in scope, EXCLUDING managers ("vedoucí se nezapočítává")
+    const { data: emps } = await sb
+      .from('employees').select('id, department, is_manager').eq('organization_id', orgId).eq('active', true)
+    const eligible = (emps ?? []).filter((e: { department: string | null; is_manager?: boolean }) =>
+      inScope(departments, e.department) && !e.is_manager)
+    const headcount = eligible.length
+    const budget = headcount * rate
+
+    // Spent this month within scope
+    const { data: bonusRows } = await sb
+      .from('employee_bonuses').select('amount, employees ( department )')
+      .eq('organization_id', orgId).eq('month', month)
+    const spent = ((bonusRows ?? []) as { amount: number; employees: { department: string | null } | null }[])
+      .filter(r => inScope(departments, r.employees?.department))
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0)
+
+    return NextResponse.json({ budget, spent: Math.round(spent * 100) / 100, headcount, rate })
+  }
+
+  // ── Owner overview: all bonuses across the org ─────────────────────────────
+  if (searchParams.get('scope') === 'all') {
+    if (!(await resolveIsOwner(sb, orgId, employeeId, isAdmin))) {
+      return NextResponse.json({ error: 'Přehled všech bonusů má jen majitel.' }, { status: 403 })
+    }
+    const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+    const { data, error } = await sb
+      .from('employee_bonuses')
+      .select('id, employee_id, month, amount, note, granted_by, created_at, employees ( id, name, department, is_manager )')
+      .eq('organization_id', orgId).eq('month', month).order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ bonuses: data ?? [] })
+  }
 
   if (searchParams.get('summary') === '1') {
     const { data, error } = await sb
@@ -108,8 +162,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Částka musí být kladné číslo.' }, { status: 422 })
   }
 
-  const check = await checkEmployee({ orgId, sb, departments }, employee_id)
-  if ('error' in check) return check.error
+  // Owner may bonus anyone (incl. managers) — bypass the department scope.
+  const isOwner = await resolveIsOwner(sb, orgId, managerEmployeeId, isAdmin)
+  if (isOwner) {
+    const { data: emp } = await sb.from('employees').select('id').eq('id', employee_id).eq('organization_id', orgId).maybeSingle()
+    if (!emp) return NextResponse.json({ error: 'Zaměstnanec nenalezen.' }, { status: 404 })
+  } else {
+    const check = await checkEmployee({ orgId, sb, departments }, employee_id)
+    if ('error' in check) return check.error
+  }
 
   let grantedBy = isAdmin ? 'Administrátor' : 'Manažer'
   if (managerEmployeeId) {
@@ -142,7 +203,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const resolved = await resolveOrgId(req)
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-  const { orgId, supabase, departments } = resolved
+  const { orgId, supabase, departments, employeeId, isAdmin } = resolved
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any
 
@@ -157,7 +218,8 @@ export async function DELETE(req: NextRequest) {
     .maybeSingle()
 
   if (!existing) return NextResponse.json({ error: 'Záznam nenalezen.' }, { status: 404 })
-  if (!inScope(departments, existing.employees?.department)) {
+  const isOwner = await resolveIsOwner(sb, orgId, employeeId, isAdmin)
+  if (!isOwner && !inScope(departments, existing.employees?.department)) {
     return NextResponse.json({ error: 'Tento záznam nepatří do vašich oddělení.' }, { status: 403 })
   }
 

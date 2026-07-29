@@ -44,6 +44,7 @@ const EXTRA_KEYS = [
   'bonus_sunday_departments',
   'bonus_special_days',
   'ui_layout',
+  'bonus_budget_per_person',
 ];
 
 // GET /api/manager/settings

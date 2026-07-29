@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
     vacation_hours_offset,
     employment_type,
     is_manager,
+    is_owner,
     managed_departments,
     manager_permissions,
     hourly_rate,
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
     vacation_hours_offset: typeof vacation_hours_offset === 'number' ? Math.max(0, vacation_hours_offset) : 0,
     employment_type: typeof employment_type === 'string' ? employment_type : 'hpp',
     is_manager: typeof is_manager === 'boolean' ? is_manager : false,
+    is_owner: typeof is_owner === 'boolean' ? is_owner : false,
     managed_departments: Array.isArray(managed_departments) ? (managed_departments as string[]) : null,
     manager_permissions: Array.isArray(manager_permissions) ? (manager_permissions as string[]) : [],
     hourly_rate: typeof hourly_rate === 'number' ? hourly_rate : null,
@@ -107,11 +109,18 @@ export async function POST(req: NextRequest) {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: employee, error } = await (supabase as any)
+  let { data: employee, error } = await (supabase as any)
     .from('employees')
     .insert(insert)
     .select()
     .single();
+
+  // Graceful fallback if is_owner column isn't migrated yet
+  if (error && /is_owner/.test(error.message ?? '')) {
+    delete (insert as Record<string, unknown>).is_owner;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ data: employee, error } = await (supabase as any).from('employees').insert(insert).select().single());
+  }
 
   if (error) {
     console.error('[POST /api/employees]', error);

@@ -26,6 +26,19 @@ interface MonthSummary {
   count: number
 }
 
+interface OverviewRow {
+  id: string
+  employee_id: string
+  month: string
+  amount: number
+  note: string | null
+  granted_by: string | null
+  created_at: string
+  employees: { id: string; name: string; department: string | null; is_manager?: boolean } | null
+}
+
+type ViewMode = 'staff' | 'managers' | 'overview'
+
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
 }
@@ -56,16 +69,55 @@ export default function BonusesTab() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showHistory, setShowHistory] = useState(false)
+  // Owner features
+  const [isOwner, setIsOwner] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('staff')
+  const [budget, setBudget] = useState<{ budget: number; spent: number; headcount: number; rate: number } | null>(null)
+  const [overview, setOverview] = useState<OverviewRow[]>([])
 
   const isCurrentMonth = month === currentMonth()
 
-  // Scoped list — a manager only hands out bonuses to their own people
+  // Am I the owner? (drives the manager-bonus window + overview)
   useEffect(() => {
-    managerFetch('/api/employees')
+    managerFetch('/api/manager/whoami')
       .then(r => r.json())
-      .then(d => setEmployees((d.employees ?? []).map((e: Employee) => ({ id: e.id, name: e.name, department: e.department }))))
+      .then(d => setIsOwner(Boolean(d.isOwner)))
       .catch(() => {})
   }, [])
+
+  // Recipients list — staff (scoped) vs managers (owner giving to managers)
+  useEffect(() => {
+    const url = viewMode === 'managers' ? '/api/employees?all=1' : '/api/employees'
+    managerFetch(url)
+      .then(r => r.json())
+      .then(d => {
+        let list = (d.employees ?? []) as (Employee & { is_manager?: boolean })[]
+        if (viewMode === 'managers') list = list.filter(e => e.is_manager)
+        setEmployees(list.map(e => ({ id: e.id, name: e.name, department: e.department })))
+      })
+      .catch(() => {})
+  }, [viewMode])
+
+  // Budget for the manager's scope
+  const fetchBudget = useCallback(async () => {
+    try {
+      const res = await managerFetch(`/api/manager/bonuses?budget=1&month=${month}`)
+      const d = await res.json()
+      if (res.ok) setBudget(d)
+    } catch { /* non-critical */ }
+  }, [month])
+  useEffect(() => { fetchBudget() }, [fetchBudget])
+
+  // Owner overview — all bonuses across the org for the month
+  const fetchOverview = useCallback(async () => {
+    if (!isOwner || viewMode !== 'overview') return
+    try {
+      const res = await managerFetch(`/api/manager/bonuses?scope=all&month=${month}`)
+      const d = await res.json()
+      if (res.ok) setOverview((d.bonuses ?? []) as OverviewRow[])
+    } catch { /* ignore */ }
+  }, [isOwner, viewMode, month])
+  useEffect(() => { fetchOverview() }, [fetchOverview])
 
   const fetchEntries = useCallback(async () => {
     setLoading(true)
@@ -132,7 +184,7 @@ export default function BonusesTab() {
       if (!res.ok) throw new Error(resp.error ?? 'Uložení selhalo')
       setEntries(prev => [...prev, resp.bonus as BonusEntry])
       setDrafts(prev => { const next = new Map(prev); next.delete(empId); return next })
-      fetchSummary()
+      fetchSummary(); fetchBudget()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Uložení selhalo')
     } finally {
@@ -148,7 +200,7 @@ export default function BonusesTab() {
       const resp = await res.json()
       if (!res.ok) throw new Error(resp.error ?? 'Smazání selhalo')
       setEntries(prev => prev.filter(e => e.id !== entryId))
-      fetchSummary()
+      fetchSummary(); fetchBudget()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Smazání selhalo')
     } finally {
@@ -174,8 +226,31 @@ export default function BonusesTab() {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'cs'))
   }, [filtered, t])
 
+  const overBudget = budget != null && budget.spent > budget.budget
+
   return (
     <div className="p-6 max-w-4xl">
+      {/* Owner view switcher */}
+      {isOwner && (
+        <div className="flex items-center gap-1 mb-4 bg-slate-100 rounded-xl p-1 w-fit">
+          {([
+            { id: 'staff' as ViewMode, label: `👥 ${t('Zaměstnancům', 'To staff')}` },
+            { id: 'managers' as ViewMode, label: `👔 ${t('Manažerům', 'To managers')}` },
+            { id: 'overview' as ViewMode, label: `📊 ${t('Přehled všech', 'All bonuses')}` },
+          ]).map(m => (
+            <button
+              key={m.id}
+              onClick={() => setViewMode(m.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                viewMode === m.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Month navigation */}
       <div className="flex flex-wrap items-center gap-3 mb-1">
         <div className="flex items-center gap-1">
@@ -229,9 +304,43 @@ export default function BonusesTab() {
       </div>
 
       <p className="text-xs text-gray-400 mb-4">
-        {t('Bonusy pro podřízené — jednomu člověku lze přidat i více bonusů za měsíc. Bonusy se propíší do exportu jako „Bonus od vedoucího“.',
-           'Bonuses for your people — one person can receive multiple bonuses per month. Bonuses appear in the export as "Manager bonus".')}
+        {viewMode === 'managers'
+          ? t('Bonusy pro manažery. Jako majitel je můžeš přidat komukoliv z vedení.', 'Bonuses for managers. As the owner you can give them to anyone in the leadership.')
+          : t('Bonusy pro podřízené — jednomu člověku lze přidat i více bonusů za měsíc. Bonusy se propíší do exportu jako „Bonus od vedoucího“.',
+               'Bonuses for your people — one person can receive multiple bonuses per month. Bonuses appear in the export as "Manager bonus".')}
       </p>
+
+      {/* Budget banner — staff mode */}
+      {viewMode === 'staff' && budget != null && budget.budget > 0 && (
+        <div className={`mb-4 rounded-xl border px-4 py-3 ${overBudget ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+          <div className="flex items-center justify-between text-sm mb-1.5">
+            <span className="font-semibold text-slate-700">
+              💰 {t('Rozpočet oddělení', 'Department budget')}
+              <span className="text-xs font-normal text-slate-400 ml-1">
+                ({fmtCZK(budget.rate)} Kč × {budget.headcount} {t('lidí', 'people')})
+              </span>
+            </span>
+            <span className={`font-bold ${overBudget ? 'text-red-600' : 'text-emerald-700'}`}>
+              {fmtCZK(budget.spent)} / {fmtCZK(budget.budget)} Kč
+            </span>
+          </div>
+          <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-slate-100">
+            <div
+              className={`h-full rounded-full transition-all ${overBudget ? 'bg-red-500' : 'bg-emerald-500'}`}
+              style={{ width: `${Math.min(100, budget.budget > 0 ? (budget.spent / budget.budget) * 100 : 0)}%` }}
+            />
+          </div>
+          {overBudget ? (
+            <p className="text-xs text-red-600 font-medium mt-1.5">
+              ⚠️ {t('Překročeno o', 'Over by')} {fmtCZK(budget.spent - budget.budget)} Kč — {t('rozpočet lze překročit, ale hlídej to.', 'you can exceed it, but keep an eye on it.')}
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 mt-1.5">
+              {t('Zbývá', 'Remaining')} {fmtCZK(budget.budget - budget.spent)} Kč
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Month-by-month history */}
       {showHistory && (
@@ -271,7 +380,9 @@ export default function BonusesTab() {
         <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600 font-medium">{error}</div>
       )}
 
-      {loading ? (
+      {viewMode === 'overview' ? (
+        <OwnerOverview overview={overview} month={month} onDelete={deleteEntry} deletingId={deletingId} t={t} />
+      ) : loading ? (
         <div className="py-12 text-center text-gray-400 text-sm">
           <div className="inline-flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
@@ -373,6 +484,88 @@ export default function BonusesTab() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ─── Owner overview: all bonuses across the org for the month ────────────────
+
+function OwnerOverview({
+  overview, month, onDelete, deletingId, t,
+}: {
+  overview: OverviewRow[]
+  month: string
+  onDelete: (id: string) => void
+  deletingId: string | null
+  t: (cs: string, en: string) => string
+}) {
+  const total = overview.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+
+  // Split: bonuses to managers vs to staff; group staff by department
+  const toManagers = overview.filter(r => r.employees?.is_manager)
+  const toStaff = overview.filter(r => !r.employees?.is_manager)
+
+  const byDept = new Map<string, OverviewRow[]>()
+  for (const r of toStaff) {
+    const key = r.employees?.department ?? t('Bez oddělení', 'No department')
+    if (!byDept.has(key)) byDept.set(key, [])
+    byDept.get(key)!.push(r)
+  }
+  const deptGroups = Array.from(byDept.entries()).sort((a, b) => a[0].localeCompare(b[0], 'cs'))
+
+  const Row = ({ r }: { r: OverviewRow }) => (
+    <div className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 transition-colors">
+      <span className="text-sm font-medium text-slate-800 w-40 truncate">{r.employees?.name ?? '—'}</span>
+      <span className="text-sm font-bold text-emerald-600 w-24">{fmtCZK(Number(r.amount))} Kč</span>
+      {r.note && <span className="text-xs text-slate-400 flex-1 min-w-0 truncate">— {r.note}</span>}
+      <span className="text-[11px] text-slate-400 ml-auto shrink-0">
+        {r.granted_by ? `${t('od', 'by')} ${r.granted_by}` : ''}
+      </span>
+      <button
+        onClick={() => { if (confirm(t('Smazat tento bonus?', 'Delete this bonus?'))) onDelete(r.id) }}
+        disabled={deletingId === r.id}
+        className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+        title={t('Smazat', 'Delete')}
+      >✕</button>
+    </div>
+  )
+
+  const groupTotal = (rows: OverviewRow[]) => rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+
+  return (
+    <div>
+      <div className="mb-5 flex items-center justify-between px-4 py-3 rounded-xl bg-slate-800 text-white">
+        <span className="text-sm font-medium">{t('Rozdáno celkem za', 'Total for')} {monthLabel(month)}</span>
+        <span className="text-lg font-bold">{fmtCZK(total)} Kč</span>
+      </div>
+
+      {overview.length === 0 && (
+        <div className="py-12 text-center text-slate-400 text-sm">{t('Za tento měsíc žádné bonusy.', 'No bonuses this month.')}</div>
+      )}
+
+      {toManagers.length > 0 && (
+        <div className="mb-5">
+          <h3 className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-2 flex items-center justify-between">
+            <span>👔 {t('Manažerům', 'To managers')}</span>
+            <span className="text-slate-500 normal-case">{fmtCZK(groupTotal(toManagers))} Kč</span>
+          </h3>
+          <div className="border border-amber-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+            {toManagers.map(r => <Row key={r.id} r={r} />)}
+          </div>
+        </div>
+      )}
+
+      {deptGroups.map(([dept, rows]) => (
+        <div key={dept} className="mb-5">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center justify-between">
+            <span>{dept}</span>
+            <span className="normal-case">{fmtCZK(groupTotal(rows))} Kč</span>
+          </h3>
+          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+            {rows.map(r => <Row key={r.id} r={r} />)}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

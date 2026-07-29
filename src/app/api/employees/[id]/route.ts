@@ -73,6 +73,7 @@ export async function PUT(
     vacation_hours_offset,
     employment_type,
     is_manager,
+    is_owner,
     managed_departments,
     manager_permissions,
     hourly_rate,
@@ -117,6 +118,7 @@ export async function PUT(
   // RBAC fields + hourly_rate — only admin can change these
   if (isAdmin) {
     if (is_manager !== undefined) update.is_manager = typeof is_manager === 'boolean' ? is_manager : false;
+    if (is_owner !== undefined) update.is_owner = typeof is_owner === 'boolean' ? is_owner : false;
     if (managed_departments !== undefined)
       update.managed_departments = Array.isArray(managed_departments) ? managed_departments : null;
     if (manager_permissions !== undefined)
@@ -130,13 +132,20 @@ export async function PUT(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: employee, error } = await (supabase as any)
+  let { data: employee, error } = await (supabase as any)
     .from('employees')
     .update(update)
     .eq('id', params.id)
     .eq('organization_id', orgId)
     .select()
     .single();
+
+  // Graceful fallback if is_owner column isn't migrated yet
+  if (error && /is_owner/.test(error.message ?? '')) {
+    delete (update as Record<string, unknown>).is_owner;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ data: employee, error } = await (supabase as any).from('employees').update(update).eq('id', params.id).eq('organization_id', orgId).select().single());
+  }
 
   if (error) {
     console.error('[PUT /api/employees/[id]]', error);

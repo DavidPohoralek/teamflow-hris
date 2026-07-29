@@ -268,6 +268,7 @@ interface Employee {
   tier?: number;
   active: boolean;
   is_manager?: boolean;
+  is_owner?: boolean;
   managed_departments?: string[] | null;
   manager_permissions?: string[] | null;
 }
@@ -1130,6 +1131,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
     max_saturdays: employee?.max_saturdays ?? 0,
     short_long_week: employee?.short_long_week ?? false,
     is_manager: employee?.is_manager ?? false,
+    is_owner: employee?.is_owner ?? false,
     managed_departments: (employee?.managed_departments ?? []) as string[],
     manager_permissions: (employee?.manager_permissions ?? []) as string[],
   });
@@ -1418,6 +1420,17 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
                     className="w-4 h-4 rounded accent-blue-600"
                   />
                   <span className="text-sm text-slate-700">{t('Je manažer (může se přihlásit PINem)', 'Is manager (can log in with PIN)')}</span>
+                </label>
+              </FormField>
+              <FormField label="">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_owner}
+                    onChange={(e) => set('is_owner', e.target.checked)}
+                    className="w-4 h-4 rounded accent-amber-600"
+                  />
+                  <span className="text-sm text-slate-700">👑 {t('Je majitel (rozdává bonusy manažerům, vidí vše)', 'Is owner (bonuses to managers, sees everything)')}</span>
                 </label>
               </FormField>
               {form.is_manager && (
