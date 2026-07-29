@@ -611,6 +611,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   // Sticky toolbar
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarHeight, setToolbarHeight] = useState(56);
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [deptFilters, setDeptFilters] = useState<string[]>([]);
@@ -802,6 +803,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     });
     ro.observe(el);
     setToolbarHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  // ── Scrollbar width tracking for header/body alignment ────────────────────
+  useEffect(() => {
+    const el = bodyScrollRef.current;
+    if (!el) return;
+    const measure = () => setScrollbarWidth(el.offsetWidth - el.clientWidth);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
     return () => ro.disconnect();
   }, []);
 
@@ -1533,7 +1545,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         {/* Sticky header div — no overflow here, so position:sticky works vs. the window */}
         <div
           ref={headerScrollRef}
-          style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden' }}
+          style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden', paddingRight: scrollbarWidth > 0 ? scrollbarWidth : undefined }}
           className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-gray-50 border-b-2 border-gray-200 rounded-t-xl'}
         >
           <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
