@@ -167,9 +167,12 @@ export async function GET(req: NextRequest) {
 
     const managerBonus = managerBonusMap.get(emp.id) ?? 0;
     const hourlyRate = includeRate ? (emp.hourly_rate ?? null) : null;
+    const vacHours = countVacHoursInMonth(emp.id);
+    const isHPP = (emp.employment_type ?? '') === 'hpp';
     // Payroll total = final hours × rate + manager bonus (CZK)
+    // For HPP employees, vacation hours are also paid at the hourly rate
     const billableTotal = hourlyRate != null
-      ? Math.round((finalHours * hourlyRate + managerBonus) * 100) / 100
+      ? Math.round(((finalHours + (isHPP ? vacHours : 0)) * hourlyRate + managerBonus) * 100) / 100
       : null;
 
     return {
@@ -186,8 +189,8 @@ export async function GET(req: NextRequest) {
       finalHours,
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
-      vacHours: countVacHoursInMonth(emp.id),
-      finalWithVac: Math.round((finalHours + countVacHoursInMonth(emp.id)) * 100) / 100,
+      vacHours,
+      finalWithVac: Math.round((finalHours + vacHours) * 100) / 100,
       managerBonus,
       hourlyRate,
       billableTotal,
@@ -316,7 +319,14 @@ export async function GET(req: NextRequest) {
       if (colIdx.has('billableTotal') && r.hourlyRate != null) {
         const fh = colIdx.has('finalHours') ? cellRef('finalHours', excelRow) : String(r.finalHours);
         const mb = refOrConst('managerBonus', excelRow, r.managerBonus);
-        setFormula('billableTotal', `ROUND(${fh}*${cellRef('hourlyRate', excelRow)}+${mb},2)`, r.billableTotal ?? 0);
+        const rate = cellRef('hourlyRate', excelRow);
+        const isHPP = r.employmentType === 'HPP';
+        if (isHPP) {
+          const vh = refOrConst('vacHours', excelRow, r.vacHours);
+          setFormula('billableTotal', `ROUND((${fh}+${vh})*${rate}+${mb},2)`, r.billableTotal ?? 0);
+        } else {
+          setFormula('billableTotal', `ROUND(${fh}*${rate}+${mb},2)`, r.billableTotal ?? 0);
+        }
       }
     });
 
