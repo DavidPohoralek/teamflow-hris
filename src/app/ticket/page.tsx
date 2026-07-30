@@ -174,7 +174,7 @@ export default function TicketPage() {
   }
 
   const handleLogout = () => {
-    supabase.auth.signOut()
+    supabase.auth.signOut({ scope: 'global' })
     sessionStorage.removeItem('tf_ticket_session')
     sessionStorage.removeItem('tf_ticket_admin')
     setAccessToken(''); setUserName(''); setIsAdmin(false); setAdminPw('')

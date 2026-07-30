@@ -195,7 +195,7 @@ export default function Sidebar({ userEmail, displayName }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'global' });
     router.push('/login');
     router.refresh();
   }
