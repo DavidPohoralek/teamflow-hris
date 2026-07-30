@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     empQuery,
     sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
     sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
+    sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved'),
     activeBenefits.length > 0
       ? sb.from('employee_benefit_logs').select('employee_id, benefit_key, count').eq('organization_id', orgId).eq('month', month)
       : Promise.resolve({ data: [] }),
@@ -85,13 +85,24 @@ export async function GET(req: NextRequest) {
 
   function isSat(dateStr: string) { return new Date(dateStr + 'T00:00:00').getDay() === 6; }
 
-  function countVacHours(empId: string): number {
-    const days = vacReqs.filter((r) => r.employee_id === empId).reduce((sum, r) => {
-      if (!r.date_to) return sum + 1;
-      const d1 = new Date(r.date_from + 'T00:00:00');
-      const d2 = new Date(r.date_to + 'T00:00:00');
-      return sum + Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1);
-    }, 0);
+  const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all';
+
+  function countVacHoursInMonth(empId: string): number {
+    let days = 0;
+    for (const r of vacReqs) {
+      if (r.employee_id !== empId) continue;
+      const from = new Date(r.date_from + 'T00:00:00');
+      const to = r.date_to ? new Date(r.date_to + 'T00:00:00') : from;
+      const cur = new Date(from);
+      while (cur <= to) {
+        const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+        if (iso >= dateFrom && iso <= dateTo) {
+          const dow = cur.getDay();
+          if (countWeekends || (dow !== 0 && dow !== 6)) days++;
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
     return days * 8;
   }
 
@@ -175,7 +186,7 @@ export async function GET(req: NextRequest) {
       finalHours,
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
-      vacHours: countVacHours(emp.id),
+      vacHours: countVacHoursInMonth(emp.id),
       managerBonus,
       hourlyRate,
       billableTotal,
