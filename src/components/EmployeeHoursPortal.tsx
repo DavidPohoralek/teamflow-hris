@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EmployeeRequestModal from './EmployeeRequestModal';
 import PinPad from './PinPad';
 
@@ -108,10 +108,33 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   // Retroactive date picker: key = benefit_key, value = ISO date being picked
   const [retroDatePicker, setRetroDatePicker] = useState<Record<string, string>>({});
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
-  // Bottom tab: 'logs' | 'requests'
-  const [activeTab, setActiveTab] = useState<'logs' | 'requests'>('logs');
+  // Bottom tab: 'logs' | 'requests' | 'ho'
+  const [activeTab, setActiveTab] = useState<'logs' | 'requests' | 'ho'>('logs');
   // Log filter: 'today' | '7d' | '30d' | 'all'
   const [logFilter, setLogFilter] = useState<'today' | '7d' | '30d' | 'all'>('30d');
+  // HO reports
+  const [hoEnabled, setHoEnabled] = useState(false);
+  const [hoLogs, setHoLogs] = useState<{ id: string; date: string; checkIn: string | null; checkOut: string | null; note: string | null }[]>([]);
+  const [hoLoading, setHoLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.require_ho_activity_report) setHoEnabled(true); })
+      .catch(() => {});
+  }, [orgId]);
+
+  const fetchHoLogs = async (enteredPin: string) => {
+    setHoLoading(true);
+    try {
+      const res = await fetch(`/api/public/ho-reports?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(enteredPin)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setHoLogs(json.logs ?? []);
+      }
+    } catch { /* ignore */ }
+    finally { setHoLoading(false); }
+  };
 
   const handleNumpad = (key: string) => {
     if (key === '⌫') {
@@ -170,6 +193,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
         };
         setData(normalized);
         fetchRequests(enteredPin);
+        if (hoEnabled) fetchHoLogs(enteredPin);
         if (normalized.thisMonth.monthKey) {
           fetchBenefitCounts(enteredPin, normalized.thisMonth.monthKey);
           fetchBenefitEntries(enteredPin, normalized.thisMonth.monthKey);
@@ -508,6 +532,14 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                   <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-amber-400 text-white rounded-full">{requests.filter(r => r.status === 'pending').length}</span>
                 )}
               </button>
+              {hoEnabled && (
+                <button
+                  onClick={() => setActiveTab('ho')}
+                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'ho' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  HO
+                </button>
+              )}
             </div>
 
             {/* LOGS TAB */}
@@ -668,6 +700,44 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                   </div>
                 )}
               </>
+            )}
+
+            {/* HO TAB */}
+            {activeTab === 'ho' && (
+              hoLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : hoLogs.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-xl border border-slate-100">Žádné HomeOffice záznamy</p>
+              ) : (
+                <div className="space-y-3">
+                  {hoLogs.map((log) => {
+                    const mins = log.checkIn && log.checkOut
+                      ? Math.round((new Date(log.checkOut).getTime() - new Date(log.checkIn).getTime()) / 60000)
+                      : null;
+                    const hours = mins != null ? (mins / 60).toFixed(1) : null;
+                    const d = new Date(log.date + 'T00:00:00');
+                    const dayName = d.toLocaleDateString('cs-CZ', { weekday: 'short' });
+                    const dateStr = d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+                    return (
+                      <div key={log.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-slate-800">{dayName} {dateStr}</span>
+                          {hours && (
+                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{hours} h</span>
+                          )}
+                        </div>
+                        {log.note ? (
+                          <p className="text-sm text-slate-600 whitespace-pre-wrap">{log.note}</p>
+                        ) : (
+                          <p className="text-sm text-slate-400 italic">Bez poznámky</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
 
