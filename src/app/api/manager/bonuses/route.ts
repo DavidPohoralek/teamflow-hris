@@ -50,10 +50,10 @@ export async function GET(req: NextRequest) {
       inScope(departments, e.department) && !e.is_manager)
 
     const { data: bonusRows } = await sb
-      .from('employee_bonuses').select('amount, employees ( department )')
+      .from('employee_bonuses').select('amount, employees ( department, is_manager )')
       .eq('organization_id', orgId).eq('month', month)
-    const allBonuses = ((bonusRows ?? []) as { amount: number; employees: { department: string | null } | null }[])
-      .filter(r => inScope(departments, r.employees?.department))
+    const allBonuses = ((bonusRows ?? []) as { amount: number; employees: { department: string | null; is_manager?: boolean } | null }[])
+      .filter(r => inScope(departments, r.employees?.department) && !r.employees?.is_manager)
 
     // Group by department
     const deptMap = new Map<string, { headcount: number; spent: number }>()

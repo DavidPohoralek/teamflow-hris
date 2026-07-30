@@ -94,6 +94,7 @@ export default function BonusesTab() {
       .then(d => {
         let list = (d.employees ?? []) as (Employee & { is_manager?: boolean })[]
         if (viewMode === 'managers') list = list.filter(e => e.is_manager)
+        else if (viewMode === 'staff') list = list.filter(e => !e.is_manager)
         setEmployees(list.map(e => ({ id: e.id, name: e.name, department: e.department })))
       })
       .catch(() => {})
