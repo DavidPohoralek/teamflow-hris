@@ -743,11 +743,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         months.map((m) =>
           fetch(`/api/public/schedule?orgId=${encodeURIComponent(orgId)}&month=${encodeURIComponent(m)}`)
             .then((r) => r.json())
-            .then((d) => (d.workPlans ?? []) as WorkPlanEntry[])
-            .catch(() => [] as WorkPlanEntry[])
+            .then((d) => ({ plans: (d.workPlans ?? []) as WorkPlanEntry[], emps: (d.employees ?? []) as Employee[] }))
+            .catch(() => ({ plans: [] as WorkPlanEntry[], emps: [] as Employee[] }))
         )
       );
-      const allPlans = results.flat();
+      const allPlans = results.flatMap((r) => r.plans);
+      if (!isManagerMode && results.length > 0) {
+        const empMap = new Map<string, Employee>();
+        for (const r of results) for (const e of r.emps) if (!empMap.has(e.id)) empMap.set(e.id, e);
+        setEmployees(Array.from(empMap.values()));
+      }
 
       setPlansMap(buildMap(allPlans, (d) => weekDays.includes(d)));
       setMonthPlansMap(buildMap(allPlans, (d) => d.startsWith(currentMonth)));
@@ -755,7 +760,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     } finally {
       if (!opts?.silent) setLoading(false);
     }
-  }, [orgId, weekDays.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orgId, isManagerMode, weekDays.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
@@ -892,10 +897,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   // ── Employee list ─────────────────────────────────────────────────────────
   const baseEmployees: Employee[] = useMemo(() => {
-    const sourceMap = viewMode === 'month' ? fullPlansMap : plansMap;
-    const list = isManagerMode
+    const list = employees.length > 0
       ? employees
       : (() => {
+          const sourceMap = viewMode === 'month' ? fullPlansMap : plansMap;
           const seen = new Map<string, Employee>();
           Array.from(sourceMap.values()).forEach((p) => {
             p.forEach((e) => {

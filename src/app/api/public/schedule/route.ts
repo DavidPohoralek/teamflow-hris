@@ -106,5 +106,19 @@ export async function GET(req: NextRequest) {
     assignedCount: row.assigned_count,
   }));
 
-  return NextResponse.json({ month, workPlans, scheduleDays });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: empRows } = await (supabase as any)
+    .from('employees')
+    .select('id, name, department')
+    .eq('organization_id', orgId)
+    .eq('active', true)
+    .order('name');
+
+  const employees = (empRows ?? []).map((e: { id: string; name: string; department: string | null }) => ({
+    id: e.id,
+    name: e.name,
+    department: e.department,
+  }));
+
+  return NextResponse.json({ month, workPlans, scheduleDays, employees });
 }
