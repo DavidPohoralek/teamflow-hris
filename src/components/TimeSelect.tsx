@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useId } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTES = ['00', '15', '30', '45']
@@ -15,21 +15,33 @@ interface TimeSelectProps {
 
 export default function TimeSelect({ value, onChange, className, dark, selectClassName }: TimeSelectProps) {
   const id = useId()
-  const [h, m] = (value || '').split(':')
-  const hour = h ?? ''
-  const minute = m ?? ''
+  const [h, m] = (value || '00:00').split(':')
+
+  const [hourDraft, setHourDraft] = useState(h || '00')
+  const [minDraft, setMinDraft] = useState(m || '00')
+
+  useEffect(() => {
+    const [vh, vm] = (value || '00:00').split(':')
+    setHourDraft(vh || '00')
+    setMinDraft(vm || '00')
+  }, [value])
 
   const clamp = (v: string, max: number) => {
     const n = parseInt(v, 10)
-    if (isNaN(n)) return ''
+    if (isNaN(n)) return '00'
     return String(Math.max(0, Math.min(max, n))).padStart(2, '0')
   }
 
-  const commit = (newH: string, newM: string) => {
-    const ch = clamp(newH, 23)
-    const cm = clamp(newM, 59)
-    if (ch && cm) onChange(`${ch}:${cm}`)
-    else if (ch) onChange(`${ch}:00`)
+  const commitHour = (raw: string) => {
+    const ch = clamp(raw, 23)
+    setHourDraft(ch)
+    onChange(`${ch}:${clamp(minDraft, 59)}`)
+  }
+
+  const commitMin = (raw: string) => {
+    const cm = clamp(raw, 59)
+    setMinDraft(cm)
+    onChange(`${clamp(hourDraft, 23)}:${cm}`)
   }
 
   const inputCls = selectClassName ?? (dark
@@ -40,12 +52,9 @@ export default function TimeSelect({ value, onChange, className, dark, selectCla
     <div className={`flex items-center gap-1 ${className ?? ''}`}>
       <input
         list={`${id}-h`}
-        value={hour}
-        onChange={(e) => {
-          const raw = e.target.value.replace(/\D/g, '').slice(0, 2)
-          commit(raw, minute)
-        }}
-        onBlur={() => { if (hour) commit(hour, minute || '00') }}
+        value={hourDraft}
+        onChange={(e) => setHourDraft(e.target.value.replace(/\D/g, '').slice(0, 2))}
+        onBlur={(e) => commitHour(e.target.value)}
         placeholder="HH"
         inputMode="numeric"
         maxLength={2}
@@ -57,12 +66,9 @@ export default function TimeSelect({ value, onChange, className, dark, selectCla
       <span className={dark ? 'text-slate-400 font-medium' : 'text-gray-500 font-medium'}>:</span>
       <input
         list={`${id}-m`}
-        value={minute}
-        onChange={(e) => {
-          const raw = e.target.value.replace(/\D/g, '').slice(0, 2)
-          commit(hour, raw)
-        }}
-        onBlur={() => { if (minute) commit(hour || '00', minute) }}
+        value={minDraft}
+        onChange={(e) => setMinDraft(e.target.value.replace(/\D/g, '').slice(0, 2))}
+        onBlur={(e) => commitMin(e.target.value)}
         placeholder="MM"
         inputMode="numeric"
         maxLength={2}
