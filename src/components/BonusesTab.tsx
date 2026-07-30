@@ -20,12 +20,6 @@ interface BonusEntry {
   created_at: string
 }
 
-interface MonthSummary {
-  month: string
-  total: number
-  count: number
-}
-
 interface OverviewRow {
   id: string
   employee_id: string
@@ -60,7 +54,6 @@ export default function BonusesTab() {
   const [month, setMonth] = useState(currentMonth())
   const [employees, setEmployees] = useState<Employee[]>([])
   const [entries, setEntries] = useState<BonusEntry[]>([])
-  const [summary, setSummary] = useState<MonthSummary[]>([])
   const [loading, setLoading] = useState(true)
   // Add-form drafts keyed by employee id
   const [drafts, setDrafts] = useState<Map<string, { amount: string; note: string }>>(new Map())
@@ -68,7 +61,6 @@ export default function BonusesTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [showHistory, setShowHistory] = useState(false)
   // Owner features
   const [isOwner, setIsOwner] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('staff')
@@ -138,16 +130,7 @@ export default function BonusesTab() {
     }
   }, [month])
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      const res = await managerFetch('/api/manager/bonuses?summary=1')
-      const d = await res.json()
-      if (res.ok) setSummary((d.summary ?? []) as MonthSummary[])
-    } catch { /* non-critical */ }
-  }, [])
-
   useEffect(() => { fetchEntries() }, [fetchEntries])
-  useEffect(() => { fetchSummary() }, [fetchSummary])
 
   const entriesByEmployee = useMemo(() => {
     const map = new Map<string, BonusEntry[]>()
@@ -188,7 +171,7 @@ export default function BonusesTab() {
       if (!res.ok) throw new Error(resp.error ?? 'Uložení selhalo')
       setEntries(prev => [...prev, resp.bonus as BonusEntry])
       setDrafts(prev => { const next = new Map(prev); next.delete(empId); return next })
-      fetchSummary(); fetchBudget()
+      fetchBudget()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Uložení selhalo')
     } finally {
@@ -204,7 +187,7 @@ export default function BonusesTab() {
       const resp = await res.json()
       if (!res.ok) throw new Error(resp.error ?? 'Smazání selhalo')
       setEntries(prev => prev.filter(e => e.id !== entryId))
-      fetchSummary(); fetchBudget()
+      fetchBudget()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Smazání selhalo')
     } finally {
@@ -288,15 +271,6 @@ export default function BonusesTab() {
           )}
         </div>
 
-        <button
-          onClick={() => setShowHistory(v => !v)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-            showHistory ? 'bg-slate-700 text-white border-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          📊 {t('Historie', 'History')}
-        </button>
-
         <div className="relative ml-auto">
           <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -317,34 +291,6 @@ export default function BonusesTab() {
       </p>
 
       {/* Budget banners are now rendered per-department inside the grouped loop */}
-
-      {/* Month-by-month history */}
-      {showHistory && (
-        <div className="mb-5 border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-widest">
-            {t('Historie po měsících', 'Month-by-month history')}
-          </div>
-          {summary.length === 0 ? (
-            <div className="px-4 py-4 text-sm text-gray-400">{t('Zatím žádné bonusy.', 'No bonuses yet.')}</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {summary.map(s => (
-                <button
-                  key={s.month}
-                  onClick={() => { setMonth(s.month); setShowHistory(false) }}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors ${s.month === month ? 'bg-blue-50/60' : 'bg-white'}`}
-                >
-                  <span className="font-medium text-slate-700 capitalize">{monthLabel(s.month)}</span>
-                  <span className="flex items-center gap-3">
-                    <span className="text-xs text-slate-400">{s.count}× {t('bonus', 'bonus')}</span>
-                    <span className="font-bold text-slate-800">{fmtCZK(s.total)} Kč</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {!isCurrentMonth && (
         <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
