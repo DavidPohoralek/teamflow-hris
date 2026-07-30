@@ -187,6 +187,7 @@ export async function GET(req: NextRequest) {
       targetHours,
       delta: Math.round((workedHours - targetHours) * 100) / 100,
       vacHours: countVacHoursInMonth(emp.id),
+      finalWithVac: Math.round((finalHours + countVacHoursInMonth(emp.id)) * 100) / 100,
       managerBonus,
       hourlyRate,
       billableTotal,
@@ -213,6 +214,7 @@ export async function GET(req: NextRequest) {
   if (col('targetHours'))    colDefs.push({ key: 'targetHours', label: isEn ? 'Target hours' : 'Fond hodin (h)' });
   if (col('delta'))          colDefs.push({ key: 'delta', label: isEn ? 'Difference' : 'Rozdíl (h)' });
   if (col('vacDays'))        colDefs.push({ key: 'vacHours', label: isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)' });
+  if (col('finalWithVac'))   colDefs.push({ key: 'finalWithVac', label: isEn ? 'Total incl. vacation (h)' : 'Výsledek vč. dovolené (h)' });
   if (col('managerBonus'))   colDefs.push({ key: 'managerBonus', label: isEn ? 'Manager bonus (CZK)' : 'Bonus od vedoucího (Kč)' });
   if (includeRate) {
     colDefs.push({ key: 'hourlyRate', label: isEn ? 'Hourly rate (CZK)' : 'Sazba (Kč/h)' });
@@ -235,6 +237,7 @@ export async function GET(req: NextRequest) {
       case 'targetHours': return r.targetHours;
       case 'delta': return r.delta;
       case 'vacHours': return r.vacHours;
+      case 'finalWithVac': return r.finalWithVac;
       case 'managerBonus': return r.managerBonus;
       case 'hourlyRate': return r.hourlyRate;
       case 'billableTotal': return r.billableTotal;
@@ -302,6 +305,12 @@ export async function GET(req: NextRequest) {
         setFormula('finalHours', `ROUND(${finalExpr},2)`, r.finalHours);
 
         setFormula('delta', `ROUND(${worked}-${refOrConst('targetHours', excelRow, r.targetHours)},2)`, r.delta);
+
+        if (colIdx.has('finalWithVac')) {
+          const fh = refOrConst('finalHours', excelRow, r.finalHours);
+          const vh = refOrConst('vacHours', excelRow, r.vacHours);
+          setFormula('finalWithVac', `ROUND(${fh}+${vh},2)`, r.finalWithVac);
+        }
       }
 
       if (colIdx.has('billableTotal') && r.hourlyRate != null) {
