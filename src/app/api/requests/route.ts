@@ -4,6 +4,7 @@ import { resolveOrgId } from '@/lib/resolveOrg';
 // GET /api/requests
 // Query params:
 //   status=pending|approved|rejected  (optional)
+//   type=vacation|sick|correction|other (optional)
 //   month=YYYY-MM                     (optional)
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const statusFilter = searchParams.get('status');
+  const typeFilter = searchParams.get('type');
   const monthFilter = searchParams.get('month'); // YYYY-MM
 
   // If scoped manager has department restrictions, fetch allowed employee IDs first
@@ -58,6 +60,7 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (allowedEmpIds !== null) q = q.in('employee_id', allowedEmpIds);
+    if (typeFilter && ['vacation', 'sick', 'correction', 'other'].includes(typeFilter)) q = q.eq('type', typeFilter);
     if (statusFilter && ['pending', 'approved', 'rejected'].includes(statusFilter)) q = q.eq('status', statusFilter);
     if (monthFilter && /^\d{4}-\d{2}$/.test(monthFilter)) {
       const [year, month] = monthFilter.split('-').map(Number);

@@ -478,6 +478,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [requests, setRequests] = useState<VacationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [nameSearch, setNameSearch] = useState('');
   // Employee PIN session
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
@@ -550,8 +551,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       if (isManagerMode) {
         const [empRes, approvedRes, pendingRes] = await Promise.all([
           managerFetch('/api/employees'),
-          managerFetch(`/api/requests?status=approved`),
-          managerFetch(`/api/requests?status=pending`),
+          managerFetch(`/api/requests?type=vacation&status=approved`),
+          managerFetch(`/api/requests?type=vacation&status=pending`),
         ]);
         const empJson = await empRes.json();
         const approvedJson = await approvedRes.json();
@@ -610,10 +611,18 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const [year, mo] = month.split('-').map(Number);
   const firstOffset = days.length > 0 ? mondayWeekday(days[0]) : 0;
 
-  // Apply "Pouze má dovolená" filter
-  const visibleRequests = myVacationOnly && sessionEmployee
-    ? requests.filter((r) => r.employee_id === sessionEmployee.id)
-    : requests;
+  // Apply "Pouze má dovolená" + name search filter
+  const visibleRequests = (() => {
+    let result = requests;
+    if (myVacationOnly && sessionEmployee) {
+      result = result.filter((r) => r.employee_id === sessionEmployee.id);
+    }
+    if (nameSearch.trim()) {
+      const q = nameSearch.trim().toLowerCase();
+      result = result.filter((r) => (r.employeeName ?? '').toLowerCase().includes(q));
+    }
+    return result;
+  })();
 
   // For each employee, collect their vacation days in this month
   const empVacMap = new Map<string, Set<string>>();
@@ -833,6 +842,18 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
               </form>
             )
           )}
+
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
+              placeholder={t('Hledat…', 'Search…')}
+              className="pl-7 pr-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-40" />
+            {nameSearch && (
+              <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+            )}
+          </div>
 
           {isManagerMode && (
             <button onClick={() => setShowModal(true)}
@@ -1088,7 +1109,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
             {isAdmin && <span className="text-[11px] text-slate-400">{t('Rozklikni jméno pro správu dovolených', 'Click a name to manage vacations')}</span>}
           </div>
           <div className="divide-y divide-slate-50">
-            {employees.map((emp) => {
+            {employees.filter((emp) => !nameSearch.trim() || emp.name.toLowerCase().includes(nameSearch.trim().toLowerCase())).map((emp) => {
               const total = emp.vacation_days_per_year ?? 20;
               const empVacs = requests
                 .filter((r) => r.employee_id === emp.id && (!r.type || r.type === 'vacation'))
