@@ -176,6 +176,7 @@ export async function GET(req: NextRequest) {
 
     // All logs for display (sorted by date desc, check_in desc)
     let thisMonthSatBonusHours = 0
+    let lastMonthSatBonusHours = 0
     const recentLogs = logs.map((l) => {
       const durationHours =
         l.check_in && l.check_out
@@ -199,6 +200,9 @@ export async function GET(req: NextRequest) {
           if (l.date >= thisRange.firstDay && l.date <= thisRange.lastDay) {
             thisMonthSatBonusHours += satBonusHours
           }
+          if (l.date >= lastRange.firstDay && l.date <= lastRange.lastDay) {
+            lastMonthSatBonusHours += satBonusHours
+          }
         }
       }
 
@@ -212,6 +216,7 @@ export async function GET(req: NextRequest) {
       }
     })
     thisMonthSatBonusHours = Math.round(thisMonthSatBonusHours * 100) / 100
+    lastMonthSatBonusHours = Math.round(lastMonthSatBonusHours * 100) / 100
 
     // Count vacation days used
     let vacationUsed = 0
@@ -267,6 +272,7 @@ export async function GET(req: NextRequest) {
         days: lastStats.days,
         monthName: czechMonthName(lastYear, lastMonthNum),
         monthKey: `${lastYear}-${String(lastMonthNum).padStart(2, '0')}`,
+        saturdayBonusHours: lastMonthSatBonusHours,
       },
       recentLogs,
       benefits,

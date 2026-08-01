@@ -38,6 +38,7 @@ interface EmployeeHoursData {
     hours: number;
     days: number;
     monthKey?: string;
+    saturdayBonusHours?: number;
   };
   records: AttendanceRecord[];
   vacation?: {
@@ -173,6 +174,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             hours: json.lastMonth?.hours ?? 0,
             days: json.lastMonth?.days ?? 0,
             monthKey: json.lastMonth?.monthKey,
+            saturdayBonusHours: json.lastMonth?.saturdayBonusHours ?? 0,
           },
           vacation: json.vacation ?? undefined,
           benefits: json.benefits ?? [],
@@ -385,16 +387,27 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             );
           })()}
 
-          {/* Saturday bonus card */}
-          {(data.thisMonth.saturdayBonusHours ?? 0) > 0 && (
-            <div className="px-4 sm:px-6 pb-3">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-0.5">Bonus za soboty</p>
-                  <p className="text-xs text-amber-500">aktuální měsíc</p>
+          {/* Saturday bonus cards */}
+          {((data.thisMonth.saturdayBonusHours ?? 0) > 0 || (data.lastMonth.saturdayBonusHours ?? 0) > 0) && (
+            <div className="px-4 sm:px-6 pb-3 space-y-2">
+              {(data.thisMonth.saturdayBonusHours ?? 0) > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-0.5">Bonus za soboty</p>
+                    <p className="text-xs text-amber-500">aktuální měsíc</p>
+                  </div>
+                  <p className="text-2xl font-bold text-amber-700">+{data.thisMonth.saturdayBonusHours!.toFixed(2)}<span className="text-sm ml-1 font-medium">h</span></p>
                 </div>
-                <p className="text-2xl font-bold text-amber-700">+{data.thisMonth.saturdayBonusHours!.toFixed(2)}<span className="text-sm ml-1 font-medium">h</span></p>
-              </div>
+              )}
+              {(data.lastMonth.saturdayBonusHours ?? 0) > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Bonus za soboty</p>
+                    <p className="text-xs text-slate-400">minulý měsíc</p>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-600">+{data.lastMonth.saturdayBonusHours!.toFixed(2)}<span className="text-sm ml-1 font-medium">h</span></p>
+                </div>
+              )}
             </div>
           )}
 
