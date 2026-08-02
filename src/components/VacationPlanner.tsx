@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { managerFetch, getManagerScope } from '@/lib/managerFetch';
+import { eachDayISO } from '@/lib/vacationDays';
 import { useT } from '@/lib/i18n';
 
 interface VacationRequest {
@@ -218,9 +219,7 @@ function VacationDayPicker({ selectedDays, onChange }: {
     if (e.shiftKey && lastClicked && lastClicked !== dateStr) {
       // Shift+click: add every day in range from lastClicked to dateStr
       const [a, b] = [lastClicked, dateStr].sort();
-      const cur = new Date(a + 'T00:00:00');
-      const end = new Date(b + 'T00:00:00');
-      while (cur <= end) { next.add(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+      for (const iso of eachDayISO(a, b)) next.add(iso);
     } else {
       // Normal click: toggle individual day
       if (next.has(dateStr)) next.delete(dateStr); else next.add(dateStr);
@@ -523,6 +522,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   const isAdmin = isManagerMode && getManagerScope()?.isAdmin !== false;
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [closedWeekdays, setClosedWeekdays] = useState<Set<number>>(new Set());
+  // Per-employee vacation balances from the shared endpoint — the single source
+  // of truth (honors vacation_counting_mode, vacation_hours_offset, dedups overlaps)
+  const [balances, setBalances] = useState<Map<string, { totalDays: number; usedDays: number; remainingDays: number }>>(new Map());
   const portalRootRef = useRef<HTMLElement | null>(null);
   useEffect(() => { portalRootRef.current = document.body; }, []);
 
@@ -606,6 +608,21 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
   }, [isManagerMode, orgId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Vacation balances for the manager overview — refetched when the displayed
+  // year changes and whenever the request list changes (add/approve/delete).
+  const balancesYear = month.slice(0, 4);
+  useEffect(() => {
+    if (!isManagerMode) return;
+    managerFetch(`/api/manager/vacation-balances?year=${balancesYear}`)
+      .then((r) => r.json())
+      .then((j: { balances?: { employeeId: string; totalDays: number; usedDays: number; remainingDays: number }[] }) => {
+        const map = new Map<string, { totalDays: number; usedDays: number; remainingDays: number }>();
+        for (const b of j.balances ?? []) map.set(b.employeeId, { totalDays: b.totalDays, usedDays: b.usedDays, remainingDays: b.remainingDays });
+        setBalances(map);
+      })
+      .catch(() => {});
+  }, [isManagerMode, balancesYear, requests]);
 
   const days = buildDays(month);
   const [year, mo] = month.split('-').map(Number);
@@ -1110,19 +1127,15 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           </div>
           <div className="divide-y divide-slate-50">
             {employees.filter((emp) => !nameSearch.trim() || emp.name.toLowerCase().includes(nameSearch.trim().toLowerCase())).map((emp) => {
-              const total = emp.vacation_days_per_year ?? 20;
               const empVacs = requests
                 .filter((r) => r.employee_id === emp.id && (!r.type || r.type === 'vacation'))
                 .sort((a, b) => b.date_from.localeCompare(a.date_from));
-              const used = empVacs
-                .filter((r) => r.status === 'approved')
-                .reduce((acc, r) => {
-                  if (r.date_to && r.date_to > r.date_from) {
-                    return acc + Math.round((new Date(r.date_to).getTime() - new Date(r.date_from).getTime()) / 86400000) + 1;
-                  }
-                  return acc + 1;
-                }, 0);
-              const remaining = Math.max(0, total - used);
+              // Balances come from /api/manager/vacation-balances — same numbers
+              // the employee sees in their own portal
+              const bal = balances.get(emp.id);
+              const total = bal?.totalDays ?? emp.vacation_days_per_year ?? 20;
+              const used = bal?.usedDays ?? 0;
+              const remaining = bal?.remainingDays ?? Math.max(0, total - used);
               const pct = Math.min(100, (used / total) * 100);
               const isExpanded = expandedEmp === emp.id;
               const todayStr = new Date().toISOString().slice(0, 10);

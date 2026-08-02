@@ -2,19 +2,7 @@
 // Returns vacation balance for all active employees
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
-
-function countVacationDays(dateFrom: string, dateTo: string | null, countWeekends: boolean = false): number {
-  const from = new Date(dateFrom + 'T00:00:00');
-  const to = dateTo ? new Date(dateTo + 'T00:00:00') : from;
-  let days = 0;
-  const cur = new Date(from);
-  while (cur <= to) {
-    const dow = cur.getDay();
-    if (countWeekends || (dow !== 0 && dow !== 6)) days++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return days;
-}
+import { vacationDaysInRange } from '@/lib/vacationDays';
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
@@ -24,7 +12,8 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const currentYear = new Date().getFullYear();
+  const yearParam = new URL(req.url).searchParams.get('year');
+  const currentYear = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : new Date().getFullYear();
 
   const [empsRes, requestsRes, settingsRes] = await Promise.all([
     sb.from('employees').select('id, name, vacation_days_per_year, vacation_hours_offset, employment_type').eq('organization_id', orgId).eq('active', true).order('name'),
@@ -38,13 +27,15 @@ export async function GET(req: NextRequest) {
   const defaultVacationDays = typeof extraSettings.default_vacation_days === 'number' ? extraSettings.default_vacation_days : 20;
   const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
 
-  // Group requests by employee
-  const byEmployee: Record<string, { usedDays: number; pendingDays: number }> = {};
+  // Group requests by employee — Sets of unique days so overlapping requests don't double-count
+  const byEmployee: Record<string, { used: Set<string>; pending: Set<string> }> = {};
   for (const req of (requestsRes.data ?? [])) {
-    if (!byEmployee[req.employee_id]) byEmployee[req.employee_id] = { usedDays: 0, pendingDays: 0 };
-    const days = countVacationDays(req.date_from, req.date_to ?? null, countWeekends);
-    if (req.status === 'approved') byEmployee[req.employee_id].usedDays += days;
-    else if (req.status === 'pending') byEmployee[req.employee_id].pendingDays += days;
+    if (!byEmployee[req.employee_id]) byEmployee[req.employee_id] = { used: new Set(), pending: new Set() };
+    const target = req.status === 'approved' ? byEmployee[req.employee_id].used
+      : req.status === 'pending' ? byEmployee[req.employee_id].pending
+      : null;
+    if (!target) continue;
+    for (const iso of vacationDaysInRange(req.date_from, req.date_to ?? null, countWeekends)) target.add(iso);
   }
 
   const hoursPerDay = 8;
@@ -54,7 +45,8 @@ export async function GET(req: NextRequest) {
     const totalDays = emp.vacation_days_per_year ?? defaultVacationDays;
     const offsetHours = Number(emp.vacation_hours_offset ?? 0);
     const effectiveStartDays = offsetHours > 0 ? offsetHours / hoursPerDay : totalDays;
-    const { usedDays = 0, pendingDays = 0 } = byEmployee[emp.id] ?? {};
+    const usedDays = byEmployee[emp.id]?.used.size ?? 0;
+    const pendingDays = byEmployee[emp.id]?.pending.size ?? 0;
     const remainingDays = Math.max(0, effectiveStartDays - usedDays);
     return {
       employeeId: emp.id,

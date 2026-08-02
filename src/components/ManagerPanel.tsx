@@ -936,7 +936,9 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                         if (!b.hasPaidVacation) return <span className="text-xs text-gray-400">{t('Bez nároku', 'No entitlement')}</span>;
                         const pct = b.totalDays > 0 ? Math.min(100, (b.usedDays / b.totalDays) * 100) : 0;
                         const pendingPct = b.totalDays > 0 ? Math.min(100 - pct, (b.pendingDays / b.totalDays) * 100) : 0;
-                        const remaining = b.totalDays - b.usedDays;
+                        // remainingDays from the API honors vacation_hours_offset — same
+                        // number the employee sees in their portal
+                        const remaining = b.remainingDays ?? (b.totalDays - b.usedDays);
                         const barColor = remaining / b.totalDays > 0.5 ? 'bg-emerald-500' : remaining / b.totalDays > 0.1 ? 'bg-amber-500' : 'bg-red-500';
                         return (
                           <div className="min-w-[90px]">
@@ -1769,11 +1771,11 @@ function VacationOverviewPanel() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      managerFetch('/api/requests?status=approved').then((r) => r.json()),
-      managerFetch('/api/requests?status=pending').then((r) => r.json()),
+      managerFetch('/api/requests?type=vacation&status=approved').then((r) => r.json()),
+      managerFetch('/api/requests?type=vacation&status=pending').then((r) => r.json()),
       managerFetch('/api/employees').then((r) => r.json()),
     ]).then(([approved, pending, emps]) => {
-      setRequests([...(approved.requests ?? []), ...(pending.requests ?? [])].filter((r: Request) => r.type === 'vacation'));
+      setRequests([...(approved.requests ?? []), ...(pending.requests ?? [])]);
       setEmployees(emps.employees ?? []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);

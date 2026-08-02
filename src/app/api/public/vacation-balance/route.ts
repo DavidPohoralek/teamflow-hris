@@ -2,24 +2,12 @@
 // Returns vacation balance for the employee identified by PIN
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { vacationDaysInRange, toISODateLocal } from '@/lib/vacationDays';
 
 function getServiceClient() {
   const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(url, key);
-}
-
-function countVacationDays(dateFrom: string, dateTo: string | null, countWeekends: boolean = false): number {
-  const from = new Date(dateFrom + 'T00:00:00');
-  const to = dateTo ? new Date(dateTo + 'T00:00:00') : from;
-  let days = 0;
-  const cur = new Date(from);
-  while (cur <= to) {
-    const dow = cur.getDay();
-    if (countWeekends || (dow !== 0 && dow !== 6)) days++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return days;
 }
 
 export async function GET(req: NextRequest) {
@@ -95,7 +83,7 @@ export async function GET(req: NextRequest) {
     .gte('date_from', `${currentYear}-01-01`)
     .lte('date_from', `${currentYear}-12-31`);
 
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = toISODateLocal(new Date()); // YYYY-MM-DD, local (Prague) — not UTC
 
   // Use Sets to count unique dates — prevents overlapping requests from being counted twice
   const consumedDateSet = new Set<string>();
@@ -103,23 +91,13 @@ export async function GET(req: NextRequest) {
   const pendingDateSet = new Set<string>();
 
   for (const req of requests ?? []) {
-    const dateFrom = req.date_from;
-    const dateTo = req.date_to ?? req.date_from;
-    const from = new Date(dateFrom + 'T00:00:00');
-    const to = new Date(dateTo + 'T00:00:00');
-    const cur = new Date(from);
-    while (cur <= to) {
-      const dow = cur.getDay();
-      if (countWeekends || (dow !== 0 && dow !== 6)) {
-        const ds = cur.toISOString().split('T')[0];
-        if (req.status === 'approved') {
-          if (ds < today) consumedDateSet.add(ds);
-          else plannedDateSet.add(ds);
-        } else if (req.status === 'pending') {
-          pendingDateSet.add(ds);
-        }
+    for (const ds of vacationDaysInRange(req.date_from, req.date_to, countWeekends)) {
+      if (req.status === 'approved') {
+        if (ds < today) consumedDateSet.add(ds);
+        else plannedDateSet.add(ds);
+      } else if (req.status === 'pending') {
+        pendingDateSet.add(ds);
       }
-      cur.setDate(cur.getDate() + 1);
     }
   }
 
@@ -148,7 +126,7 @@ export async function GET(req: NextRequest) {
     pendingHours: pendingDays * hoursPerDay,
     remainingDays,
     remainingHours: remainingDays * hoursPerDay,
-    remainingAfterPendingDays: Math.max(0, totalDays - usedDays - pendingDays),
-    remainingAfterPendingHours: Math.max(0, totalDays - usedDays - pendingDays) * hoursPerDay,
+    remainingAfterPendingDays: Math.max(0, remainingDays - pendingDays),
+    remainingAfterPendingHours: Math.max(0, remainingDays - pendingDays) * hoursPerDay,
   });
 }

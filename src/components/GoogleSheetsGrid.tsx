@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { managerFetch, getManagerToken } from '@/lib/managerFetch';
+import { eachDayISO } from '@/lib/vacationDays';
 import { useT } from '@/lib/i18n';
 import TimeSelect from '@/components/TimeSelect';
 
@@ -708,12 +709,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         const set = new Set<string>();
         for (const req of d.requests ?? []) {
           if (req.status !== 'approved') continue;
-          const from = new Date(req.date_from + 'T00:00:00');
-          const to = req.date_to ? new Date(req.date_to + 'T00:00:00') : new Date(from);
-          const cur = new Date(from);
-          while (cur <= to) {
-            set.add(`${req.employee_id}|${toISO(cur)}`);
-            cur.setDate(cur.getDate() + 1);
+          for (const iso of eachDayISO(req.date_from, req.date_to)) {
+            set.add(`${req.employee_id}|${iso}`);
           }
         }
         setVacationSet(set);
@@ -1187,8 +1184,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
     const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
 
+    const isVacation = vacationSet.has(key);
+
     if (!entries || entries.length === 0) {
-      const isVacation = vacationSet.has(key);
       if (isVacation) {
         return (
           <div className="flex items-center justify-center h-full w-full" style={{ backgroundImage: DOV_HATCH }}>
@@ -1241,6 +1239,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </div>
           );
         })}
+        {isVacation && (
+          <div
+            title={t('Schválená dovolená', 'Approved vacation')}
+            className="w-full text-[10px] font-bold px-1.5 py-[2px] leading-tight text-center border border-blue-300"
+            style={{ backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '6px' }}
+          >
+            {t('DOV', 'VAC')}
+          </div>
+        )}
       </div>
     );
   }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { managerFetch } from '@/lib/managerFetch';
+import { eachDayISO } from '@/lib/vacationDays';
 import PinPad from './PinPad';
 import { useT } from '@/lib/i18n';
 import TimeSelect from '@/components/TimeSelect';
@@ -1390,13 +1391,8 @@ export default function WorkPlanGrid({
       const dates = new Set<string>();
       for (const req of json.requests ?? []) {
         if (req.employee_id !== employeeId) continue;
-        const from = new Date(req.date_from);
-        const to = req.date_to ? new Date(req.date_to) : from;
-        const cur = new Date(from);
-        while (cur <= to) {
-          dates.add(cur.toISOString().slice(0, 10));
-          cur.setDate(cur.getDate() + 1);
-        }
+        if (req.status !== 'approved') continue;
+        for (const iso of eachDayISO(req.date_from, req.date_to)) dates.add(iso);
       }
       setVacationDates(dates);
     } catch { /* non-critical */ }

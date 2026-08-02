@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { countUniqueVacationDays } from '@/lib/vacationDays';
 
 // GET /api/analytics?month=YYYY-MM&department=Prodejna
 export async function GET(req: NextRequest) {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  let empQuery = sb.from('employees').select('id, name, department, target_hours, vacation_days_per_year').eq('organization_id', orgId).eq('active', true).order('name');
+  let empQuery = sb.from('employees').select('id, name, department, target_hours, vacation_days_per_year, vacation_hours_offset').eq('organization_id', orgId).eq('active', true).order('name');
   if (deptFilter && deptFilter !== '__all__') {
     empQuery = empQuery.eq('department', deptFilter);
   } else if (departments && departments.length > 0) {
@@ -43,13 +44,7 @@ export async function GET(req: NextRequest) {
   const logs: { employee_id: string; check_in: string | null; check_out: string | null; work_type_name: string | null; date: string }[] = logsRes.data ?? [];
   const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null; work_type: string }[] = plansRes.data ?? [];
   const vacRequests: { employee_id: string; date_from: string; date_to: string | null }[] = requestsRes.data ?? [];
-
-  function countDays(from: string, to: string | null): number {
-    if (!to) return 1;
-    const d1 = new Date(from + 'T00:00:00');
-    const d2 = new Date(to + 'T00:00:00');
-    return Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000) + 1);
-  }
+  const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all';
 
   const stats = employees.map((emp) => {
     const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
@@ -135,10 +130,17 @@ export async function GET(req: NextRequest) {
     }
     const workTypes = Array.from(wtMins.entries()).map(([name, mins]) => ({ name, hours: Math.round(mins / 6) / 10 }));
 
-    // Vacation used this year (in days)
-    const vacUsedHours = vacRequests
-      .filter((r) => r.employee_id === emp.id)
-      .reduce((sum, r) => sum + countDays(r.date_from, r.date_to), 0) * 8;
+    // Vacation used this year — shared logic: honors vacation_counting_mode, dedups overlaps
+    const vacCountedHours = countUniqueVacationDays(
+      vacRequests.filter((r) => r.employee_id === emp.id),
+      countWeekends,
+    ) * 8;
+    // vacation_hours_offset = remaining hours when tracking started; hours consumed
+    // before that are folded into "used" so used + remaining = total (same as the portal)
+    const vacTotalHours = (emp.vacation_days_per_year ?? 20) * 8;
+    const offsetHours = Number((emp as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0);
+    const effectiveStartHours = offsetHours > 0 ? offsetHours : vacTotalHours;
+    const vacUsedHours = Math.max(0, vacTotalHours - effectiveStartHours) + vacCountedHours;
 
     const targetHours = emp.target_hours ?? 160;
     const satHours = Math.round((satWorkedMinutes / 60) * 10) / 10;
@@ -158,9 +160,9 @@ export async function GET(req: NextRequest) {
       // Per-shift overtime/debt: check_out vs planned end_time
       overtimeHours: Math.round(overtimeMinutes / 6) / 10,
       debtHours: Math.round(debtMinutes / 6) / 10,
-      vacationHoursTotal: (emp.vacation_days_per_year ?? 20) * 8,
+      vacationHoursTotal: vacTotalHours,
       vacationHoursUsed: vacUsedHours,
-      vacationHoursRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) * 8 - vacUsedHours),
+      vacationHoursRemaining: Math.max(0, vacTotalHours - vacUsedHours),
       saturdayHours: satHours,
       saturdayBonusHours: satBonusHours,
       workTypes,

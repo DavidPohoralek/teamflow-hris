@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { countUniqueVacationDays } from '@/lib/vacationDays'
 
 function getServiceClient() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -218,22 +219,17 @@ export async function GET(req: NextRequest) {
     thisMonthSatBonusHours = Math.round(thisMonthSatBonusHours * 100) / 100
     lastMonthSatBonusHours = Math.round(lastMonthSatBonusHours * 100) / 100
 
-    // Count vacation days used
-    let vacationUsed = 0
-    for (const req of vacationReqs) {
-      if (req.date_to && req.date_to > req.date_from) {
-        const from = new Date(req.date_from)
-        const to = new Date(req.date_to)
-        const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1
-        vacationUsed += days
-      } else {
-        vacationUsed += 1
-      }
-    }
+    // Count vacation days used — shared logic: honors vacation_counting_mode,
+    // dedups overlapping requests, timezone-safe.
+    const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all'
+    const vacationCounted = countUniqueVacationDays(vacationReqs, countWeekends)
     const vacationTotal = (employee as { vacation_days_per_year?: number }).vacation_days_per_year ?? 20
     const vacationOffsetHours = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0)
     const effectiveStartDays = vacationOffsetHours > 0 ? vacationOffsetHours / 8 : vacationTotal
-    const vacationRemaining = Math.max(0, effectiveStartDays - vacationUsed)
+    // Days consumed before the system started tracking (implied by the offset)
+    const consumedOutsideDays = Math.max(0, vacationTotal - effectiveStartDays)
+    const vacationUsed = consumedOutsideDays + vacationCounted
+    const vacationRemaining = Math.max(0, vacationTotal - vacationUsed)
 
     const BENEFIT_DEFS = [
       { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',   hoursKey: 'benefit_blood_hours',   maxKey: 'benefit_blood_max' },
