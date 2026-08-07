@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PinPad from './PinPad';
 import TimeSelect from '@/components/TimeSelect';
+import { toISODateLocal } from '@/lib/vacationDays';
 import { useT } from '@/lib/i18n';
 
 interface WorkType {
@@ -469,7 +470,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
       // Fallback: no open session in DB (session started before the fix) → create full record
       if (!res.ok && res.status === 404) {
-        const date = startAt.toISOString().slice(0, 10);
+        const date = toISODateLocal(startAt);
         const fbRes = await fetch('/api/public/kiosk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -487,6 +488,17 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         });
         const fbJson = await fbRes.json().catch(() => ({})) as { ok?: boolean; error?: string; durationLabel?: string };
         if (!fbRes.ok) {
+          // 409 = the interval overlaps an existing closed record → this session
+          // was already ended on another device (e.g. PC). Hours are in the DB;
+          // just clear the stale stopwatch on this device instead of erroring forever.
+          if (fbRes.status === 409) {
+            localStorage.removeItem(HO_SW_KEY);
+            setHoSw(null);
+            setSuccessMessage(t('HomeOffice už byl ukončen na jiném zařízení ✓ Hodiny jsou zapsané.', 'HomeOffice was already ended on another device ✓ Hours are recorded.'));
+            setScreen('success-checkin');
+            resetKiosk();
+            return;
+          }
           setHoFormError(fbJson.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
           return;
         }
