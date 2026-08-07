@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import EmployeeRequestModal from './EmployeeRequestModal';
 import PinPad from './PinPad';
 
@@ -408,7 +409,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             <div className="px-4 sm:px-6 pb-3">
               {(() => {
                 const BENEFIT_ICONS: Record<string, string> = { blood: '🩸', english: '🇬🇧', gym: '🏋️' };
-                const today = new Date().toISOString().slice(0, 10);
+                const today = toISODateLocal(new Date());
                 return (
                   <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
                     <div className="px-4 py-2.5 border-b border-slate-100 bg-white">

@@ -13,6 +13,24 @@ export function toISODateLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Server code runs in UTC (Amplify/Vercel), where "today" via toISOString lags
+// Prague by one day between local midnight and 01:00/02:00. These helpers give
+// the Prague calendar day regardless of the runtime timezone.
+// (The 'sv-SE' locale formats as YYYY-MM-DD.)
+const pragueFmt = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+/** Today's date in Prague as YYYY-MM-DD — safe on a UTC server. */
+export function pragueToday(): string {
+  return pragueFmt.format(new Date());
+}
+
+/** Current month in Prague as YYYY-MM — safe on a UTC server. */
+export function pragueMonth(): string {
+  return pragueToday().slice(0, 7);
+}
+
 /** Day of week (0=Sun … 6=Sat) for a YYYY-MM-DD string, timezone-safe. */
 export function dayOfWeekISO(iso: string): number {
   return new Date(iso + 'T12:00:00').getDay();

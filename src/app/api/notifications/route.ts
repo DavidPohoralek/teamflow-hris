@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueToday } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
 // Lazy check: unclosed sessions from past days → one notification per employee+day.
@@ -6,7 +7,7 @@ import { resolveOrgId } from '@/lib/resolveOrg';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function generateUnclosedSessionNotifications(sb: any, orgId: string) {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = pragueToday();
     const fence = new Date();
     fence.setDate(fence.getDate() - 14);
     const fenceISO = fence.toISOString().slice(0, 10);

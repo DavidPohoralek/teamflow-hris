@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import TimeSelect from '@/components/TimeSelect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ function calcDuration(checkIn: string | null, checkOut: string | null): string {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISODateLocal(new Date());
 }
 
 function nowTimeStr(): string {
@@ -65,7 +66,7 @@ function nowTimeStr(): string {
 }
 
 function currentMonthISO(): string {
-  return new Date().toISOString().slice(0, 7);
+  return toISODateLocal(new Date()).slice(0, 7);
 }
 
 function initials(emp: Employee): string {

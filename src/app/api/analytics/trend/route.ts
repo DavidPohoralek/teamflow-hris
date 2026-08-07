@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase, departments } = resolved;
 
   const { searchParams } = new URL(req.url);
-  const endMonth = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const endMonth = searchParams.get('month') ?? pragueMonth();
   const deptFilter = searchParams.get('department');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
   const rangeFrom = `${months[0]}-01`;
   const [ly, lm] = months[11].split('-').map(Number);
-  const rangeTo = new Date(ly, lm, 0).toISOString().slice(0, 10);
+  const rangeTo = toISODateLocal(new Date(ly, lm, 0));
 
   let empQuery = sb.from('employees')
     .select('id, target_hours')
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
   const result = months.map((month) => {
     const [my, mm] = month.split('-').map(Number);
     const monthFrom = `${month}-01`;
-    const monthTo = new Date(my, mm, 0).toISOString().slice(0, 10);
+    const monthTo = toISODateLocal(new Date(my, mm, 0));
 
     const monthLogs = relevantLogs.filter((l) => l.date >= monthFrom && l.date <= monthTo);
     const workedMinutes = monthLogs.reduce((s, l) => {

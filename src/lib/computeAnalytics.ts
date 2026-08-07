@@ -3,7 +3,8 @@
 // Záměrně NEMĚNÍME původní /api/analytics/route.ts, aby zůstala živá Analytika beze změny.
 // Počítá jen pole potřebná pro týmový souhrn (bez sobotních bonusů, work-type breakdownu apod.).
 
-import { countUniqueVacationDays } from '@/lib/vacationDays';
+import { countUniqueVacationDays, toISODateLocal } from '@/lib/vacationDays';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export type EmployeeStat = {
   workedHours: number;
@@ -26,7 +27,7 @@ export async function computeMonthlyStats(
 
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
-  const dateTo = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const dateTo = toISODateLocal(new Date(year, mon, 0));
 
   let empQuery = sb
     .from('employees')
@@ -40,17 +41,20 @@ export async function computeMonthlyStats(
     empQuery = empQuery.in('department', departments);
   }
 
-  const [empRes, logsRes, plansRes, requestsRes, settingsRes] = await Promise.all([
+  // attendance_logs and work_plans are paginated past the 1000-row PostgREST cap;
+  // vacation fence covers ranges straddling New Year (counted days are clipped below).
+  const [empRes, logs, plans, requestsRes, settingsRes] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs').select('employee_id, check_in, check_out, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
+    fetchAllRows<{ employee_id: string; check_in: string | null; check_out: string | null; date: string }>((from, to) =>
+      sb.from('attendance_logs').select('employee_id, check_in, check_out, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    fetchAllRows<{ employee_id: string; date: string; start_time: string | null; end_time: string | null }>((from, to) =>
+      sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved')
+      .lte('date_from', `${year}-12-31`).or(`date_to.gte.${year}-01-01,and(date_to.is.null,date_from.gte.${year}-01-01)`),
     sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
 
   const employees: { id: string; department: string | null; target_hours: number; vacation_days_per_year: number }[] = empRes.data ?? [];
-  const logs: { employee_id: string; check_in: string | null; check_out: string | null; date: string }[] = logsRes.data ?? [];
-  const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacRequests: { employee_id: string; date_from: string; date_to: string | null }[] = requestsRes.data ?? [];
   const extraSettings = (settingsRes.data as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
   const countWeekends = (extraSettings['vacation_counting_mode'] as string | undefined) === 'all';
@@ -95,6 +99,7 @@ export async function computeMonthlyStats(
     const vacUsedHours = countUniqueVacationDays(
       vacRequests.filter((r) => r.employee_id === emp.id),
       countWeekends,
+      { start: `${year}-01-01`, end: `${year}-12-31` },
     ) * 8;
 
     const targetHours = emp.target_hours ?? 160;

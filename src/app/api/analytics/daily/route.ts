@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 // GET /api/analytics/daily?month=YYYY-MM&department=X
 // Returns one point per calendar day: planned hours vs worked hours (team total)
@@ -9,12 +11,12 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase, departments } = resolved;
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
   const deptFilter = searchParams.get('department');
 
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
-  const dateTo = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const dateTo = toISODateLocal(new Date(year, mon, 0));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -26,17 +28,24 @@ export async function GET(req: NextRequest) {
     empQuery = empQuery.in('department', departments);
   }
 
-  const [empRes, logsRes, plansRes] = await Promise.all([
+  // Paginated — a busy month can exceed the 1000-row PostgREST cap
+  const [empRes, allLogs, allPlans] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs')
-      .select('employee_id, date, check_in, check_out')
-      .eq('organization_id', orgId)
-      .gte('date', dateFrom).lte('date', dateTo),
-    sb.from('work_plans')
-      .select('employee_id, date, start_time, end_time')
-      .eq('organization_id', orgId).eq('active', true)
-      .gte('date', dateFrom).lte('date', dateTo),
+    fetchAllRows<{ employee_id: string; date: string; check_in: string | null; check_out: string | null }>((from, to) =>
+      sb.from('attendance_logs')
+        .select('employee_id, date, check_in, check_out')
+        .eq('organization_id', orgId)
+        .gte('date', dateFrom).lte('date', dateTo)
+        .order('date').range(from, to)),
+    fetchAllRows<{ employee_id: string; date: string; start_time: string | null; end_time: string | null }>((from, to) =>
+      sb.from('work_plans')
+        .select('employee_id, date, start_time, end_time')
+        .eq('organization_id', orgId).eq('active', true)
+        .gte('date', dateFrom).lte('date', dateTo)
+        .order('date').range(from, to)),
   ]);
+  const logsRes = { data: allLogs };
+  const plansRes = { data: allPlans };
 
   const empIds = new Set<string>((empRes.data ?? []).map((e: { id: string }) => e.id));
 

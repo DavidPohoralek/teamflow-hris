@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueMonth } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
 async function getOrgDlcToken(supabase: unknown, orgId: string): Promise<string | null> {
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
   const draft = (searchParams.get('draft') ?? 'A').toUpperCase() === 'B' ? 'B' : 'A';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

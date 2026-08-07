@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueToday, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 // GET /api/attendance?date=YYYY-MM-DD
 // GET /api/attendance?month=YYYY-MM
@@ -48,22 +50,25 @@ export async function GET(req: NextRequest) {
   } else if (month) {
     const [year, mon] = month.split('-').map(Number);
     const firstDay = `${month}-01`;
-    const lastDay = new Date(year, mon, 0).toISOString().slice(0, 10);
+    const lastDay = toISODateLocal(new Date(year, mon, 0));
     query = query.gte('date', firstDay).lte('date', lastDay);
   } else {
     // Fallback: bez parametrů vrátí jen dnešek aby nevylila celá historie
-    query = query.eq('date', new Date().toISOString().slice(0, 10));
+    query = query.eq('date', pragueToday());
   }
 
-  const { data, error } = await query;
-
-  if (error) {
+  // Paginated — an org-wide month can exceed the 1000-row PostgREST cap,
+  // which would silently drop the oldest days from the attendance overview.
+  let data: Record<string, unknown>[];
+  try {
+    data = await fetchAllRows<Record<string, unknown>>((from, to) => query.range(from, to));
+  } catch (error) {
     console.error('GET attendance error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Nepodařilo se načíst docházku.' }, { status: 500 });
   }
 
   // Supabase returns joined table as `employees` (plural) — remap to `employee` (singular) expected by client
-  const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
+  const mapped = data.map((row: Record<string, unknown>) => ({
     ...row,
     employee: row.employees ?? { id: row.employee_id, name: '—' },
   }));

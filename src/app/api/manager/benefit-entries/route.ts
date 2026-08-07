@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pragueMonth } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg'
 
 // GET /api/manager/benefit-entries?month=YYYY-MM
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase, departments } = resolved
 
   const { searchParams } = new URL(req.url)
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+  const month = searchParams.get('month') ?? pragueMonth()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any

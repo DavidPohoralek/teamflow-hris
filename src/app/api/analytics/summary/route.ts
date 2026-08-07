@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueMonth } from '@/lib/vacationDays';
 import crypto from 'crypto';
 import { getServiceClient } from '@/lib/managerAuth';
 import { computeMonthlyStats } from '@/lib/computeAnalytics';
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = getServiceClient() as any;

@@ -39,11 +39,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Neplatný PIN.' }, { status: 401 });
   }
 
+  // Filter HO server-side — filtering in JS after a capped fetch would burn
+  // the row budget on non-HO logs and silently hide older HO reports.
   const { data, error } = await supabase
     .from('attendance_logs')
     .select('id, date, check_in, check_out, work_type_name, note')
     .eq('organization_id', orgId)
     .eq('employee_id', employee.id)
+    .or('work_type_name.ilike.%homeoffice%,work_type_name.ilike.%home office%,work_type_name.ilike.ho')
     .order('date', { ascending: false })
     .limit(500);
 

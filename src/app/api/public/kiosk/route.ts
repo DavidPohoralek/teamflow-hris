@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { pragueToday } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server'
 
 function getServiceClient() {
@@ -90,13 +91,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Neplatný PIN kód' }, { status: 401 })
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = pragueToday()
 
     if (action === 'checkin') {
       const now = new Date().toISOString()
 
-      // If an open session exists, auto-close it first so every tap is recorded
-      const { data: openSession } = await supabase
+      // If open sessions exist, auto-close them all first so every tap is
+      // recorded (multiple rows per day are legal — no maybeSingle here,
+      // it errors when more than one row matches).
+      const { data: openSessions } = await supabase
         .from('attendance_logs')
         .select('id')
         .eq('organization_id', orgId)
@@ -104,13 +107,13 @@ export async function POST(req: NextRequest) {
         .eq('date', today)
         .not('check_in', 'is', null)
         .is('check_out', null)
-        .maybeSingle()
 
-      if (openSession) {
+      const openIds = (openSessions ?? []).map((s) => s.id)
+      if (openIds.length > 0) {
         await supabase
           .from('attendance_logs')
           .update({ check_out: now })
-          .eq('id', openSession.id)
+          .in('id', openIds)
       }
 
       // Always insert a fresh row — every check-in is its own record
@@ -128,26 +131,12 @@ export async function POST(req: NextRequest) {
         .insert(insertData)
 
       if (insertError) {
-        // Unique constraint still in place — fall back to updating the existing row
-        // so check-in at least works. Drop the index in Supabase to record every session.
-        if (insertError.code === '23505') {
-          const { error: updateError } = await supabase
-            .from('attendance_logs')
-            .update({ check_in: now, check_out: null,
-              ...(workTypeId ? { work_type_id: workTypeId } : {}),
-              ...(workTypeName ? { work_type_name: workTypeName } : {}),
-            })
-            .eq('organization_id', orgId)
-            .eq('employee_id', employee.id)
-            .eq('date', today)
-          if (updateError) {
-            console.error('Kiosk checkin fallback update error:', updateError)
-            return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
-          }
-        } else {
-          console.error('Kiosk checkin insert error:', insertError)
-          return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
-        }
+        // No overwrite fallback here: rewriting the existing row's check_in and
+        // nulling check_out would silently destroy the earlier session's hours.
+        // (The unique(employee_id, date) index was dropped in production; if it
+        // ever comes back, this surfaces as an error instead of data loss.)
+        console.error('Kiosk checkin insert error:', insertError)
+        return NextResponse.json({ ok: false, error: 'Chyba při záznamu příchodu' }, { status: 500 })
       }
 
       if (isDoctorVisit(workTypeName)) {
@@ -235,7 +224,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── action === 'checkout' ──────────────────────────────────────────────
-    const { data: log, error: logError } = await supabase
+    // Multiple open rows can exist (double-tap, legacy data) — close the most
+    // recent one; maybeSingle() would error on >1 row and jam checkout all day.
+    const { data: openLogs, error: logError } = await supabase
       .from('attendance_logs')
       .select('id, check_in, work_type_name')
       .eq('organization_id', orgId)
@@ -243,8 +234,10 @@ export async function POST(req: NextRequest) {
       .eq('date', today)
       .not('check_in', 'is', null)
       .is('check_out', null)
-      .maybeSingle()
+      .order('check_in', { ascending: false })
+      .limit(1)
 
+    const log = openLogs?.[0]
     if (logError || !log) {
       return NextResponse.json({ ok: false, error: 'Nebyl nalezen záznam příchodu' }, { status: 404 })
     }

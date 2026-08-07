@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { managerFetch, getManagerScope } from '@/lib/managerFetch';
-import { eachDayISO } from '@/lib/vacationDays';
+import { eachDayISO, toISODateLocal } from '@/lib/vacationDays';
 import { useT } from '@/lib/i18n';
 
 interface VacationRequest {
@@ -426,7 +426,9 @@ function icsEscapeVac(s: string) {
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10).replace(/-/g, '');
+  // Local formatting — toISOString would return the previous day in Prague,
+  // making every exported ICS vacation one day shorter
+  return toISODateLocal(d).replace(/-/g, '');
 }
 
 function downloadVacationIcs(myRequests: VacationRequest[], employeeName: string) {
@@ -1082,7 +1084,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                   const days = req.date_to
                     ? Math.round((new Date(req.date_to + 'T00:00:00').getTime() - new Date(req.date_from + 'T00:00:00').getTime()) / 86400000) + 1
                     : 1;
-                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const todayStr = toISODateLocal(new Date());
                   const isPast = req.date_from < todayStr;
                   return (
                     <div key={req.id} className="flex items-center gap-4 px-4 sm:px-5 py-3.5 hover:bg-slate-50 transition-colors">
@@ -1138,7 +1140,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
               const remaining = bal?.remainingDays ?? Math.max(0, total - used);
               const pct = Math.min(100, (used / total) * 100);
               const isExpanded = expandedEmp === emp.id;
-              const todayStr = new Date().toISOString().slice(0, 10);
+              const todayStr = toISODateLocal(new Date());
 
               return (
                 <div key={emp.id}>

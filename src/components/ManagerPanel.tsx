@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import { managerFetch, type ManagerScope } from '@/lib/managerFetch';
 import IntegrationSettings from './IntegrationSettings';
 import OrgLogoUpload from './OrgLogoUpload';
@@ -549,7 +550,7 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addDate, setAddDate] = useState(() => now.toISOString().slice(0, 10));
+  const [addDate, setAddDate] = useState(() => toISODateLocal(now));
   const [addCheckIn, setAddCheckIn] = useState('');
   const [addCheckOut, setAddCheckOut] = useState('');
   const [addNote, setAddNote] = useState('');
@@ -2323,7 +2324,7 @@ interface BenefitEntry {
 
 function BenefitEntriesTab({ orgId }: { orgId: string }) {
   const t = useT();
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(toISODateLocal(new Date()).slice(0, 7));
   const [entries, setEntries] = useState<BenefitEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -2633,7 +2634,7 @@ function HomeOfficeTab() {
                 type="date"
                 value={dayFilter}
                 min={`${month}-01`}
-                max={(() => { const [y, m] = month.split('-').map(Number); return new Date(y, m, 0).toISOString().slice(0, 10); })()}
+                max={(() => { const [y, m] = month.split('-').map(Number); return toISODateLocal(new Date(y, m, 0)); })()}
                 onChange={(e) => setDayFilter(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />

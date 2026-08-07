@@ -2,7 +2,9 @@
 // Returns per-employee comparison: how many times they checked in with each activity work type
 // vs. how many benefit entries were deducted for the same benefit.
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
@@ -10,15 +12,15 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase } = resolved;
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
-  const dateTo = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const dateTo = toISODateLocal(new Date(year, mon, 0));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const [activityTypesRes, logsRes, benefitLogsRes, empsRes] = await Promise.all([
+  const [activityTypesRes, logs, benefitLogsRes, empsRes] = await Promise.all([
     // Activity work types that have a benefit_key
     sb.from('work_types')
       .select('id, name, benefit_key, color')
@@ -26,14 +28,17 @@ export async function GET(req: NextRequest) {
       .eq('active', true)
       .eq('category', 'activity'),
 
-    // Attendance logs for the month — work_type_name matches activity names
-    sb.from('attendance_logs')
-      .select('employee_id, work_type_name')
-      .eq('organization_id', orgId)
-      .gte('date', dateFrom)
-      .lte('date', dateTo)
-      .not('check_in', 'is', null)
-      .not('check_out', 'is', null),
+    // Attendance logs for the month — paginated past the 1000-row cap so
+    // activity check-ins aren't silently dropped in a busy month
+    fetchAllRows<{ employee_id: string; work_type_name: string | null }>((from, to) =>
+      sb.from('attendance_logs')
+        .select('employee_id, work_type_name')
+        .eq('organization_id', orgId)
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .not('check_in', 'is', null)
+        .not('check_out', 'is', null)
+        .order('date').range(from, to)),
 
     // Benefit logs (deductions) for the month
     sb.from('employee_benefit_logs')
@@ -50,7 +55,6 @@ export async function GET(req: NextRequest) {
   ]);
 
   const activityTypes: { id: string; name: string; benefit_key: string | null; color: string }[] = activityTypesRes.data ?? [];
-  const logs: { employee_id: string; work_type_name: string | null }[] = logsRes.data ?? [];
   const benefitLogs: { employee_id: string; benefit_key: string; count: number }[] = benefitLogsRes.data ?? [];
   const employees: { id: string; name: string; department: string | null }[] = empsRes.data ?? [];
 

@@ -403,18 +403,32 @@ export async function PUT(
       if (hasPaidVacation) {
         const dateFrom = existing.date_from as string;
         const dateTo = (existing.date_to as string | null) ?? dateFrom;
+        const vacationDays = vacationDaysInRange(dateFrom, dateTo, countWeekends);
 
-        // attendance_logs has no `type` column and enforces unique(employee_id, date) —
-        // a day where the employee already has a log is skipped (insert fails, logged only).
-        for (const dateStr of vacationDaysInRange(dateFrom, dateTo, countWeekends)) {
-          const { error: logError } = await svc.from('attendance_logs').insert({
+        // Skip days that already have ANY attendance log — otherwise a vacation
+        // approved over a worked day would double-count the hours (the DB no
+        // longer enforces unique(employee_id, date)).
+        const { data: existingLogs } = await svc
+          .from('attendance_logs')
+          .select('date')
+          .eq('organization_id', orgId)
+          .eq('employee_id', existing.employee_id)
+          .in('date', vacationDays);
+        const daysWithLog = new Set((existingLogs ?? []).map((l: { date: string }) => l.date));
+
+        const rows = vacationDays
+          .filter((dateStr) => !daysWithLog.has(dateStr))
+          .map((dateStr) => ({
             organization_id: orgId,
             employee_id: existing.employee_id,
             date: dateStr,
             check_in: `${dateStr}T09:00:00`,
             check_out: `${dateStr}T17:00:00`,
             note: 'Placená dovolená',
-          });
+          }));
+
+        if (rows.length > 0) {
+          const { error: logError } = await svc.from('attendance_logs').insert(rows);
           if (logError) {
             console.error('Vacation attendance_log insert error:', logError.message, logError);
           }

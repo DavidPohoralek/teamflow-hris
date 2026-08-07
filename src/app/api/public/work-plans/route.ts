@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { toISODateLocal } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server'
 import { isTokenValid } from '@/lib/managerAuth'
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const [year, mo] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
-  const dateTo = new Date(year, mo, 0).toISOString().slice(0, 10);
+  const dateTo = toISODateLocal(new Date(year, mo, 0));
 
   const supabase = getServiceClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

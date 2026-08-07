@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { countUniqueVacationDays } from '@/lib/vacationDays'
+import { countUniqueVacationDays, pragueToday, toISODateLocal } from '@/lib/vacationDays'
 
 function getServiceClient() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -31,8 +31,9 @@ function czechMonthName(year: number, month: number): string {
 /** Returns { firstDay: 'YYYY-MM-DD', lastDay: 'YYYY-MM-DD' } for a given year+month (1-based). */
 function monthRange(year: number, month: number): { firstDay: string; lastDay: string } {
   const firstDay = `${year}-${String(month).padStart(2, '0')}-01`
-  const lastDayDate = new Date(year, month, 0) // day 0 of next month = last day of current
-  const lastDay = lastDayDate.toISOString().slice(0, 10)
+  // Local formatting — toISOString on a local-midnight Date would return the
+  // previous day (i.e. drop the last day of the month) on a non-UTC runtime
+  const lastDay = toISODateLocal(new Date(year, month, 0))
   return { firstDay, lastDay }
 }
 
@@ -91,9 +92,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Nesprávný PIN' }, { status: 401 })
     }
 
-    const now = new Date()
-    const thisYear = now.getFullYear()
-    const thisMonthNum = now.getMonth() + 1 // 1-based
+    // Prague calendar date — the server runs in UTC, where getFullYear/getMonth
+    // would report the previous day (and on the 1st, the previous month) until 01:00/02:00
+    const [thisYear, thisMonthNum] = pragueToday().split('-').map(Number) // 1-based month
 
     const lastMonthDate = new Date(thisYear, thisMonthNum - 2, 1) // subtract 1 month
     const lastYear = lastMonthDate.getFullYear()
@@ -125,8 +126,9 @@ export async function GET(req: NextRequest) {
         .eq('employee_id', employee.id)
         .eq('type', 'vacation')
         .eq('status', 'approved')
-        .gte('date_from', thisYearStart)
-        .lte('date_from', thisYearEnd),
+        // Overlap fence: covers ranges straddling New Year; counting clips to the year
+        .lte('date_from', thisYearEnd)
+        .or(`date_to.gte.${thisYearStart},and(date_to.is.null,date_from.gte.${thisYearStart})`),
       supabase
         .from('company_settings')
         .select('extra_settings')
@@ -222,7 +224,7 @@ export async function GET(req: NextRequest) {
     // Count vacation days used — shared logic: honors vacation_counting_mode,
     // dedups overlapping requests, timezone-safe.
     const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all'
-    const vacationCounted = countUniqueVacationDays(vacationReqs, countWeekends)
+    const vacationCounted = countUniqueVacationDays(vacationReqs, countWeekends, { start: thisYearStart, end: thisYearEnd })
     const vacationTotal = (employee as { vacation_days_per_year?: number }).vacation_days_per_year ?? 20
     const vacationOffsetHours = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0)
     const effectiveStartDays = vacationOffsetHours > 0 ? vacationOffsetHours / 8 : vacationTotal

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pragueToday } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg'
 
 // GET /api/manager/open-sessions
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
   const { orgId, supabase, departments } = resolved
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = pragueToday()
   const fence = new Date()
   fence.setDate(fence.getDate() - 60)
   const fenceISO = fence.toISOString().slice(0, 10)

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import { useT } from '@/lib/i18n';
 import { managerFetch } from '@/lib/managerFetch';
 import TimeSelect from '@/components/TimeSelect';
@@ -112,7 +113,9 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
     setEditSaving(true);
     setEditError(null);
     try {
-      const date = new Date(record.checkInTime).toISOString().slice(0, 10);
+      // Local calendar day of the check-in — toISOString would shift records
+      // from 00:00–02:00 Prague to the previous day and silently rewrite them
+      const date = toISODateLocal(new Date(record.checkInTime));
       const body: Record<string, string> = {
         check_in: `${date}T${editCheckIn}:00`,
       };

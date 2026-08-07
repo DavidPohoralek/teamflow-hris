@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pragueToday, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg'
 
 function isHO(name: string | null | undefined): boolean {
@@ -48,12 +49,12 @@ export async function GET(req: NextRequest) {
   if (month) {
     const [year, mon] = month.split('-').map(Number)
     const first = `${month}-01`
-    const last = new Date(year, mon, 0).toISOString().slice(0, 10)
+    const last = toISODateLocal(new Date(year, mon, 0))
     query = query.gte('date', first).lte('date', last)
   }
 
   // ── Current HO presence (open sessions today) ─────────────────────────────
-  const today = new Date().toISOString().slice(0, 10)
+  const today = pragueToday()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let liveQuery = (supabase as any)
     .from('attendance_logs')

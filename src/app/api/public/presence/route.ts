@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { pragueToday } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/public/presence?orgId=UUID          → vrátí všechny přítomné (Přehled dashboard)
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = pragueToday();
 
   // --- KIOSK MODE: pin provided → validate and return single employee status ---
   if (pin) {

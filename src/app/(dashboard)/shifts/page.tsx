@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import TimeSelect from '@/components/TimeSelect';
 
 const DAY_NAMES = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
@@ -352,7 +353,7 @@ export default function ShiftsPage() {
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
-  const today = now.toISOString().slice(0, 10);
+  const today = toISODateLocal(now);
 
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),

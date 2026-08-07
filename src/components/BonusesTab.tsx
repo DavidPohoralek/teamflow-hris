@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toISODateLocal } from '@/lib/vacationDays';
 import { managerFetch } from '@/lib/managerFetch'
 import { useT } from '@/lib/i18n'
 
@@ -34,7 +35,7 @@ interface OverviewRow {
 type ViewMode = 'staff' | 'managers' | 'overview'
 
 function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7)
+  return toISODateLocal(new Date()).slice(0, 7)
 }
 
 function shiftMonth(month: string, delta: number): string {

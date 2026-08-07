@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 
 // GET /api/requests
@@ -65,14 +66,14 @@ export async function GET(req: NextRequest) {
     if (monthFilter && /^\d{4}-\d{2}$/.test(monthFilter)) {
       const [year, month] = monthFilter.split('-').map(Number);
       const firstDay = `${monthFilter}-01`;
-      const lastDay = new Date(year, month, 0).toISOString().slice(0, 10);
+      const lastDay = toISODateLocal(new Date(year, month, 0));
       q = q.gte('date_from', firstDay).lte('date_from', lastDay);
     } else {
       const fence = new Date();
       fence.setFullYear(fence.getFullYear() - 1);
       q = q.gte('date_from', fence.toISOString().slice(0, 10));
     }
-    return q.limit(500);
+    return q.limit(1000);
   };
 
   let { data, error } = await buildQuery(true);

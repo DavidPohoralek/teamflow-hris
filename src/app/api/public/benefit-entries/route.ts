@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { pragueToday } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server'
 
 function svc() {
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
     const employee = await resolveEmployee(sb, orgId, pin)
     if (!employee) return NextResponse.json({ error: 'Nesprávný PIN.' }, { status: 401 })
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = pragueToday()
     // Allow specifying a past date (current month only for safety)
     const targetDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= today ? dateParam : today
     const month = targetDate.slice(0, 7)
@@ -113,7 +114,7 @@ export async function DELETE(req: NextRequest) {
     const employee = await resolveEmployee(sb, orgId, pin)
     if (!employee) return NextResponse.json({ error: 'Nesprávný PIN.' }, { status: 401 })
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = pragueToday()
 
     const { data: existing } = await sb
       .from('benefit_entries')

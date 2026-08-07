@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase, departments } = resolved;
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
   const deptFilter = searchParams.get('department');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
   const rangeFrom = `${months[0]}-01`;
   const [ly, lm] = months[2].split('-').map(Number);
-  const rangeTo = new Date(ly, lm, 0).toISOString().slice(0, 10);
+  const rangeTo = toISODateLocal(new Date(ly, lm, 0));
 
   let empQuery = sb.from('employees').select('id').eq('organization_id', orgId).eq('active', true);
   if (deptFilter && deptFilter !== '__all__') {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
-import { countUniqueVacationDays } from '@/lib/vacationDays';
+import { fetchAllRows } from '@/lib/fetchAllRows';
+import { countUniqueVacationDays, pragueMonth, toISODateLocal } from '@/lib/vacationDays';
 
 // GET /api/analytics?month=YYYY-MM&department=Prodejna
 export async function GET(req: NextRequest) {
@@ -9,12 +10,12 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase, departments } = resolved;
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
   const deptFilter = searchParams.get('department');
 
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
-  const dateTo = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const dateTo = toISODateLocal(new Date(year, mon, 0));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -26,11 +27,16 @@ export async function GET(req: NextRequest) {
     empQuery = empQuery.in('department', departments);
   }
 
-  const [empRes, logsRes, plansRes, requestsRes, settingsRes] = await Promise.all([
+  // attendance_logs and work_plans are paginated — a busy month can exceed the
+  // 1000-row PostgREST cap. Vacation fence covers ranges straddling New Year.
+  const [empRes, logs, plans, requestsRes, settingsRes] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs').select('employee_id, check_in, check_out, work_type_name, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('work_plans').select('employee_id, date, start_time, end_time, work_type').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('requests').select('employee_id, type, status, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved').gte('date_from', `${year}-01-01`).lte('date_from', `${year}-12-31`),
+    fetchAllRows<{ employee_id: string; check_in: string | null; check_out: string | null; work_type_name: string | null; date: string }>((from, to) =>
+      sb.from('attendance_logs').select('employee_id, check_in, check_out, work_type_name, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    fetchAllRows<{ employee_id: string; date: string; start_time: string | null; end_time: string | null; work_type: string }>((from, to) =>
+      sb.from('work_plans').select('employee_id, date, start_time, end_time, work_type').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    sb.from('requests').select('employee_id, type, status, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved')
+      .lte('date_from', `${year}-12-31`).or(`date_to.gte.${year}-01-01,and(date_to.is.null,date_from.gte.${year}-01-01)`),
     sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
 
@@ -41,8 +47,6 @@ export async function GET(req: NextRequest) {
   function isSat(dateStr: string): boolean { return new Date(dateStr + 'T12:00:00').getDay() === 6; }
 
   const employees: { id: string; name: string; department: string | null; target_hours: number; vacation_days_per_year: number }[] = empRes.data ?? [];
-  const logs: { employee_id: string; check_in: string | null; check_out: string | null; work_type_name: string | null; date: string }[] = logsRes.data ?? [];
-  const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null; work_type: string }[] = plansRes.data ?? [];
   const vacRequests: { employee_id: string; date_from: string; date_to: string | null }[] = requestsRes.data ?? [];
   const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all';
 
@@ -130,10 +134,12 @@ export async function GET(req: NextRequest) {
     }
     const workTypes = Array.from(wtMins.entries()).map(([name, mins]) => ({ name, hours: Math.round(mins / 6) / 10 }));
 
-    // Vacation used this year — shared logic: honors vacation_counting_mode, dedups overlaps
+    // Vacation used this year — shared logic: honors vacation_counting_mode,
+    // dedups overlaps, clips ranges straddling New Year to this year's days
     const vacCountedHours = countUniqueVacationDays(
       vacRequests.filter((r) => r.employee_id === emp.id),
       countWeekends,
+      { start: `${year}-01-01`, end: `${year}-12-31` },
     ) * 8;
     // vacation_hours_offset = remaining hours when tracking started; hours consumed
     // before that are folded into "used" so used + remaining = total (same as the portal)

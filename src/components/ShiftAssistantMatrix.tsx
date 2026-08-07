@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
 import { NotifyModal, type NotifyTarget } from './ShiftAssistant';
@@ -134,7 +135,7 @@ export default function ShiftAssistantMatrix({
   onOpenNotifications,
 }: ShiftAssistantMatrixProps) {
   const t = useT();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toISODateLocal(new Date());
 
   // ── Data state ──────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Employee[]>([]);

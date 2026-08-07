@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import Link from 'next/link';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,11 +68,11 @@ interface Stats {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISODateLocal(new Date());
 }
 
 function todayMonth(): string {
-  return new Date().toISOString().slice(0, 7);
+  return toISODateLocal(new Date()).slice(0, 7);
 }
 
 function formatDate(dateStr: string): string {

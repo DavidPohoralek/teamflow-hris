@@ -106,7 +106,27 @@ export async function PUT(
   if (profile_id !== undefined)
     update.profile_id = typeof profile_id === 'string' ? profile_id : null;
   if (pin !== undefined) {
-    update.pin_code = typeof pin === 'string' ? pin.trim() || null : null;
+    const newPin = typeof pin === 'string' ? pin.trim() : '';
+    // PIN must be unique within the org — a duplicate would break PIN login
+    // for BOTH employees (every lookup expects a single match).
+    if (newPin) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: pinClash } = await (supabase as any)
+        .from('employees')
+        .select('id, name')
+        .eq('organization_id', orgId)
+        .eq('pin_code', newPin)
+        .neq('id', params.id)
+        .limit(1)
+        .maybeSingle();
+      if (pinClash) {
+        return NextResponse.json(
+          { error: `PIN už používá ${pinClash.name}. Zvolte prosím jiný PIN.` },
+          { status: 409 }
+        );
+      }
+    }
+    update.pin_code = newPin || null;
   }
   if (vacation_days_per_year !== undefined)
     update.vacation_days_per_year = typeof vacation_days_per_year === 'number' ? vacation_days_per_year : 20;

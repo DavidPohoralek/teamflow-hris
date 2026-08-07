@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
 import { NotifyModal, type NotifyTarget } from './ShiftAssistant';
@@ -125,7 +126,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitchView }: Props & { onSwitchView: () => void }) {
   const t = useT();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toISODateLocal(new Date());
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workPlans, setWorkPlans] = useState<WorkPlanEntry[]>([]);

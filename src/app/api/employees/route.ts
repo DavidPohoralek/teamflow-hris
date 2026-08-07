@@ -81,6 +81,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // PIN must be unique within the org — a duplicate would break PIN login
+  // for BOTH employees (every lookup expects a single match).
+  const newPin = typeof pin === 'string' ? pin.trim() : '';
+  if (newPin) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: pinClash } = await (supabase as any)
+      .from('employees')
+      .select('id, name')
+      .eq('organization_id', orgId)
+      .eq('pin_code', newPin)
+      .limit(1)
+      .maybeSingle();
+    if (pinClash) {
+      return NextResponse.json(
+        { error: `PIN už používá ${pinClash.name}. Zvolte prosím jiný PIN.` },
+        { status: 409 }
+      );
+    }
+  }
+
   const insert = {
     organization_id: orgId,
     name: (name as string).trim(),

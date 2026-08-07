@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pragueMonth } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg'
 
 type ScopedResolve = {
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   // ── Budget per department ───────────────────────────────────────────────────
   if (searchParams.get('budget') === '1') {
-    const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+    const month = searchParams.get('month') ?? pragueMonth()
 
     const { data: settingsRow } = await sb
       .from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle()
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
     if (!(await resolveIsOwner(sb, orgId, employeeId, isAdmin))) {
       return NextResponse.json({ error: 'Přehled všech bonusů má jen majitel.' }, { status: 403 })
     }
-    const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+    const month = searchParams.get('month') ?? pragueMonth()
     const { data, error } = await sb
       .from('employee_bonuses')
       .select('id, employee_id, month, amount, note, granted_by, created_at, employees ( id, name, department, is_manager )')
@@ -96,10 +97,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (searchParams.get('summary') === '1') {
+    // Fenced to the last 24 months — an unbounded fetch would eventually hit
+    // the 1000-row cap and silently drop whole months from the summary
+    const now = new Date()
+    const fenceMonth = `${now.getFullYear() - 2}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const { data, error } = await sb
       .from('employee_bonuses')
       .select('month, amount, employees ( department )')
       .eq('organization_id', orgId)
+      .gte('month', fenceMonth)
+      .order('month', { ascending: false })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -118,7 +125,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ summary })
   }
 
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+  const month = searchParams.get('month') ?? pragueMonth()
   if (!/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json({ error: 'Neplatný měsíc.' }, { status: 400 })
   }

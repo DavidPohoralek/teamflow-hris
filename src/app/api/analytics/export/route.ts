@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { fetchAllRows } from '@/lib/fetchAllRows';
+import { countUniqueVacationDays, pragueMonth, toISODateLocal } from '@/lib/vacationDays';
 import * as XLSX from 'xlsx';
 
 // GET /api/analytics/export?month=YYYY-MM&lang=cs|en&format=csv|xlsx
@@ -9,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { orgId, supabase, departments, isAdmin } = resolved;
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? new Date().toISOString().slice(0, 7);
+  const month = searchParams.get('month') ?? pragueMonth();
   const lang = (searchParams.get('lang') ?? 'cs') as 'cs' | 'en';
   const format = (searchParams.get('format') ?? 'csv') as 'csv' | 'xlsx';
   const allowedEmpIds = searchParams.get('employees')
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const [year, mon] = month.split('-').map(Number);
   const dateFrom = `${month}-01`;
-  const dateTo = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const dateTo = toISODateLocal(new Date(year, mon, 0));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -60,11 +62,17 @@ export async function GET(req: NextRequest) {
     .order('name');
   if (departments && departments.length > 0) empQuery = empQuery.in('department', departments);
 
-  const [empRes, logsRes, plansRes, vacRes, benefitLogsRes, bonusRes] = await Promise.all([
+  // attendance_logs and work_plans are paginated — a busy month can exceed the
+  // 1000-row PostgREST cap, which would silently drop hours from the payroll export.
+  // Vacation requests are fenced to those overlapping the exported month.
+  const [empRes, logs, plans, vacRes, benefitLogsRes, bonusRes] = await Promise.all([
     empQuery,
-    sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo),
-    sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved'),
+    fetchAllRows<{ employee_id: string; check_in: string; check_out: string; date: string; work_type_name?: string | null }>((from, to) =>
+      sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    fetchAllRows<{ employee_id: string; date: string; start_time: string | null; end_time: string | null }>((from, to) =>
+      sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved')
+      .lte('date_from', dateTo).or(`date_to.gte.${dateFrom},and(date_to.is.null,date_from.gte.${dateFrom})`),
     activeBenefits.length > 0
       ? sb.from('employee_benefit_logs').select('employee_id, benefit_key, count').eq('organization_id', orgId).eq('month', month)
       : Promise.resolve({ data: [] }),
@@ -72,8 +80,6 @@ export async function GET(req: NextRequest) {
   ]);
 
   const employees: { id: string; name: string; department: string | null; target_hours: number; employment_type?: string; vacation_days_per_year?: number; hourly_rate?: number | null }[] = empRes.data ?? [];
-  const logs: { employee_id: string; check_in: string; check_out: string; date: string; work_type_name?: string | null }[] = logsRes.data ?? [];
-  const plans: { employee_id: string; date: string; start_time: string | null; end_time: string | null }[] = plansRes.data ?? [];
   const vacReqs: { employee_id: string; date_from: string; date_to: string | null }[] = vacRes.data ?? [];
   const benefitLogs: { employee_id: string; benefit_key: string; count: number }[] = benefitLogsRes.data ?? [];
   // Manager-granted monthly bonuses (CZK) — multiple entries per employee are summed;
@@ -88,22 +94,11 @@ export async function GET(req: NextRequest) {
   const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all';
 
   function countVacHoursInMonth(empId: string): number {
-    let days = 0;
-    for (const r of vacReqs) {
-      if (r.employee_id !== empId) continue;
-      const from = new Date(r.date_from + 'T00:00:00');
-      const to = r.date_to ? new Date(r.date_to + 'T00:00:00') : from;
-      const cur = new Date(from);
-      while (cur <= to) {
-        const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
-        if (iso >= dateFrom && iso <= dateTo) {
-          const dow = cur.getDay();
-          if (countWeekends || (dow !== 0 && dow !== 6)) days++;
-        }
-        cur.setDate(cur.getDate() + 1);
-      }
-    }
-    return days * 8;
+    return countUniqueVacationDays(
+      vacReqs.filter((r) => r.employee_id === empId),
+      countWeekends,
+      { start: dateFrom, end: dateTo },
+    ) * 8;
   }
 
   const filteredEmployees = allowedEmpIds

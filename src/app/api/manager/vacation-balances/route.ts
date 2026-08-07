@@ -15,9 +15,14 @@ export async function GET(req: NextRequest) {
   const yearParam = new URL(req.url).searchParams.get('year');
   const currentYear = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : new Date().getFullYear();
 
+  // Overlap fence: a vacation straddling New Year contributes its days in this
+  // year to this year's balance (day expansion below clips to the year window)
+  const yearStart = `${currentYear}-01-01`;
+  const yearEnd = `${currentYear}-12-31`;
   const [empsRes, requestsRes, settingsRes] = await Promise.all([
     sb.from('employees').select('id, name, vacation_days_per_year, vacation_hours_offset, employment_type').eq('organization_id', orgId).eq('active', true).order('name'),
-    sb.from('requests').select('employee_id, date_from, date_to, status').eq('organization_id', orgId).eq('type', 'vacation').gte('date_from', `${currentYear}-01-01`).lte('date_from', `${currentYear}-12-31`),
+    sb.from('requests').select('employee_id, date_from, date_to, status').eq('organization_id', orgId).eq('type', 'vacation')
+      .lte('date_from', yearEnd).or(`date_to.gte.${yearStart},and(date_to.is.null,date_from.gte.${yearStart})`),
     sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
 
@@ -35,7 +40,7 @@ export async function GET(req: NextRequest) {
       : req.status === 'pending' ? byEmployee[req.employee_id].pending
       : null;
     if (!target) continue;
-    for (const iso of vacationDaysInRange(req.date_from, req.date_to ?? null, countWeekends)) target.add(iso);
+    for (const iso of vacationDaysInRange(req.date_from, req.date_to ?? null, countWeekends, { start: yearStart, end: yearEnd })) target.add(iso);
   }
 
   const hoursPerDay = 8;

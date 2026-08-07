@@ -1,5 +1,6 @@
 // SQL: ALTER TABLE requests ADD COLUMN IF NOT EXISTS hours NUMERIC DEFAULT NULL;
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { pragueToday } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server';
 
 const VALID_TYPES = ['vacation', 'sick', 'correction', 'other'] as const;
@@ -157,7 +158,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Block deletion of requests whose start date is in the past
-    const today = new Date().toISOString().slice(0, 10);
+    const today = pragueToday();
     if (existing.date_from && existing.date_from < today) {
       return NextResponse.json(
         { error: 'Proběhlé žádosti nelze smazat.' },

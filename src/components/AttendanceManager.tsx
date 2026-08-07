@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toISODateLocal } from '@/lib/vacationDays';
 import AttendanceKiosk from './AttendanceKiosk';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
@@ -40,7 +41,7 @@ interface EditState {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISODateLocal(new Date());
 }
 
 function nowTimeStr(): string {

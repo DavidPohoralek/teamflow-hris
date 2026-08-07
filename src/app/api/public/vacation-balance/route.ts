@@ -73,15 +73,19 @@ export async function GET(req: NextRequest) {
   const effectiveStartDays = offsetHours > 0 ? offsetHours / hoursPerDay : totalDays;
   const currentYear = new Date().getFullYear();
 
-  // Load vacation requests for current year
+  // Load vacation requests overlapping the current year — a range straddling
+  // New Year (27.12.–5.1.) must contribute its January days to this year's
+  // balance; day counting below clips to the year window.
+  const yearStart = `${currentYear}-01-01`;
+  const yearEnd = `${currentYear}-12-31`;
   const { data: requests } = await supabase
     .from('requests')
     .select('date_from, date_to, status')
     .eq('organization_id', orgId)
     .eq('employee_id', employee.id)
     .eq('type', 'vacation')
-    .gte('date_from', `${currentYear}-01-01`)
-    .lte('date_from', `${currentYear}-12-31`);
+    .lte('date_from', yearEnd)
+    .or(`date_to.gte.${yearStart},and(date_to.is.null,date_from.gte.${yearStart})`);
 
   const today = toISODateLocal(new Date()); // YYYY-MM-DD, local (Prague) — not UTC
 
@@ -91,7 +95,7 @@ export async function GET(req: NextRequest) {
   const pendingDateSet = new Set<string>();
 
   for (const req of requests ?? []) {
-    for (const ds of vacationDaysInRange(req.date_from, req.date_to, countWeekends)) {
+    for (const ds of vacationDaysInRange(req.date_from, req.date_to, countWeekends, { start: yearStart, end: yearEnd })) {
       if (req.status === 'approved') {
         if (ds < today) consumedDateSet.add(ds);
         else plannedDateSet.add(ds);
