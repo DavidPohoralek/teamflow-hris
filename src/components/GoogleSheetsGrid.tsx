@@ -542,7 +542,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   const [weekStart, setWeekStart] = useState<Date>(() => {
     const [y, m] = month.split('-').map(Number);
-    return getWeekStart(new Date(y, m - 1, 1));
+    const today = new Date();
+    // Current month → start on today's week
+    if (today.getFullYear() === y && today.getMonth() === m - 1) {
+      return getWeekStart(today);
+    }
+    // Other months: first week whose midpoint (Thursday) lies inside the month —
+    // otherwise a month starting Fri–Sun would report the previous month back
+    // via onMonthChange and flip the whole view
+    const start = getWeekStart(new Date(y, m - 1, 1));
+    const mid = new Date(start);
+    mid.setDate(mid.getDate() + 3);
+    if (mid.getMonth() !== m - 1) start.setDate(start.getDate() + 7);
+    return start;
   });
 
   const weekDays = getWeekDays(weekStart);
