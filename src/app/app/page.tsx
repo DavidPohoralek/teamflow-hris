@@ -39,23 +39,24 @@ const MANAGER_TABS: { id: Tab; labelCs: string; labelEn: string; icon: string }[
 const MANAGER_SESSION_KEY = 'hris_manager_session'
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000 // 12 hours
 
+// Decodes the payload of a signed v3 token ("base64(payload).signature").
+// Unsigned legacy tokens are treated as expired — the server rejects them anyway.
+function decodeTokenPayload(raw: string): string | null {
+  const dotIdx = raw.lastIndexOf('.')
+  if (dotIdx < 0) return null
+  return atob(raw.slice(0, dotIdx))
+}
+
 function isManagerSessionValid(): boolean {
   try {
     const raw = localStorage.getItem(MANAGER_SESSION_KEY)
     if (!raw) return false
-    const decoded = atob(raw)
-    let ts: number
-    if (decoded.includes('|')) {
-      // v2 token: base64(orgId|employeeId|role|departments|permissions|timestamp)
-      const parts = decoded.split('|')
-      if (parts.length < 6) return false
-      ts = parseInt(parts[5], 10)
-    } else {
-      // v1 legacy token: base64(orgId:timestamp)
-      const parts = decoded.split(':')
-      if (parts.length < 2) return false
-      ts = parseInt(parts[parts.length - 1], 10)
-    }
+    const decoded = decodeTokenPayload(raw)
+    if (!decoded || !decoded.includes('|')) return false
+    // payload: orgId|employeeId|role|departments|permissions|timestamp
+    const parts = decoded.split('|')
+    if (parts.length < 6) return false
+    const ts = parseInt(parts[5], 10)
     if (isNaN(ts)) return false
     return new Date().getTime() - ts < SESSION_DURATION_MS
   } catch {
@@ -187,8 +188,8 @@ export default function HomePage() {
       if (managerValid) {
         try {
           const raw = localStorage.getItem(MANAGER_SESSION_KEY)
-          const decoded = atob(raw!)
-          const tokenOrgId = decoded.includes('|') ? decoded.split('|')[0] : decoded.split(':')[0]
+          const decoded = decodeTokenPayload(raw!) ?? ''
+          const tokenOrgId = decoded.split('|')[0]
           if (tokenOrgId !== data.id) {
             localStorage.removeItem(MANAGER_SESSION_KEY)
             setIsManagerMode(false)

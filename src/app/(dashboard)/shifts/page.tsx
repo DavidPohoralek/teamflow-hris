@@ -29,55 +29,6 @@ interface DayData {
 
 type ScheduleData = Record<string, DayData>;
 
-// --- Mock API helpers ---
-function buildMockData(year: number, month: number, draft: 'A' | 'B'): ScheduleData {
-  const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const stored = typeof window !== 'undefined' ? localStorage.getItem(`schedule-${key}-${draft}`) : null;
-  if (stored) return JSON.parse(stored);
-
-  const data: ScheduleData = {};
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const sampleEmployees: Employee[][] = [
-    [
-      { id: '1', name: 'Jan Novák', timeFrom: '09:00', timeTo: '17:00' },
-      { id: '2', name: 'Marie Horáková', timeFrom: '07:00', timeTo: '15:00' },
-      { id: '3', name: 'Petr Sedláček', timeFrom: '13:00', timeTo: '21:00' },
-    ],
-    [
-      { id: '2', name: 'Marie Horáková', timeFrom: '07:00', timeTo: '15:00' },
-    ],
-    [
-      { id: '1', name: 'Jan Novák', timeFrom: '09:00', timeTo: '17:00' },
-      { id: '3', name: 'Petr Sedláček', timeFrom: '13:00', timeTo: '21:00' },
-    ],
-    [],
-  ];
-
-  const holidays: number[] = draft === 'A' ? [1, 8] : [1, 15];
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const dayOfWeek = new Date(year, month, d).getDay(); // 0=Sun
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const isHoliday = holidays.includes(d);
-
-    let dayType: DayType = 'Pracovní';
-    if (isHoliday) dayType = 'Svátek';
-    else if (isWeekend) dayType = 'Zavřeno';
-
-    const empSet = isWeekend || isHoliday ? [] : sampleEmployees[(d - 1) % sampleEmployees.length];
-
-    data[date] = {
-      date,
-      dayType,
-      requiredStaff: isWeekend || isHoliday ? 0 : 3,
-      employees: empSet,
-      notes: '',
-    };
-  }
-  return data;
-}
-
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -151,12 +102,20 @@ function DayModal({ dayData, onClose, onSave }: ModalProps) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch(`/api/schedule/${form.date}`, {
+      const res = await fetch(`/api/schedule/${form.date}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
-      }).catch(() => {}); // ignore if API doesn't exist yet
+      });
+      if (!res.ok) {
+        alert(res.status === 401
+          ? 'Přihlášení vypršelo — obnovte prosím stránku a přihlaste se znovu.'
+          : 'Uložení se nepodařilo. Zkuste to prosím znovu.');
+        return;
+      }
       onSave(form);
+    } catch {
+      alert('Uložení se nepodařilo. Zkuste to prosím znovu.');
     } finally {
       setSaving(false);
     }
@@ -316,24 +275,26 @@ export default function ShiftsPage() {
   const [draft, setDraft] = useState<'A' | 'B'>('A');
   const [scheduleData, setScheduleData] = useState<ScheduleData>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/schedule?month=${monthKey}&draft=${draft}`);
-      if (res.ok) {
-        const json = await res.json();
-        setScheduleData(json);
-      } else {
-        throw new Error('API not available');
+      if (!res.ok) {
+        // No mock fallback — fabricated names looked like real data and edits
+        // "saved" only to localStorage while nothing reached the database
+        throw new Error(res.status === 401 ? 'Přihlášení vypršelo — obnovte prosím stránku a přihlaste se znovu.' : 'Nepodařilo se načíst směny.');
       }
-    } catch {
-      // Fall back to mock data
-      const mock = buildMockData(year, month, draft);
-      setScheduleData(mock);
+      const json = await res.json();
+      setScheduleData(json);
+    } catch (err) {
+      setScheduleData({});
+      setLoadError(err instanceof Error ? err.message : 'Nepodařilo se načíst směny.');
     } finally {
       setLoading(false);
     }
@@ -361,12 +322,10 @@ export default function ShiftsPage() {
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
+  // Called only after the server confirmed the PUT — the DB is the source of
+  // truth, localStorage is never used as a hidden save target.
   const handleDaySave = (updated: DayData) => {
     setScheduleData(prev => ({ ...prev, [updated.date]: updated }));
-    // Persist mock to localStorage
-    const storageKey = `schedule-${monthKey}-${draft}`;
-    const current = { ...scheduleData, [updated.date]: updated };
-    if (typeof window !== 'undefined') localStorage.setItem(storageKey, JSON.stringify(current));
     setSelectedDate(null);
   };
 
@@ -440,6 +399,12 @@ export default function ShiftsPage() {
               {MONTH_NAMES[month]} {year}
             </h2>
             {loading && <p className="text-xs text-slate-400 mt-0.5">Načítám…</p>}
+            {!loading && loadError && (
+              <p className="text-xs text-red-500 mt-0.5 font-medium">
+                {loadError}{' '}
+                <button onClick={loadData} className="underline hover:text-red-600">Zkusit znovu</button>
+              </p>
+            )}
           </div>
           <button
             onClick={nextMonth}

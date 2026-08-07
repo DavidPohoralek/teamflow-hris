@@ -925,26 +925,29 @@ function Legend({ workTypes, isManagerMode, onChanged }: LegendProps) {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      if (editing) {
-        await managerFetch(`/api/work-types/${editing.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(form),
-        });
-      } else {
-        await managerFetch('/api/work-types', {
-          method: 'POST',
-          body: JSON.stringify(form),
-        });
+      const res = editing
+        ? await managerFetch(`/api/work-types/${editing.id}`, { method: 'PUT', body: JSON.stringify(form) })
+        : await managerFetch('/api/work-types', { method: 'POST', body: JSON.stringify(form) });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? t('Uložení se nepodařilo.', 'Save failed.'));
+        return;
       }
       setEditing(null); setAdding(false);
       onChanged();
-    } catch { /* silent */ }
+    } catch {
+      alert(t('Uložení se nepodařilo.', 'Save failed.'));
+    }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('Smazat tento typ práce?', 'Delete this work type?'))) return;
-    await managerFetch(`/api/work-types/${id}`, { method: 'DELETE' });
+    const res = await managerFetch(`/api/work-types/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      alert(t('Smazání se nepodařilo.', 'Delete failed.'));
+      return;
+    }
     onChanged();
   };
 
@@ -1330,8 +1333,16 @@ export default function WorkPlanGrid({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orgId, pin: sessionPin, month }),
       });
-      if (res.ok) setShiftConfirmed(true);
-    } catch { /* ignore */ }
+      if (res.ok) {
+        setShiftConfirmed(true);
+      } else {
+        // Typically a stale session (deactivated employee / rotated PIN) —
+        // silently doing nothing would leave the employee tapping forever
+        alert(t('Potvrzení se nepodařilo — přihlaste se prosím znovu.', 'Confirmation failed — please log in again.'));
+      }
+    } catch {
+      alert(t('Potvrzení se nepodařilo. Zkuste to prosím znovu.', 'Confirmation failed. Please try again.'));
+    }
     finally { setConfirmingShift(false); }
   }, [sessionPin, orgId, month, confirmingShift, shiftConfirmed]);
 
@@ -1644,9 +1655,15 @@ export default function WorkPlanGrid({
         if (res.ok) {
           await fetchSchedule();
           setToastMessage(`✓ ${t('Zkopírováno na', 'Copied to')} ${dateStr.slice(8)}.${dateStr.slice(5, 7)}.`);
-          setShowToast(true);
+        } else {
+          const d = await res.json().catch(() => ({}));
+          setToastMessage(`✕ ${d.error ?? t('Uložení se nepodařilo.', 'Save failed.')}`);
         }
-      } catch { /* ignore */ }
+        setShowToast(true);
+      } catch {
+        setToastMessage(`✕ ${t('Uložení se nepodařilo.', 'Save failed.')}`);
+        setShowToast(true);
+      }
     }
   }, [clipboard, orgId, isManagerMode, sessionPin, fetchSchedule]);
 
@@ -1655,8 +1672,13 @@ export default function WorkPlanGrid({
     const res = await managerFetch(`/api/public/work-plans?workPlanId=${entryId}&orgId=${orgId}`, {
       method: 'DELETE',
     });
-    if (res.ok) await fetchSchedule();
-  }, [orgId, fetchSchedule]);
+    if (res.ok) {
+      await fetchSchedule();
+    } else {
+      setToastMessage(`✕ ${t('Smazání se nepodařilo.', 'Delete failed.')}`);
+      setShowToast(true);
+    }
+  }, [orgId, fetchSchedule, t]);
 
   // PIN-authenticated delete: employee removes only their own shift
   const handleRemoveEmployeeSelf = useCallback(async (_dateStr: string, entryId: string) => {
@@ -1667,8 +1689,13 @@ export default function WorkPlanGrid({
       `/api/public/work-plans?workPlanId=${entryId}&orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}`,
       { method: 'DELETE' }
     );
-    if (res.ok) await fetchSchedule();
-  }, [data, orgId, sessionPin, sessionEmployee, fetchSchedule]);
+    if (res.ok) {
+      await fetchSchedule();
+    } else {
+      setToastMessage(`✕ ${t('Smazání se nepodařilo — přihlaste se prosím znovu.', 'Delete failed — please log in again.')}`);
+      setShowToast(true);
+    }
+  }, [data, orgId, sessionPin, sessionEmployee, fetchSchedule, t]);
 
   // Mobile week navigation — sync month when week crosses boundary
   const handlePrevWeek = () => {

@@ -18,7 +18,10 @@ export function getManagerScope(): ManagerScope | null {
   const token = getManagerToken()
   if (!token) return null
   try {
-    const decoded = atob(token)
+    // Signed v3 tokens are "base64(payload).signature" — decode the payload part.
+    // (Display-only convenience; the server verifies the signature on every request.)
+    const dotIdx = token.lastIndexOf('.')
+    const decoded = atob(dotIdx >= 0 ? token.slice(0, dotIdx) : token)
     if (decoded.includes('|')) {
       const parts = decoded.split('|')
       if (parts.length < 6) return null

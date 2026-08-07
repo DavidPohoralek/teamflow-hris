@@ -294,13 +294,17 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     if (!data?.thisMonth.monthKey) return;
     setBenefitSaving(benefitKey);
     try {
-      await fetch('/api/public/employee-benefits', {
+      const res = await fetch('/api/public/employee-benefits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orgId, pin, month: data.thisMonth.monthKey, benefit_key: benefitKey, count }),
       });
+      if (!res.ok) throw new Error('save failed');
+      // Only reflect the new count after the server confirmed the write
       setBenefitCounts((prev) => ({ ...prev, [benefitKey]: count }));
-    } catch { /* ignore */ }
+    } catch {
+      alert('Uložení se nepodařilo. Zkuste to prosím znovu.');
+    }
     finally { setBenefitSaving(null); }
   };
 
@@ -313,8 +317,13 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       );
       if (res.ok) {
         setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Smazání se nepodařilo. Zkuste to prosím znovu.');
       }
-    } catch { /* ignore */ }
+    } catch {
+      alert('Smazání se nepodařilo. Zkuste to prosím znovu.');
+    }
     finally { setDeletingRequestId(null); }
   };
 

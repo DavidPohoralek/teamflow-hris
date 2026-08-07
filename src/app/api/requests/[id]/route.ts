@@ -440,19 +440,20 @@ export async function PUT(
   }
 
   // Send email notification to employee (fire-and-forget, non-blocking)
-  void (async () => {
-    try {
-      const svc = getServiceClient();
+  // Awaited — a fire-and-forget block can be killed by the serverless runtime
+  // the moment the response returns, silently losing the notification.
+  try {
+    const svc = getServiceClient();
 
-      // Fetch employee email + name
-      const { data: emp } = await svc
-        .from('employees')
-        .select('email, name')
-        .eq('id', existing.employee_id)
-        .eq('organization_id', orgId)
-        .maybeSingle();
+    // Fetch employee email + name
+    const { data: emp } = await svc
+      .from('employees')
+      .select('email, name')
+      .eq('id', existing.employee_id)
+      .eq('organization_id', orgId)
+      .maybeSingle();
 
-      if (!emp?.email) return;
+    if (emp?.email) {
 
       // Fetch Resend API key from org_integrations
       const { data: integRows } = await svc
@@ -475,10 +476,11 @@ export async function PUT(
         dateTo: existing.date_to ?? null,
         managerNote: note ?? null,
       });
-    } catch (err) {
-      console.error('Email notification error:', err);
     }
-  })();
+  } catch (err) {
+    // Non-critical — the approval itself already succeeded
+    console.error('Email notification error:', err);
+  }
 
   return NextResponse.json({ request: updated });
 }

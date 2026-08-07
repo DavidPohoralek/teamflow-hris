@@ -2499,11 +2499,15 @@ function HomeOfficeTab() {
     if (!confirm(t('Smazat tento záznam?', 'Delete this record?'))) return;
     setDeletingId(logId);
     try {
-      await managerFetch('/api/manager/homeoffice', {
+      const res = await managerFetch('/api/manager/homeoffice', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ logId }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? 'Server error');
+      }
       setLogs((prev) => prev.filter((l) => l.id !== logId));
     } catch {
       alert(t('Nepodařilo se smazat záznam.', 'Failed to delete record.'));

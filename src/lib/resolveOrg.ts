@@ -1,4 +1,4 @@
-import { isTokenValid, getServiceClient } from './managerAuth'
+import { verifyManagerToken, getServiceClient } from './managerAuth'
 import { createClient } from './supabase/server'
 
 type ServiceClient = ReturnType<typeof getServiceClient>
@@ -17,7 +17,8 @@ type ResolveResult =
 export async function resolveOrgId(req: { headers: { get(k: string): string | null } }): Promise<ResolveResult> {
   const managerToken = req.headers.get('Manager-Token')
   if (managerToken) {
-    const result = isTokenValid(managerToken)
+    // Signature + expiry + DB revalidation (manager role/scope read fresh)
+    const result = await verifyManagerToken(managerToken)
     if (!result.valid) return { error: 'Token manažera je neplatný nebo vypršel.', status: 401 }
     return {
       orgId: result.orgId,

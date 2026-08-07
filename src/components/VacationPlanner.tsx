@@ -740,8 +740,13 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       if (res.ok) {
         setMyRequests((prev) => prev.filter((r) => r.id !== requestId));
         fetchData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? t('Smazání se nepodařilo. Zkuste to prosím znovu.', 'Delete failed. Please try again.'));
       }
-    } catch { /* ignore */ }
+    } catch {
+      alert(t('Smazání se nepodařilo. Zkuste to prosím znovu.', 'Delete failed. Please try again.'));
+    }
     finally { setDeletingId(null); }
   };
 

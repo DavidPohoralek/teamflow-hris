@@ -403,14 +403,24 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     if (!skip && hoLogId && hoNote.trim()) {
       setHoLoading(true);
       try {
-        await fetch('/api/public/attendance-note', {
+        const res = await fetch('/api/public/attendance-note', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ logId: hoLogId, orgId, pin, note: hoNote.trim() }),
         });
-      } catch { /* show success regardless */ }
+        if (!res.ok) {
+          // The org made this note mandatory — don't discard it silently;
+          // keep the screen open so the employee can retry
+          setErrorMessage(t('Poznámku se nepodařilo uložit. Zkuste to prosím znovu.', 'Failed to save the note. Please try again.'));
+          return;
+        }
+      } catch {
+        setErrorMessage(t('Poznámku se nepodařilo uložit. Zkuste to prosím znovu.', 'Failed to save the note. Please try again.'));
+        return;
+      }
       finally { setHoLoading(false); }
     }
+    setErrorMessage('');
     setScreen('success-checkout');
     resetKiosk();
   };
@@ -1115,6 +1125,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             rows={5}
             autoFocus
           />
+          {errorMessage && (
+            <p className="w-full text-center text-red-300 bg-red-900/40 border border-red-700 rounded-xl px-4 py-2.5 text-sm">{errorMessage}</p>
+          )}
           <div className="flex gap-3 w-full">
             <button
               onClick={() => handleHoNoteSubmit(true)}

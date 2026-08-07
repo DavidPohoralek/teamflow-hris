@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { toISODateLocal } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server'
-import { isTokenValid } from '@/lib/managerAuth'
+import { verifyManagerToken } from '@/lib/managerAuth'
 
 function getServiceClient() {
   return createClient(
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   // Auth: manager token OR employee PIN (PIN may only create shifts for its own row)
   const rawToken = req.headers.get('Manager-Token')
-  const tokenResult = isTokenValid(rawToken ?? '')
+  const tokenResult = await verifyManagerToken(rawToken ?? '')
   if (tokenResult.valid) {
     if (tokenResult.orgId !== orgId) {
       return NextResponse.json({ error: 'Token neodpovídá organizaci.' }, { status: 403 })
@@ -220,7 +220,7 @@ export async function DELETE(req: NextRequest) {
 
   // ── Manager-Token authenticated delete ──────────────────────────────────────
   const rawToken = req.headers.get('Manager-Token')
-  const tokenResult = isTokenValid(rawToken ?? '')
+  const tokenResult = await verifyManagerToken(rawToken ?? '')
   if (!tokenResult.valid) {
     return NextResponse.json({ error: 'Neplatný nebo expirovaný token.' }, { status: 401 })
   }
@@ -267,7 +267,7 @@ export async function PATCH(req: NextRequest) {
 
   // Auth: Manager-Token or PIN
   const rawToken = req.headers.get('Manager-Token')
-  const tokenResult = isTokenValid(rawToken ?? '')
+  const tokenResult = await verifyManagerToken(rawToken ?? '')
   if (!tokenResult.valid || tokenResult.orgId !== orgId) {
     // Fall back to PIN auth
     if (!pin) return NextResponse.json({ error: 'Neplatná autorizace.' }, { status: 401 })
