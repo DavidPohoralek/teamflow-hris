@@ -42,6 +42,7 @@ interface AttendanceRow {
   check_in: string | null
   check_out: string | null
   work_type_name: string | null
+  note: string | null
 }
 
 function calcStats(logs: AttendanceRow[]): { hours: number; days: number } {
@@ -112,7 +113,7 @@ export async function GET(req: NextRequest) {
     const [logsResult, vacResult, settingsResult] = await Promise.all([
       supabase
         .from('attendance_logs')
-        .select('date, check_in, check_out, work_type_name')
+        .select('date, check_in, check_out, work_type_name, note')
         .eq('organization_id', orgId)
         .eq('employee_id', employee.id)
         .gte('date', earliestDate)
@@ -214,7 +215,9 @@ export async function GET(req: NextRequest) {
         check_in: l.check_in,
         check_out: l.check_out,
         duration: durationHours,
-        work_type_name: l.work_type_name ?? null,
+        // Vacation logs have no work type — label them by their note so the
+        // portal shows "Dovolená" instead of an empty category
+        work_type_name: l.work_type_name ?? (l.note === 'Placená dovolená' ? 'Dovolená' : null),
         sat_bonus_hours: satBonusHours,
       }
     })

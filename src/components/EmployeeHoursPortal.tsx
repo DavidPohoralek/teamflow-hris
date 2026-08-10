@@ -691,7 +691,11 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isComplete ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{rec.category}</span>
+                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      rec.category === 'Dovolená'
+                                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}>{rec.category === 'Dovolená' ? '🏖️ Dovolená' : rec.category}</span>
                                     {(rec.satBonusHours ?? 0) > 0 && (
                                       <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
                                         +{rec.satBonusHours!.toFixed(2)}h bonus
