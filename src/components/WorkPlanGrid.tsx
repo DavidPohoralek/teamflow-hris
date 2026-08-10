@@ -635,17 +635,20 @@ function DayCard({
           ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
           : isToday
           ? 'bg-white border-rose-400 shadow-sm shadow-rose-100 cursor-pointer hover:border-rose-500 ring-1 ring-rose-300'
+          : isClosed
+          ? 'bg-slate-100 border-slate-200 cursor-pointer hover:border-slate-300'
           : isWeekend
           ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
           : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
       }`}
     >
-      {/* Closed day hatching — purely decorative, sits behind content */}
+      {/* Closed day hatching — light whitish-gray stripes so a closed day is
+          recognizable at a glance, not just by the small badge */}
       {isClosed && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
           style={{
-            background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.15) 0px, rgba(148,163,184,0.15) 3px, transparent 3px, transparent 10px)',
+            background: 'repeating-linear-gradient(-45deg, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 5px, rgba(148,163,184,0.28) 5px, rgba(148,163,184,0.28) 8px)',
           }}
         />
       )}
@@ -1943,6 +1946,7 @@ export default function WorkPlanGrid({
                   className={`w-full text-left px-4 py-3 flex items-start gap-3 active:bg-slate-50 transition-colors ${
                     isVacation ? 'bg-pink-50' :
                     isToday ? 'bg-blue-50' :
+                    isClosed ? 'bg-slate-100' :
                     isWeekend ? 'bg-slate-50/60' : 'bg-white'
                   }`}
                 >

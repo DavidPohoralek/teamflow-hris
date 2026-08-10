@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  const [activityTypesRes, logs, benefitLogsRes, empsRes] = await Promise.all([
+  const [activityTypesRes, logs, plans, benefitLogsRes, empsRes] = await Promise.all([
     // Activity work types that have a benefit_key
     sb.from('work_types')
       .select('id, name, benefit_key, color')
@@ -38,6 +38,17 @@ export async function GET(req: NextRequest) {
         .lte('date', dateTo)
         .not('check_in', 'is', null)
         .not('check_out', 'is', null)
+        .order('date').range(from, to)),
+
+    // Planned shifts for the month — an activity scheduled in the shift grid
+    // (work_plans.work_type holds the work-type name) counts as "planned"
+    fetchAllRows<{ employee_id: string; work_type: string | null }>((from, to) =>
+      sb.from('work_plans')
+        .select('employee_id, work_type')
+        .eq('organization_id', orgId)
+        .eq('active', true)
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
         .order('date').range(from, to)),
 
     // Benefit logs (deductions) for the month
@@ -73,6 +84,15 @@ export async function GET(req: NextRequest) {
       (attendedByEmpAndName[log.employee_id][log.work_type_name] ?? 0) + 1;
   }
 
+  // Per-employee, per-activity-name: count of PLANNED shifts with that activity
+  const plannedByEmpAndName: Record<string, Record<string, number>> = {};
+  for (const plan of plans) {
+    if (!plan.work_type || !activityNameSet.has(plan.work_type)) continue;
+    if (!plannedByEmpAndName[plan.employee_id]) plannedByEmpAndName[plan.employee_id] = {};
+    plannedByEmpAndName[plan.employee_id][plan.work_type] =
+      (plannedByEmpAndName[plan.employee_id][plan.work_type] ?? 0) + 1;
+  }
+
   // Per-employee, per-benefit_key: deducted count
   const deductedByEmpAndKey: Record<string, Record<string, number>> = {};
   for (const bl of benefitLogs) {
@@ -84,22 +104,25 @@ export async function GET(req: NextRequest) {
   const result = employees
     .map((emp) => {
       const attended = attendedByEmpAndName[emp.id] ?? {};
+      const planned = plannedByEmpAndName[emp.id] ?? {};
       const deducted = deductedByEmpAndKey[emp.id] ?? {};
 
       const activities = activityTypes.map((at) => {
         const attendedCount = attended[at.name] ?? 0;
+        const plannedCount = planned[at.name] ?? 0;
         const deductedCount = at.benefit_key ? (deducted[at.benefit_key] ?? 0) : null;
         return {
           name: at.name,
           benefit_key: at.benefit_key,
           color: at.color,
+          planned: plannedCount,
           attended: attendedCount,
           deducted: deductedCount,
           diff: deductedCount != null ? attendedCount - deductedCount : null,
         };
       });
 
-      const hasAny = activities.some((a) => a.attended > 0 || (a.deducted ?? 0) > 0);
+      const hasAny = activities.some((a) => a.planned > 0 || a.attended > 0 || (a.deducted ?? 0) > 0);
       return { employeeId: emp.id, name: emp.name, department: emp.department, activities, hasAny };
     })
     .filter((r) => r.hasAny);

@@ -1149,6 +1149,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   const DOV_HATCH = 'repeating-linear-gradient(-45deg, #eff6ff 0px, #eff6ff 5px, #dbeafe 5px, #dbeafe 7px)';
   const XXX_HATCH = 'repeating-linear-gradient(-45deg, #f9fafb 0px, #f9fafb 6px, #e9eef5 6px, #e9eef5 8px)';
+  // Closed days (zavřeno) — light whitish-gray stripes, clearly distinct from
+  // open cells and from the subtle dimmed-day tint
+  const CLOSED_HATCH = 'repeating-linear-gradient(-45deg, #f8fafc 0px, #f8fafc 5px, #e2e8f0 5px, #e2e8f0 8px)';
 
   // Chip pattern per work type — stored in work_types.icon ('stripes' | 'dots')
   const wtPatternMap = useMemo(() => {
@@ -1344,14 +1347,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isStaged = clipboard != null && stagedPastes.has(`${emp.id}|${date}`);
             return (
               <td key={date}
-                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${isClosed && !isStaged ? 'bg-gray-100/60' : !isToday && isDimmed && !isStaged ? 'bg-slate-50/60' : ''}`}
+                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${!isClosed && !isToday && isDimmed && !isStaged ? 'bg-slate-50/60' : ''}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
                   if (clipboard) { toggleStagedPaste(emp.id, date); return; }
                   setAddModalDate(date); setAddModalEmployeeId(emp.id); setShowAddModal(true);
                 }}
-                style={{ cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default' }}
+                style={{
+                  cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default',
+                  ...(isClosed && !isStaged ? { backgroundImage: CLOSED_HATCH } : {}),
+                }}
               >
                 {isStaged
                   ? (

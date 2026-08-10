@@ -933,7 +933,7 @@ interface EmpComparison {
   employeeId: string;
   name: string;
   department: string | null;
-  activities: { name: string; benefit_key: string | null; color: string; attended: number; deducted: number | null; diff: number | null }[];
+  activities: { name: string; benefit_key: string | null; color: string; planned?: number; attended: number; deducted: number | null; diff: number | null }[];
 }
 
 function BenefitComparisonView({ month, activityTypes, employees }: {
@@ -951,7 +951,7 @@ function BenefitComparisonView({ month, activityTypes, employees }: {
   if (employees.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
-        Za {month} žádné aktivitní docházky ani odpočty.
+        Za {month} žádné plánované aktivity, docházky ani odpočty.
       </div>
     );
   }
@@ -968,12 +968,13 @@ function BenefitComparisonView({ month, activityTypes, employees }: {
                   <span className="font-semibold text-slate-700 text-xs">{at.name}</span>
                   {at.benefit_key && (
                     <div className="flex gap-2 text-[10px] text-slate-400 font-normal">
+                      <span>Plán</span>
                       <span>Docházka</span>
                       <span>Odečteno</span>
                     </div>
                   )}
                   {!at.benefit_key && (
-                    <span className="text-[10px] text-slate-400 font-normal">Docházka</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Plán / Docházka</span>
                   )}
                 </div>
               </th>
@@ -989,29 +990,33 @@ function BenefitComparisonView({ month, activityTypes, employees }: {
               </td>
               {emp.activities.map((a) => {
                 const hasBenefit = a.benefit_key != null;
+                const planned = a.planned ?? 0;
                 const mismatch = hasBenefit && a.diff != null && a.diff !== 0;
+                const empty = planned === 0 && a.attended === 0 && (a.deducted ?? 0) === 0;
                 return (
                   <td key={a.name} className="px-3 py-3 text-center">
                     {hasBenefit ? (
                       <div className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                        a.attended === 0 && (a.deducted ?? 0) === 0
+                        empty
                           ? 'text-slate-300'
                           : mismatch
                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
                             : 'bg-green-50 text-green-700 border border-green-200'
                       }`}>
+                        <span title="Naplánováno ve Směnách" className={empty ? '' : 'text-sky-600'}>{planned}×</span>
+                        <span className="text-slate-300">/</span>
                         <span title="Docházka">{a.attended}×</span>
                         {a.deducted != null && (
                           <>
                             <span className="text-slate-300">/</span>
                             <span title="Odečteno">{a.deducted}×</span>
-                            {mismatch && <span title="Rozdíl">⚠️</span>}
+                            {mismatch && <span title="Rozdíl docházka vs. odečteno">⚠️</span>}
                           </>
                         )}
                       </div>
                     ) : (
-                      <span className={`text-xs font-semibold ${a.attended > 0 ? 'text-purple-600' : 'text-slate-300'}`}>
-                        {a.attended > 0 ? `${a.attended}×` : '—'}
+                      <span className={`text-xs font-semibold ${planned > 0 || a.attended > 0 ? 'text-purple-600' : 'text-slate-300'}`}>
+                        {planned > 0 || a.attended > 0 ? `${planned}× / ${a.attended}×` : '—'}
                       </span>
                     )}
                   </td>
@@ -1021,10 +1026,11 @@ function BenefitComparisonView({ month, activityTypes, employees }: {
           ))}
         </tbody>
       </table>
-      <div className="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-400 flex items-center gap-4">
+      <div className="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span><span className="text-sky-600 font-semibold">Plán</span> = aktivita naplánovaná ve Směnách</span>
         <span>Docházka = počet příchodů s daným typem aktivity</span>
         <span>Odečteno = benefit záznamy v systému</span>
-        <span className="text-amber-500">⚠️ = neshoda</span>
+        <span className="text-amber-500">⚠️ = neshoda docházky a odečtů</span>
       </div>
     </div>
   );
