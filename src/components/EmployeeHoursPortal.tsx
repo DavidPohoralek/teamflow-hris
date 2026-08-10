@@ -114,6 +114,16 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [activeTab, setActiveTab] = useState<'logs' | 'requests' | 'ho'>('logs');
   // Log filter: 'today' | '7d' | '30d' | 'all'
   const [logFilter, setLogFilter] = useState<'today' | '7d' | '30d' | 'all'>('30d');
+  // Vacation balance — from /api/public/vacation-balance, the single source of
+  // truth (weekend mode, hours offset, paid-vacation entitlement per contract)
+  const [vacBalance, setVacBalance] = useState<{
+    hasPaidVacation: boolean;
+    totalDays: number;
+    consumedDays: number;
+    futurePlannedDays: number;
+    pendingDays: number;
+    remainingDays: number;
+  } | null>(null);
   // HO reports
   const [hoEnabled, setHoEnabled] = useState(false);
   const [hoLogs, setHoLogs] = useState<{ id: string; date: string; checkIn: string | null; checkOut: string | null; note: string | null }[]>([]);
@@ -125,6 +135,23 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       .then((d) => { if (d.require_ho_activity_report) setHoEnabled(true); })
       .catch(() => {});
   }, [orgId]);
+
+  const fetchVacationBalance = async (enteredPin: string) => {
+    try {
+      const res = await fetch(`/api/public/vacation-balance?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(enteredPin)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setVacBalance({
+          hasPaidVacation: json.hasPaidVacation ?? false,
+          totalDays: json.totalDays ?? 0,
+          consumedDays: json.consumedDays ?? 0,
+          futurePlannedDays: json.futurePlannedDays ?? 0,
+          pendingDays: json.pendingDays ?? 0,
+          remainingDays: json.remainingDays ?? 0,
+        });
+      }
+    } catch { /* non-critical — the card simply stays hidden */ }
+  };
 
   const fetchHoLogs = async (enteredPin: string) => {
     setHoLoading(true);
@@ -196,6 +223,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
         };
         setData(normalized);
         fetchRequests(enteredPin);
+        fetchVacationBalance(enteredPin);
         if (hoEnabled) fetchHoLogs(enteredPin);
         if (normalized.thisMonth.monthKey) {
           fetchBenefitCounts(enteredPin, normalized.thisMonth.monthKey);
@@ -334,6 +362,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
     setRequests([]);
     setBenefitCounts({});
     setBenefitEntries([]);
+    setVacBalance(null);
   };
 
   // Get current month name
@@ -412,6 +441,57 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
               </div>
             </div>
           )}
+
+          {/* Vacation dashboard */}
+          {vacBalance?.hasPaidVacation && vacBalance.totalDays > 0 && (() => {
+            const { totalDays, consumedDays, futurePlannedDays, pendingDays, remainingDays } = vacBalance;
+            const pct = (d: number) => Math.min(100, (d / totalDays) * 100);
+            return (
+              <div className="px-4 sm:px-6 pb-3">
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">🏖️ Dovolená {new Date().getFullYear()}</p>
+                    <p className="text-sm font-bold text-emerald-700">
+                      {remainingDays % 1 === 0 ? remainingDays : remainingDays.toFixed(1)}
+                      <span className="font-medium text-emerald-600"> / {totalDays} dní zbývá</span>
+                    </p>
+                  </div>
+                  {/* Segmented bar: consumed → planned → pending → remaining (track) */}
+                  <div className="h-2.5 w-full bg-white rounded-full overflow-hidden flex border border-emerald-100">
+                    <div className="h-full bg-emerald-500" style={{ width: `${pct(consumedDays)}%` }} />
+                    <div className="h-full bg-sky-400" style={{ width: `${pct(futurePlannedDays)}%` }} />
+                    <div className="h-full bg-amber-300" style={{ width: `${pct(pendingDays)}%` }} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    <div className="bg-white/70 rounded-lg px-2.5 py-2 text-center">
+                      <p className="text-lg font-bold text-emerald-700 leading-none">{consumedDays % 1 === 0 ? consumedDays : consumedDays.toFixed(1)}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1 align-middle" />Vyčerpáno
+                      </p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg px-2.5 py-2 text-center">
+                      <p className="text-lg font-bold text-sky-600 leading-none">{futurePlannedDays % 1 === 0 ? futurePlannedDays : futurePlannedDays.toFixed(1)}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-sky-400 mr-1 align-middle" />Naplánováno
+                      </p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg px-2.5 py-2 text-center">
+                      <p className="text-lg font-bold text-slate-700 leading-none">{remainingDays % 1 === 0 ? remainingDays : remainingDays.toFixed(1)}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-slate-300 mr-1 align-middle" />Zbývá
+                      </p>
+                    </div>
+                  </div>
+                  {pendingDays > 0 && (
+                    <p className="text-[11px] text-amber-600 mt-2.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-300 mr-1 align-middle" />
+                      Čeká na schválení: {pendingDays % 1 === 0 ? pendingDays : pendingDays.toFixed(1)} {pendingDays === 1 ? 'den' : pendingDays < 5 ? 'dny' : 'dní'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Benefits section */}
           {data.benefits && data.benefits.length > 0 && (
