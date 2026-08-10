@@ -1347,7 +1347,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isStaged = clipboard != null && stagedPastes.has(`${emp.id}|${date}`);
             return (
               <td key={date}
-                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'} ${!isClosed && !isToday && isDimmed && !isStaged ? 'bg-slate-50/60' : ''}`}
+                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
@@ -1356,7 +1356,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 }}
                 style={{
                   cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default',
-                  ...(isClosed && !isStaged ? { backgroundImage: CLOSED_HATCH } : {}),
+                  // Closed by date or by operating hours — whitish-gray stripes
+                  ...((isClosed || isDimmed) && !isStaged && !isToday ? { backgroundImage: CLOSED_HATCH } : {}),
                 }}
               >
                 {isStaged
@@ -1620,17 +1621,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     }
                     const dayNum = new Date(d + 'T00:00:00').getDate();
                     const isToday = d === today;
-                    const isClosed = closedDates.has(d);
-                    const isDimmed = !isOpenDay(d);
-                    const bg = isClosed ? '#475569' : isDimmed ? '#3d4f63' : '#334155';
+                    // "Closed" from the user's view = explicit closed date OR closed
+                    // by operating hours (e.g. Sundays) — both flip to light gray
+                    // so they pop out of the dark header
+                    const isNonWorking = !isOpenDay(d);
+                    const bg = isNonWorking ? '#e2e8f0' : '#334155';
                     return (
                       <th key={d} className="py-2 text-center border-r border-slate-500 last:border-r-0 font-normal" style={{ background: bg }}>
                         <div className="flex flex-col items-center gap-0.5">
-                          <span className={`text-[9px] uppercase tracking-wider font-semibold ${isDimmed || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
+                          <span className={`text-[9px] uppercase tracking-wider font-semibold ${isNonWorking ? 'text-slate-400' : 'text-slate-400'}`}>
                             {DAY_NAMES[i]}
                           </span>
                           <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
-                            isToday ? 'bg-blue-500 text-white' : isDimmed || isClosed ? 'text-slate-500' : 'text-slate-200'
+                            isToday ? 'bg-blue-500 text-white' : isNonWorking ? 'text-slate-500' : 'text-slate-200'
                           }`}>
                             {dayNum}
                           </span>
@@ -1652,7 +1655,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     const dayNum = new Date(date + 'T00:00:00').getDate();
                     return (
                       <th key={i}
-                        className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed ? 'bg-gray-100 text-gray-400' : isDimmed ? 'bg-slate-50 text-gray-400' : 'bg-gray-50 text-gray-600'}`}
+                        className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed || isDimmed ? 'bg-slate-200 text-slate-400' : 'bg-gray-50 text-gray-600'}`}
                       >
                         <div className="inline-flex flex-col items-center gap-0.5">
                           <span className="text-[10px] uppercase tracking-wider">{name}</span>
@@ -1739,17 +1742,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         }
                         const dayNum = new Date(d + 'T00:00:00').getDate();
                         const isToday = d === today;
-                        const isClosed = closedDates.has(d);
-                        const isDimmed = !isOpenDay(d);
-                        const bg = isClosed ? '#475569' : isDimmed ? '#3d4f63' : '#334155';
+                        // Closed by date or by operating hours — light gray in the dark row
+                        const isNonWorking = !isOpenDay(d);
+                        const bg = isNonWorking ? '#e2e8f0' : '#334155';
                         return (
                           <td key={d} className="py-0.5 text-center border-r border-slate-500 last:border-r-0 group-hover/sep:py-1 transition-all duration-150" style={{ background: bg }}>
                             <div className="flex flex-col items-center gap-0">
-                              <span className={`text-[8px] uppercase tracking-wider font-semibold hidden group-hover/sep:block ${isDimmed || isClosed ? 'text-slate-500' : 'text-slate-400'}`}>
+                              <span className={`text-[8px] uppercase tracking-wider font-semibold hidden group-hover/sep:block ${isNonWorking ? 'text-slate-400' : 'text-slate-400'}`}>
                                 {DAY_NAMES[i]}
                               </span>
                               <span className={`text-[10px] font-bold leading-tight ${
-                                isToday ? 'text-blue-400' : isDimmed || isClosed ? 'text-slate-500' : 'text-slate-300'
+                                isToday ? 'text-blue-400' : isNonWorking ? 'text-slate-500' : 'text-slate-300'
                               }`}>
                                 {dayNum}
                               </span>
