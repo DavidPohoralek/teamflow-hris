@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { toISODateLocal } from '@/lib/vacationDays';
+import { catColors } from '@/lib/categoryColors';
 import { useT } from '@/lib/i18n';
 import { managerFetch } from '@/lib/managerFetch';
 import TimeSelect from '@/components/TimeSelect';
@@ -67,13 +68,14 @@ function formatDuration(checkInTime: string): { since: string; duration: string 
   const mm = checkIn.getMinutes().toString().padStart(2, '0');
   const since = `${hh}:${mm}`;
 
+  // Mockup format: "2 h 1 min" (mono, no parentheses)
   let duration = '';
   if (hours > 0 && minutes > 0) {
-    duration = `(${hours} hodin ${minutes} min)`;
+    duration = `${hours} h ${minutes} min`;
   } else if (hours > 0) {
-    duration = `(${hours} hodin)`;
+    duration = `${hours} h`;
   } else {
-    duration = `(${minutes} min)`;
+    duration = `${minutes} min`;
   }
 
   return { since, duration };
@@ -318,44 +320,35 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
 
   // ── DESKTOP VIEW ─────────────────────────────────────────────────────────────
   const DesktopView = () => (
-    <div className="w-full px-6 py-5 space-y-6">
+    <div className="w-full px-6 py-5 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900">{t('Aktuální přítomnost', 'Current presence')}</h2>
+        <h2 className="text-[19px] font-semibold" style={{ color: '#111820' }}>{t('Aktuální přítomnost', 'Current presence')}</h2>
         <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="text-xs text-slate-400">
-              {t('Aktualizováno:', 'Updated:')}{' '}
-              {lastUpdated.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+            <span className="text-[12.5px]" style={{ color: '#8a929c' }}>
+              {t('Aktualizováno', 'Updated')}{' '}
+              <span className="tf-mono">{lastUpdated.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span>
             </span>
           )}
-          <button onClick={fetchPresence} className="rounded-lg border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+          <button onClick={fetchPresence} className="rounded-md border border-[#e2e0dc] bg-white px-3.5 py-[6px] text-[12.5px] font-medium hover:bg-[#f4f2ef] transition-colors" style={{ color: '#111820' }}>
             {t('Obnovit', 'Refresh')}
           </button>
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="flex flex-wrap gap-3">
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 min-w-[140px]">
-          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-sm shadow-emerald-300/50">
-            <span className="w-2 h-2 bg-white rounded-full" />
-          </div>
-          <div>
-            <div className="text-xl font-bold text-emerald-700 leading-none">{totalCount}</div>
-            <div className="text-xs text-emerald-600 mt-0.5">{t('Celkem přítomno', 'Total present')}</div>
-          </div>
+      {/* Summary cards (spec 4a: white cards, mono counts, total highlighted) */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(summaryTypes.length + 1, 7)}, minmax(120px, 1fr))` }}>
+        <div className="rounded-[9px] border px-4 py-3" style={{ background: '#f1f6f1', borderColor: '#cfdfd2' }}>
+          <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: '#111820' }}>{totalCount}</div>
+          <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{t('Celkem přítomno', 'Total present')}</div>
         </div>
         {summaryTypes.map((type) => {
           const count = countByType[type] ?? 0;
-          const hex = workTypeColorMap.get(type) ?? '#94a3b8';
-          const styles = colorStyles(hex);
           return (
-            <div key={type} className="flex items-center gap-3 rounded-xl px-4 py-3 min-w-[120px]" style={styles.summaryCard}>
-              <div>
-                <div className="text-xl font-bold leading-none">{count}</div>
-                <div className="text-xs mt-0.5 opacity-80">{type}</div>
-              </div>
+            <div key={type} className="rounded-[9px] border border-[#e2e0dc] bg-white px-4 py-3">
+              <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: count > 0 ? '#111820' : '#8a929c' }}>{count}</div>
+              <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{type}</div>
             </div>
           );
         })}
@@ -384,29 +377,28 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
       )}
 
       {!loading && sorted.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-[9px] border border-[#e2e0dc] bg-white overflow-hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((record) => {
-            const hex = workTypeColorMap.get(record.workType) ?? '#94a3b8';
-            const styles = colorStyles(hex);
+            const cat = catColors(workTypeColorMap.get(record.workType));
             const { since, duration } = formatDuration(record.checkInTime);
             const isEditing = editingId === record.id;
 
             return (
-              <div key={record.id} className="relative rounded-lg border bg-white p-4 shadow-sm transition-shadow hover:shadow-md" style={{ borderLeft: styles.border, borderColor: '#e2e8f0' }}>
+              <div key={record.id} className="relative p-4 border-b border-[#f4f2ef] sm:[&:nth-child(2n)]:border-l lg:[&:nth-child(3n-1)]:border-l lg:[&:nth-child(3n)]:border-l sm:border-l-[#f4f2ef] lg:border-l-[#f4f2ef]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="relative flex-shrink-0">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm" style={styles.avatar}>
-                        {getInitials(record.name)}
-                      </div>
-                      <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500" />
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-[12px] font-semibold shrink-0"
+                      style={{ background: cat.fill, color: cat.text }}
+                    >
+                      {getInitials(record.name)}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">{record.name}</p>
-                      <p className="text-xs text-gray-500">{t('od', 'since')} {since} <span className="text-gray-400">{duration}</span></p>
+                      <p className="truncate text-[13.5px] font-medium" style={{ color: '#111820' }}>{record.name}</p>
+                      <p className="tf-mono text-[11.5px]" style={{ color: '#8a929c' }}>{t('od', 'since')} {since} · {duration}</p>
                     </div>
                   </div>
-                  <span className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium" style={styles.badge}>{record.workType}</span>
+                  <span className="flex-shrink-0 rounded-full px-2.5 py-[3px] text-[11px] font-medium" style={{ background: cat.fill, color: cat.text }}>{record.workType}</span>
                 </div>
 
                 {isManagerMode && (
