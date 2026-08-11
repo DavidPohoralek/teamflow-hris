@@ -6,6 +6,8 @@ export interface Theme {
   navText: string;
   divider: string;
   tabsBg: string;
+  /** Active tab pill — themes without it fall back to the legacy blue pill */
+  tabActive?: string;
   tabInactive: string;
   tabHover: string;
   managerBtnClass: string;
@@ -14,6 +16,21 @@ export interface Theme {
 }
 
 export const THEMES: Theme[] = [
+  {
+    key: 'ink',
+    label: 'Ink (nový design)',
+    navBg: 'bg-[#15171C]',
+    navBorder: 'border-black/40',
+    navText: 'text-white',
+    divider: 'bg-white/15',
+    tabsBg: '',
+    tabActive: 'bg-white text-[#15171C] shadow-md',
+    tabInactive: 'text-[#C6CBD4] hover:text-white hover:bg-white/10',
+    tabHover: '',
+    managerBtnClass: 'bg-white/10 border border-white/15 text-[#E4E7EC] hover:bg-white/20 hover:text-white',
+    logoutBtnClass: 'border border-white/20 text-[#C6CBD4] hover:bg-white/10 hover:text-white',
+    preview: ['#15171C', '#2A2E36'],
+  },
   {
     key: 'slate',
     label: 'Noční modrá',

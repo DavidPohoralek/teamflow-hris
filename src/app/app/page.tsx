@@ -13,6 +13,7 @@ import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistantPlanner from '@/components/ShiftAssistantPlanner'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
+import TabIcon from '@/components/TabIcons'
 import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
 import TourSelectModal from '@/components/TourSelectModal'
@@ -321,7 +322,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-gray-50 overflow-hidden">
+    <div className="h-dvh flex flex-col bg-[#EFEDE8] overflow-hidden">
       {/* Navbar */}
       <nav className={`${theme.navBg} ${theme.navText} shadow-xl border-b ${theme.navBorder} z-10`}>
         {/* Desktop row */}
@@ -370,14 +371,16 @@ export default function HomePage() {
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 whitespace-nowrap
+                  title={lang === 'en' ? tab.labelEn : tab.labelCs}
+                  className={`px-3.5 lg:px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 whitespace-nowrap
                     ${activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      ? (theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20')
                       : theme.tabInactive
                     }`}
                 >
-                  <span className="text-base">{tab.icon}</span>
-                  <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
+                  <TabIcon id={tab.id} />
+                  {/* Narrow screens: icon only */}
+                  <span className="hidden lg:inline">{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
                 </button>
               ))}
             </div>
@@ -468,13 +471,13 @@ export default function HomePage() {
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap
                     ${activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      ? (theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20')
                       : theme.tabInactive
                     }`}
                 >
-                  <span>{tab.icon}</span>
+                  <TabIcon id={tab.id} className="w-4 h-4" />
                   <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
                 </button>
               ))}
@@ -484,7 +487,7 @@ export default function HomePage() {
       </nav>
 
       {/* Content — kiosk tabs fill height, others scroll */}
-      <main className="flex-1 overflow-hidden bg-slate-50 flex flex-col">
+      <main className="flex-1 overflow-hidden bg-[#EFEDE8] flex flex-col">
         {/* Kiosk tabs: fill remaining height, no outer scroll */}
         {activeTab === 'attendance' && (
           <AttendanceKiosk orgId={orgId} />
