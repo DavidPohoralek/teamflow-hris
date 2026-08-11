@@ -78,6 +78,13 @@ function statusColor(status: string) {
   return 'bg-amber-300';
 }
 
+// Spec 4a: light fill + dark text chips (sage for approved, amber pending, red rejected)
+function statusChipStyle(status: string): React.CSSProperties {
+  if (status === 'approved') return { background: '#e7efe8', color: '#41654a' };
+  if (status === 'rejected') return { background: '#f7e9e7', color: '#9c4a3f' };
+  return { background: '#f7f0dd', color: '#8a6d2f' };
+}
+
 function AddVacationModal({ orgId, employees, onClose, onSaved }: {
   orgId: string;
   employees: Employee[];
@@ -770,24 +777,40 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
 
   return (
     <div className="w-full px-3 sm:px-6 py-4 sm:py-5">
-      {/* Toolbar */}
+      {/* Toolbar (spec 4a): square nav buttons, large title, month stat */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-        <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
+        <div className="flex items-center gap-3">
           <button onClick={() => setMonth(prevMonth(month))}
-            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors">
-            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-[#e2e0dc] bg-white hover:bg-[#f4f2ef] transition-colors" style={{ color: '#5c6672' }}>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-slate-800 min-w-[150px] text-center px-2">
+          <span className="text-[19px] font-semibold whitespace-nowrap" style={{ color: '#111820' }}>
             {t(CZ_MONTHS[mo - 1], EN_MONTHS[mo - 1])} {year}
           </span>
           <button onClick={() => setMonth(nextMonth(month))}
-            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors">
-            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-[#e2e0dc] bg-white hover:bg-[#f4f2ef] transition-colors" style={{ color: '#5c6672' }}>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
             </svg>
           </button>
+          {(() => {
+            // Month stat: total vacation person-days (as hours) + busiest day
+            let totalDays = 0; let maxDay: string | null = null; let maxCount = 0;
+            for (const [day, c] of Array.from(dayCountMap.entries())) {
+              totalDays += c;
+              if (c > maxCount) { maxCount = c; maxDay = day; }
+            }
+            if (totalDays === 0) return null;
+            const md = maxDay ? new Date(maxDay + 'T00:00:00') : null;
+            return (
+              <span className="hidden md:inline text-[12.5px] whitespace-nowrap" style={{ color: '#8a929c' }}>
+                <span className="tf-mono">{totalDays * 8} h</span> {t('dovolené', 'of vacation')}
+                {md && <> · {t('nejvytíženější', 'busiest')} <span className="tf-mono">{md.getDate()}. {md.getMonth() + 1}. ({maxCount}×)</span></>}
+              </span>
+            );
+          })()}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -798,9 +821,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                 {/* "Pouze má dovolená" toggle */}
                 <button
                   onClick={() => setMyVacationOnly((v) => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${myVacationOnly ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20' : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'}`}
+                  className={`px-3 py-[7px] rounded-md text-[12.5px] font-medium border transition-colors ${myVacationOnly ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-[#111820] border-[#e2e0dc] hover:bg-[#f4f2ef]'}`}
                 >
-                  🏖️ {t('Pouze má dovolená', 'My vacation only')}
+                  {t('Pouze má dovolená', 'My vacation only')}
                 </button>
                 {/* .ics download for vacation */}
                 {myVacationOnly && (
@@ -815,9 +838,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                 <button
                   onClick={handleToggleMyShifts}
                   disabled={myShiftsLoading}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${showMyShifts ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+                  className={`px-3 py-[7px] rounded-md text-[12.5px] font-medium border transition-colors ${showMyShifts ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-[#111820] border-[#e2e0dc] hover:bg-[#f4f2ef]'}`}
                 >
-                  📅 {myShiftsLoading ? t('Načítám…', 'Loading…') : t('Mé směny', 'My shifts')}
+                  {myShiftsLoading ? t('Načítám…', 'Loading…') : t('Mé směny', 'My shifts')}
                 </button>
                 <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
@@ -873,7 +896,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
             </svg>
             <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
               placeholder={t('Hledat…', 'Search…')}
-              className="pl-7 pr-3 py-2 rounded-xl text-sm border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-40" />
+              className="pl-7 pr-3 py-[7px] rounded-md text-[12.5px] border border-[#e2e0dc] bg-white text-[#111820] placeholder-[#8a929c] focus:outline-none focus:border-[#8a929c] transition w-40" />
             {nameSearch && (
               <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
             )}
@@ -881,9 +904,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
 
           {isManagerMode && (
             <button onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95">
-              <span className="text-lg leading-none font-light">+</span>
-              {t('Přidat dovolenou', 'Add vacation')}
+              className="px-4 py-[8px] bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium rounded-md transition-colors">
+              {t('Zadat dovolenou', 'Add vacation')}
             </button>
           )}
         </div>
@@ -894,19 +916,20 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         <div className="flex items-center justify-center py-12 text-gray-400 text-sm">{t('Načítám…', 'Loading…')}</div>
       )}
       <div className={loading ? 'opacity-40 pointer-events-none' : ''}>
-        {/* Day headers */}
-        <div className="grid grid-cols-7 gap-1 mb-1.5 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
+        {/* Day headers (spec 4a: quiet uppercase band with hairline) */}
+        <div className="grid grid-cols-7 bg-[#fbfaf8] border border-[#e9e7e3] border-b-0 rounded-t-[9px]">
           {DAY_NAMES_SHORT.map((d, i) => (
-            <div key={d} className={`text-center text-xs font-semibold py-0.5 ${i >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
+            <div key={d} className={`text-left text-[10px] font-normal uppercase tracking-[.1em] px-3 py-2 ${i > 0 ? 'border-l border-[#f4f2ef]' : ''}`}
+              style={{ color: '#8a929c' }}>
               {d}
             </div>
           ))}
         </div>
 
-        {/* Calendar cells */}
-        <div className="grid grid-cols-7 gap-1">
+        {/* Calendar cells — continuous grid with hairlines */}
+        <div className="grid grid-cols-7 border border-[#e9e7e3] rounded-b-[9px] overflow-hidden bg-white">
           {Array.from({ length: firstOffset }).map((_, i) => (
-            <div key={`e-${i}`} className="rounded-xl" />
+            <div key={`e-${i}`} className={`bg-[#faf9f7] ${i > 0 ? 'border-l border-[#f4f2ef]' : ''} border-b border-[#f4f2ef]`} />
           ))}
           {days.map((dateStr) => {
             const wd = mondayWeekday(dateStr);
@@ -929,50 +952,30 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     setShowEmployeeVacModal(true);
                   }
                 }}
-                className={`group rounded-xl border min-h-[80px] sm:min-h-[106px] p-2 sm:p-2.5 flex flex-col gap-1 transition-colors relative overflow-hidden ${
-                  isClosed
-                    ? 'bg-slate-50 border-slate-100 cursor-default'
-                    : isToday
-                    ? 'bg-white border-rose-400 shadow-sm shadow-rose-100 ring-1 ring-rose-300 cursor-pointer hover:border-rose-500'
+                className={`group min-h-[80px] sm:min-h-[106px] p-2 sm:p-2.5 flex flex-col gap-1 transition-colors relative overflow-hidden border-b border-[#f4f2ef] ${wd > 0 ? 'border-l border-l-[#f4f2ef]' : ''} ${
+                  isClosed || isWeekend
+                    ? `bg-[#faf9f7] ${isClosed ? 'cursor-default' : 'cursor-pointer'}`
                     : hasMyShift
-                    ? 'bg-blue-50/20 border-blue-300 cursor-pointer hover:border-blue-400'
-                    : isWeekend
-                    ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
-                    : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
-                } ${!isClosed && !isManagerMode && sessionEmployee ? 'group' : ''}`}
+                    ? 'bg-blue-50/20 cursor-pointer'
+                    : 'bg-white cursor-pointer hover:bg-[#fbfaf8]'
+                }`}
               >
-                {isClosed && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: 'repeating-linear-gradient(-45deg, rgba(148,163,184,0.15) 0px, rgba(148,163,184,0.15) 3px, transparent 3px, transparent 10px)',
-                    }}
-                  />
-                )}
-                <div className="relative z-10 flex items-center justify-between mb-0.5">
-                  <span className={`text-xs font-semibold ${isWeekend ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {dayName}{isClosed && <span className="ml-1 text-[9px] font-bold text-slate-400 bg-slate-200 px-1 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
+                <div className="relative z-10 flex items-start justify-between mb-0.5">
+                  <span className={`tf-mono text-[12px] font-medium ${isToday ? 'border-b-2 border-[#111820] pb-px' : ''}`}
+                    style={{ color: isClosed || isWeekend ? '#8a929c' : '#111820' }}>
+                    {dayNum}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     {hasMyShift && (
-                      <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1 py-0.5 rounded">{t('směna', 'shift')}</span>
+                      <span className="text-[9px] font-medium px-1 py-0.5 rounded-[3px]" style={{ background: '#e8edf8', color: '#3d5580' }}>{t('směna', 'shift')}</span>
                     )}
+                    {isClosed && <span className="text-[9px] font-normal uppercase tracking-[.05em]" style={{ color: '#b3aca0' }}>{t('Zavřeno', 'Closed')}</span>}
                     {!isClosed && !isManagerMode && sessionEmployee && (
-                      <span className="hidden group-hover:flex items-center text-xs text-emerald-500 font-semibold gap-0.5">
-                        <span className="text-base leading-none">+</span>
-                      </span>
+                      <span className="hidden group-hover:inline text-[13px] leading-none font-medium" style={{ color: '#41654a' }}>+</span>
                     )}
                     {count > 0 && (
-                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                        {count}×
-                      </span>
+                      <span className="tf-mono text-[11px]" style={{ color: '#8a929c' }}>{count}×</span>
                     )}
-                    <span className={`text-sm font-bold ${
-                      isToday ? 'bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs'
-                      : isWeekend ? 'text-slate-400' : 'text-slate-700'
-                    }`}>
-                      {dayNum}
-                    </span>
                   </div>
                 </div>
                 <div className="relative z-10 flex flex-col gap-0.5 flex-1 overflow-y-auto min-h-0">
@@ -986,17 +989,24 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                       );
                     })}
                   </div>
-                  <div className="hidden sm:flex flex-col gap-0.5">
-                    {onVacation.map((emp) => {
+                  <div className="hidden sm:flex flex-col gap-[3px]">
+                    {onVacation.slice(0, 5).map((emp) => {
                       const st = empStatusMap.get(emp.id)?.get(dateStr) ?? 'pending';
                       return (
                         <div key={emp.id}
-                          className={`text-xs px-1.5 py-0.5 rounded font-medium text-white truncate ${statusColor(st)}`}
+                          className="text-[11.5px] px-2 py-[3px] rounded-[4px] font-normal truncate"
+                          style={statusChipStyle(st)}
                           title={`${emp.name} (${st === 'approved' ? t('schváleno', 'approved') : st === 'rejected' ? t('zamítnuto', 'rejected') : t('čeká', 'pending')})`}>
                           {emp.name}
                         </div>
                       );
                     })}
+                    {onVacation.length > 5 && (
+                      <span className="text-[11px] px-2" style={{ color: '#8a929c' }}
+                        title={onVacation.slice(5).map((e) => e.name).join(', ')}>
+                        +{onVacation.length - 5} {t('další', 'more')}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1006,10 +1016,10 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-4 text-xs text-slate-500">
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400" />{t('Schválena', 'Approved')}</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-300" />{t('Čeká na schválení', 'Pending approval')}</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 text-[11px]" style={{ color: '#5c6672' }}>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: '#e7efe8', border: '1px solid #c4d6c8' }} />{t('Schválena', 'Approved')}</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: '#f7f0dd', border: '1px solid #e3d5ae' }} />{t('Čeká na schválení', 'Pending approval')}</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: '#f7e9e7', border: '1px solid #e5c8c3' }} />{t('Zamítnuta', 'Rejected')}</div>
       </div>
 
       {/* Vacation balance widget — only when PIN logged in (hours everywhere) */}
