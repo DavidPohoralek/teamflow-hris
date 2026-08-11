@@ -619,6 +619,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   // Sticky month-view header
   const [stickyWeekKey, setStickyWeekKey] = useState<string | null>(null);
+  // True while a week separator row sits directly under the sticky header —
+  // the sticky bar collapses so the same week bar isn't shown twice.
+  const [stickyCollapsed, setStickyCollapsed] = useState(false);
   const weekSepRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
   // Split-table sticky approach: header table in overflow:hidden, body in overflow-x:auto
   const headerScrollRef = useRef<HTMLDivElement>(null);
@@ -844,6 +847,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   useEffect(() => {
     if (viewMode !== 'month') {
       setStickyWeekKey(null);
+      setStickyCollapsed(false);
       return;
     }
 
@@ -856,11 +860,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       const threshold = getThreshold();
       let activeKey: string | null = null;
       let activeTop = -Infinity;
+      let separatorAdjacent = false;
       for (const [key, row] of Array.from(weekSepRowRefs.current.entries())) {
-        const top = row.getBoundingClientRect().top;
+        const rect = row.getBoundingClientRect();
+        const top = rect.top;
         if (top <= threshold + 2 && top > activeTop) { activeKey = key; activeTop = top; }
+        // A separator row sitting directly under the sticky header would show
+        // the exact same bar twice — collapse the sticky one in that window.
+        if (top > threshold - 6 && top <= threshold + rect.height + 6) separatorAdjacent = true;
       }
       setStickyWeekKey(activeKey);
+      setStickyCollapsed(separatorAdjacent);
     };
 
     const scrollContainer = bodyScrollRef.current?.closest<HTMLElement>('.overflow-auto') ?? null;
@@ -1605,8 +1615,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         {/* Sticky header — uses exact column widths measured from the body table */}
         <div
           ref={headerScrollRef}
-          style={{ position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden' }}
-          className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-gray-50 border-b-2 border-gray-200 rounded-t-xl'}
+          style={{
+            position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden',
+            // While a week separator row sits right under this bar, the two would
+            // duplicate — hide the sticky clone and let the row do the job.
+            visibility: viewMode === 'month' && stickyCollapsed ? 'hidden' : 'visible',
+          }}
+          className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-white rounded-t-xl'}
         >
           <table className="text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, width: colWidths.length === 8 ? colWidths.reduce((a, b) => a + b, 0) : undefined, minWidth: '100%' }}>
             {colWidths.length === 8 ? (
