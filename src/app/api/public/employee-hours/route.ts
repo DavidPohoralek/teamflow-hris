@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { countUniqueVacationDays, pragueToday, toISODateLocal } from '@/lib/vacationDays'
+import { countUniqueVacationDays, pragueToday, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays'
 
 function getServiceClient() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -142,7 +142,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: logsResult.error.message }, { status: 500 })
     }
 
-    const logs: AttendanceRow[] = logsResult.data ?? []
+    // Future vacation logs are excluded — vacation is written into attendance
+    // upfront at approval, but the portal shows only what already happened
+    // (records stay chronological, no future rows pinned on top; month totals
+    // grow day by day as the vacation actually passes).
+    const todayIso = pragueToday()
+    const logs: AttendanceRow[] = (logsResult.data ?? []).filter(
+      (l: AttendanceRow) => !(l.note === VACATION_LOG_NOTE && l.date > todayIso)
+    )
     const vacationReqs = vacResult.data ?? []
     const extra = (settingsResult.data as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {}
 
