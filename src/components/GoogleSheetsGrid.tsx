@@ -1624,6 +1624,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 <tr>
                   <th
                     className="sticky left-0 z-10 px-3.5 py-2 text-left border-r border-[#e9e7e3] bg-[#fbfaf8]"
+                    style={{ borderBottom: '2px solid #111820' }}
                   >
                     {(() => {
                       const f = new Date(stickyDays[0] + 'T00:00:00');
@@ -1644,14 +1645,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                   {stickyDays.map((d, i) => {
                     const isOutside = d.slice(0, 7) !== weekDays[3].slice(0, 7);
                     if (isOutside) {
-                      return <th key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#fbfaf8]" />;
+                      return <th key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#fbfaf8]" style={{ borderBottom: '2px solid #111820' }} />;
                     }
                     const dayNum = new Date(d + 'T00:00:00').getDate();
                     const isToday = d === today;
                     const isNonWorking = !isOpenDay(d);
                     return (
                       <th key={d} className={`tf-mono py-2 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#e9e7e3] last:border-r-0 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
-                        style={{ color: isNonWorking ? '#8a929c' : '#111820' }}
+                        style={{ color: isNonWorking ? '#8a929c' : '#111820', borderBottom: '2px solid #111820' }}
                       >
                         <span className={isToday ? 'border-b-2 border-[#111820] pb-0.5' : ''}>{DAY_NAMES[i]} {dayNum}</span>
                       </th>
@@ -1740,29 +1741,26 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                       className="group/sep"
                     >
                       <td
-                        className="sticky left-0 z-10 px-3.5 py-0.5 border-r border-[#e9e7e3] bg-[#fbfaf8] group-hover/sep:py-1.5 transition-all duration-150"
+                        className="sticky left-0 z-10 px-3.5 py-1 border-r border-[#e9e7e3] bg-[#fbfaf8] group-hover/sep:py-2 transition-all duration-150"
+                        style={{ borderTop: '2px solid #111820' }}
                       >
-                        <span className="tf-mono text-[10px] font-medium leading-tight" style={{ color: '#5c6672' }}>{wLabel}</span>
+                        <span className="tf-mono text-[11px] font-medium leading-tight" style={{ color: '#111820' }}>{wLabel}</span>
                       </td>
                       {wDays.map((d, i) => {
                         const isOutside = d.slice(0, 7) !== currentMonth;
                         if (isOutside) {
-                          return <td key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#f3f1ed]" />;
+                          return <td key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#f3f1ed]" style={{ borderTop: '2px solid #111820' }} />;
                         }
                         const dayNum = new Date(d + 'T00:00:00').getDate();
                         const isToday = d === today;
                         const isNonWorking = !isOpenDay(d);
                         return (
-                          <td key={d} className={`tf-mono py-0.5 text-center border-r border-[#e9e7e3] last:border-r-0 group-hover/sep:py-1 transition-all duration-150 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}>
-                            <div className="flex flex-col items-center gap-0">
-                              <span className="text-[8px] uppercase tracking-[.04em] font-medium hidden group-hover/sep:block" style={{ color: '#8a929c' }}>
-                                {DAY_NAMES[i]}
-                              </span>
-                              <span className={`text-[10px] font-medium leading-tight ${isToday ? 'border-b border-[#111820]' : ''}`}
-                                style={{ color: isNonWorking ? '#8a929c' : '#5c6672' }}>
-                                {dayNum}
-                              </span>
-                            </div>
+                          <td key={d} className={`tf-mono py-1 text-center border-r border-[#e9e7e3] last:border-r-0 group-hover/sep:py-1.5 transition-all duration-150 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
+                            style={{ borderTop: '2px solid #111820' }}>
+                            <span className={`text-[10.5px] font-medium uppercase tracking-[.04em] leading-tight ${isToday ? 'border-b-2 border-[#111820] pb-px' : ''}`}
+                              style={{ color: isNonWorking ? '#8a929c' : '#111820' }}>
+                              {DAY_NAMES[i]} {dayNum}
+                            </span>
                           </td>
                         );
                       })}
