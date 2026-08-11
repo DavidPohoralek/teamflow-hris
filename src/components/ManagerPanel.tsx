@@ -938,13 +938,13 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                         const pct = b.totalDays > 0 ? Math.min(100, (b.usedDays / b.totalDays) * 100) : 0;
                         const pendingPct = b.totalDays > 0 ? Math.min(100 - pct, (b.pendingDays / b.totalDays) * 100) : 0;
                         // remainingDays from the API honors vacation_hours_offset — same
-                        // number the employee sees in their portal
+                        // number the employee sees in their portal; displayed in hours (×8)
                         const remaining = b.remainingDays ?? (b.totalDays - b.usedDays);
                         const barColor = remaining / b.totalDays > 0.5 ? 'bg-emerald-500' : remaining / b.totalDays > 0.1 ? 'bg-amber-500' : 'bg-red-500';
                         return (
                           <div className="min-w-[90px]">
                             <span className={`text-xs font-semibold ${remaining <= 0 ? 'text-red-600' : remaining <= 3 ? 'text-amber-600' : 'text-gray-700'}`}>
-                              {b.usedDays}/{b.totalDays} {t('dní', 'd')}
+                              {b.usedDays * 8}/{b.totalDays * 8} h
                             </span>
                             <div className="mt-1 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden flex">
                               <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />

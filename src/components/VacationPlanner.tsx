@@ -283,7 +283,7 @@ function VacationDayPicker({ selectedDays, onChange }: {
 
       <div className="mt-2 text-xs text-center min-h-[1rem]">
         {groups.length > 0
-          ? <span className="text-slate-600">{summaryText} <span className="text-slate-400">({selectedDays.size} {selectedDays.size === 1 ? 'den' : selectedDays.size < 5 ? 'dny' : 'dní'})</span></span>
+          ? <span className="text-slate-600">{summaryText} <span className="text-slate-400">({selectedDays.size * 8} h · {selectedDays.size} {selectedDays.size === 1 ? 'den' : selectedDays.size < 5 ? 'dny' : 'dní'})</span></span>
           : <span className="text-slate-400">{summaryText}</span>}
       </div>
     </div>
@@ -832,7 +832,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                             <div className={`h-full rounded-full ${barColor}`} style={{ width: `${usedPct}%` }} />
                           </div>
                           <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
-                            {vacBalance.remainingDays} / {vacBalance.totalDays} dní
+                            {vacBalance.remainingHours} / {vacBalance.totalHours} h
                           </span>
                         </div>
                       );
@@ -1012,22 +1012,22 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-300" />{t('Zamítnuta', 'Rejected')}</div>
       </div>
 
-      {/* Vacation balance widget — only when PIN logged in */}
-      {!isManagerMode && sessionEmployee && vacBalance && vacBalance.totalDays > 0 && (
+      {/* Vacation balance widget — only when PIN logged in (hours everywhere) */}
+      {!isManagerMode && sessionEmployee && vacBalance && vacBalance.totalHours > 0 && (
         <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-sm font-semibold text-slate-700">🏖️ {t('Fond dovolené', 'Vacation balance')}</span>
             <span className="text-xs text-slate-400">{new Date().getFullYear()}</span>
           </div>
           {(() => {
-            const usedPct = Math.min(100, ((vacBalance.totalDays - vacBalance.remainingDays) / vacBalance.totalDays) * 100);
+            const usedPct = Math.min(100, ((vacBalance.totalHours - vacBalance.remainingHours) / vacBalance.totalHours) * 100);
             const barColor = usedPct >= 90 ? 'bg-red-500' : usedPct >= 70 ? 'bg-amber-400' : usedPct >= 40 ? 'bg-blue-500' : 'bg-emerald-500';
             const remainColor = usedPct >= 90 ? 'text-red-600' : usedPct >= 70 ? 'text-amber-600' : usedPct >= 40 ? 'text-blue-600' : 'text-emerald-700';
             return (
               <>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs text-slate-400">{t('Vyčerpáno', 'Used')} {vacBalance.consumedDays} / {vacBalance.totalDays} {t('dní', 'days')}</span>
-                  <span className={`text-xs font-bold ${remainColor}`}>{vacBalance.remainingDays} {t('dní zbývá', 'days remaining')}</span>
+                  <span className="text-xs text-slate-400">{t('Vyčerpáno', 'Used')} {vacBalance.consumedHours} / {vacBalance.totalHours} h</span>
+                  <span className={`text-xs font-bold ${remainColor}`}>{vacBalance.remainingHours} {t('h zbývá', 'h remaining')}</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
                   <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${usedPct}%` }} />
@@ -1037,22 +1037,22 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
           })()}
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-emerald-50 rounded-xl p-2.5">
-              <div className="text-lg font-bold text-emerald-700">{vacBalance.remainingDays}</div>
+              <div className="text-lg font-bold text-emerald-700">{vacBalance.remainingHours}<span className="text-xs ml-0.5">h</span></div>
               <div className="text-xs text-emerald-600 mt-0.5">{t('Zbývá', 'Remaining')}</div>
             </div>
             <div className="bg-blue-50 rounded-xl p-2.5">
-              <div className="text-lg font-bold text-blue-600">{vacBalance.futurePlannedDays}</div>
+              <div className="text-lg font-bold text-blue-600">{vacBalance.futurePlannedHours}<span className="text-xs ml-0.5">h</span></div>
               <div className="text-xs text-blue-500 mt-0.5">{t('Naplánováno', 'Planned')}</div>
             </div>
             <div className="bg-red-50 rounded-xl p-2.5">
-              <div className="text-lg font-bold text-red-600">{vacBalance.consumedDays}</div>
+              <div className="text-lg font-bold text-red-600">{vacBalance.consumedHours}<span className="text-xs ml-0.5">h</span></div>
               <div className="text-xs text-red-500 mt-0.5">{t('Vyčerpáno', 'Used')}</div>
             </div>
           </div>
-          {vacBalance.pendingDays > 0 && (
+          {vacBalance.pendingHours > 0 && (
             <div className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">
-              ⏳ {t('Čeká na schválení:', 'Pending approval:')} <strong>{vacBalance.pendingDays} {t('dní', 'days')}</strong>
-              {' · '}{t('Po schválení zbyde:', 'After approval remaining:')} <strong>{vacBalance.remainingAfterPendingDays} {t('dní', 'days')}</strong>
+              ⏳ {t('Čeká na schválení:', 'Pending approval:')} <strong>{vacBalance.pendingHours} h</strong>
+              {' · '}{t('Po schválení zbyde:', 'After approval remaining:')} <strong>{vacBalance.remainingAfterPendingHours} h</strong>
             </div>
           )}
         </div>
@@ -1098,7 +1098,7 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-800">{from}{to ? ` — ${to}` : ''}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{days} {days === 1 ? t('den', 'day') : days < 5 ? t('dny', 'days') : t('dní', 'days')}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{days * 8} h ({days} {days === 1 ? t('den', 'day') : days < 5 ? t('dny', 'days') : t('dní', 'days')})</p>
                       </div>
                       {!isPast && (req.status === 'pending' || req.status === 'approved') && (
                         <button
@@ -1138,12 +1138,14 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                 .filter((r) => r.employee_id === emp.id && (!r.type || r.type === 'vacation'))
                 .sort((a, b) => b.date_from.localeCompare(a.date_from));
               // Balances come from /api/manager/vacation-balances — same numbers
-              // the employee sees in their own portal
+              // the employee sees in their own portal; displayed in hours (×8)
               const bal = balances.get(emp.id);
-              const total = bal?.totalDays ?? emp.vacation_days_per_year ?? 20;
-              const used = bal?.usedDays ?? 0;
-              const remaining = bal?.remainingDays ?? Math.max(0, total - used);
-              const pct = Math.min(100, (used / total) * 100);
+              const totalDays = bal?.totalDays ?? emp.vacation_days_per_year ?? 20;
+              const usedDays = bal?.usedDays ?? 0;
+              const total = totalDays * 8;
+              const used = usedDays * 8;
+              const remaining = (bal?.remainingDays ?? Math.max(0, totalDays - usedDays)) * 8;
+              const pct = Math.min(100, total > 0 ? (used / total) * 100 : 0);
               const isExpanded = expandedEmp === emp.id;
               const todayStr = toISODateLocal(new Date());
 
@@ -1165,8 +1167,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                       </div>
                     </div>
                     <span className="text-xs text-slate-500 whitespace-nowrap shrink-0">
-                      <span className="font-semibold text-slate-700">{used}</span> / {total} {t('dní', 'days')}
-                      {remaining > 0 && <span className="text-emerald-600 ml-1">({remaining} {t('zbývá', 'remaining')})</span>}
+                      <span className="font-semibold text-slate-700">{used}</span> / {total} h
+                      {remaining > 0 && <span className="text-emerald-600 ml-1">({remaining} h {t('zbývá', 'remaining')})</span>}
                     </span>
                   </div>
 
