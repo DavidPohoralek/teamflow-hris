@@ -8,6 +8,15 @@
 // - víkendy se započítávají jen když vacation_counting_mode === 'all'
 // - počítání přes Set unikátních dnů → překrývající se žádosti se nepočítají dvakrát
 
+/**
+ * Note marking auto-inserted vacation attendance logs (8 h per approved
+ * vacation day). Analytics and exports must EXCLUDE these from "worked hours"
+ * — vacation is accounted separately from requests, so counting the logs too
+ * would double it. The employee portal intentionally includes them so the
+ * monthly total matches payroll.
+ */
+export const VACATION_LOG_NOTE = 'Placená dovolená';
+
 /** Formats a Date as local YYYY-MM-DD. Never use toISOString for this. */
 export function toISODateLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

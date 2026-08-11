@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
+import { pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
@@ -38,8 +38,8 @@ export async function GET(req: NextRequest) {
 
   const [empRes, allLogs, plans] = await Promise.all([
     empQuery,
-    fetchAllRows<{ employee_id: string; check_in: string | null; date: string }>(
-      (from, to) => sb.from('attendance_logs').select('employee_id, check_in, date').eq('organization_id', orgId).gte('date', rangeFrom).lte('date', rangeTo).order('date', { ascending: true }).range(from, to),
+    fetchAllRows<{ employee_id: string; check_in: string | null; date: string; note: string | null }>(
+      (from, to) => sb.from('attendance_logs').select('employee_id, check_in, date, note').eq('organization_id', orgId).gte('date', rangeFrom).lte('date', rangeTo).order('date', { ascending: true }).range(from, to),
     ),
     fetchAllRows<{ employee_id: string; date: string; start_time: string | null }>(
       (from, to) => sb.from('work_plans').select('employee_id, date, start_time').eq('organization_id', orgId).eq('active', true).gte('date', rangeFrom).lte('date', rangeTo).order('date', { ascending: true }).range(from, to),
@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
 
   const empIds = new Set<string>((empRes.data ?? []).map((e: { id: string }) => e.id));
   const logs: { employee_id: string; check_in: string; date: string }[] =
-    allLogs.filter((l) => empIds.has(l.employee_id) && l.check_in) as { employee_id: string; check_in: string; date: string }[];
+    // vacation logs excluded — synthetic 09:00 check-ins would skew arrival stats
+    allLogs.filter((l) => empIds.has(l.employee_id) && l.check_in && l.note !== VACATION_LOG_NOTE) as { employee_id: string; check_in: string; date: string }[];
 
   // Index plans by empId+date for O(1) lookup
   const planMap = new Map<string, string>();

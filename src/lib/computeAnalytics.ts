@@ -3,7 +3,7 @@
 // Záměrně NEMĚNÍME původní /api/analytics/route.ts, aby zůstala živá Analytika beze změny.
 // Počítá jen pole potřebná pro týmový souhrn (bez sobotních bonusů, work-type breakdownu apod.).
 
-import { countUniqueVacationDays, toISODateLocal } from '@/lib/vacationDays';
+import { countUniqueVacationDays, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export type EmployeeStat = {
@@ -45,8 +45,8 @@ export async function computeMonthlyStats(
   // vacation fence covers ranges straddling New Year (counted days are clipped below).
   const [empRes, logs, plans, requestsRes, settingsRes] = await Promise.all([
     empQuery,
-    fetchAllRows<{ employee_id: string; check_in: string | null; check_out: string | null; date: string }>((from, to) =>
-      sb.from('attendance_logs').select('employee_id, check_in, check_out, date').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    fetchAllRows<{ employee_id: string; check_in: string | null; check_out: string | null; date: string; note: string | null }>((from, to) =>
+      sb.from('attendance_logs').select('employee_id, check_in, check_out, date, note').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
     fetchAllRows<{ employee_id: string; date: string; start_time: string | null; end_time: string | null }>((from, to) =>
       sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
     sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved')
@@ -68,7 +68,8 @@ export async function computeMonthlyStats(
   };
 
   const stats: EmployeeStat[] = employees.map((emp) => {
-    const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
+    // Auto-inserted vacation logs are excluded — vacation is reported separately
+    const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out && l.note !== VACATION_LOG_NOTE);
     const empPlans = plans.filter((p) => p.employee_id === emp.id);
 
     let workedMinutes = 0;

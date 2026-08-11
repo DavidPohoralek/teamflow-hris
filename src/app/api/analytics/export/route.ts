@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
-import { countUniqueVacationDays, pragueMonth, toISODateLocal } from '@/lib/vacationDays';
+import { countUniqueVacationDays, pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 import * as XLSX from 'xlsx';
 
 // GET /api/analytics/export?month=YYYY-MM&lang=cs|en&format=csv|xlsx
@@ -67,8 +67,8 @@ export async function GET(req: NextRequest) {
   // Vacation requests are fenced to those overlapping the exported month.
   const [empRes, logs, plans, vacRes, benefitLogsRes, bonusRes] = await Promise.all([
     empQuery,
-    fetchAllRows<{ employee_id: string; check_in: string; check_out: string; date: string; work_type_name?: string | null }>((from, to) =>
-      sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
+    fetchAllRows<{ employee_id: string; check_in: string; check_out: string; date: string; work_type_name?: string | null; note?: string | null }>((from, to) =>
+      sb.from('attendance_logs').select('employee_id, check_in, check_out, date, work_type_name, note').eq('organization_id', orgId).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
     fetchAllRows<{ employee_id: string; date: string; start_time: string | null; end_time: string | null }>((from, to) =>
       sb.from('work_plans').select('employee_id, date, start_time, end_time').eq('organization_id', orgId).eq('active', true).gte('date', dateFrom).lte('date', dateTo).order('date').range(from, to)),
     sb.from('requests').select('employee_id, date_from, date_to').eq('organization_id', orgId).eq('type', 'vacation').eq('status', 'approved')
@@ -108,7 +108,9 @@ export async function GET(req: NextRequest) {
   const LEGACY: Record<string, string> = { hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO' };
 
   const rows = filteredEmployees.map((emp) => {
-    const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out);
+    // Auto-inserted vacation logs are EXCLUDED from worked hours — vacation is
+    // counted separately from requests (vacHours); including both doubled it.
+    const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out && l.note !== VACATION_LOG_NOTE);
     const hasAttendance = empLogs.length > 0;
 
     const empDept = emp.department ?? '';

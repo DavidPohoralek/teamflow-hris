@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
+import { pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
@@ -31,9 +31,9 @@ export async function GET(req: NextRequest) {
   // Paginated — a busy month can exceed the 1000-row PostgREST cap
   const [empRes, allLogs, allPlans] = await Promise.all([
     empQuery,
-    fetchAllRows<{ employee_id: string; date: string; check_in: string | null; check_out: string | null }>((from, to) =>
+    fetchAllRows<{ employee_id: string; date: string; check_in: string | null; check_out: string | null; note: string | null }>((from, to) =>
       sb.from('attendance_logs')
-        .select('employee_id, date, check_in, check_out')
+        .select('employee_id, date, check_in, check_out, note')
         .eq('organization_id', orgId)
         .gte('date', dateFrom).lte('date', dateTo)
         .order('date').range(from, to)),
@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
 
   const workedByDate = new Map<string, number>();
   for (const l of (logsRes.data ?? [])) {
-    if (!empIds.has(l.employee_id) || !l.check_in || !l.check_out) continue;
+    // vacation logs excluded — vacation is not "worked" time
+    if (!empIds.has(l.employee_id) || !l.check_in || !l.check_out || l.note === VACATION_LOG_NOTE) continue;
     const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
     workedByDate.set(l.date, (workedByDate.get(l.date) ?? 0) + Math.max(0, mins));
   }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { createClient } from '@supabase/supabase-js';
-import { vacationDaysInRange } from '@/lib/vacationDays';
+import { vacationDaysInRange, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 
 function getServiceClient() {
   return createClient(
@@ -132,7 +132,7 @@ export async function DELETE(
       .delete()
       .eq('organization_id', orgId)
       .eq('employee_id', existing.employee_id)
-      .eq('note', 'Placená dovolená')
+      .eq('note', VACATION_LOG_NOTE)
       .gte('date', dateFrom)
       .lte('date', dateTo);
     if (logError) {
@@ -424,7 +424,7 @@ export async function PUT(
             date: dateStr,
             check_in: `${dateStr}T09:00:00`,
             check_out: `${dateStr}T17:00:00`,
-            note: 'Placená dovolená',
+            note: VACATION_LOG_NOTE,
           }));
 
         if (rows.length > 0) {

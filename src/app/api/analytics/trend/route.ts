@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pragueMonth, toISODateLocal } from '@/lib/vacationDays';
+import { pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
   const [empRes, allLogs] = await Promise.all([
     empQuery,
     // stránkovat přes 1000-řádkový limit (12 měsíců docházky může být >1000 řádků)
-    fetchAllRows<{ employee_id: string; date: string; check_in: string | null; check_out: string | null }>(
+    fetchAllRows<{ employee_id: string; date: string; check_in: string | null; check_out: string | null; note: string | null }>(
       (from, to) => sb.from('attendance_logs')
-        .select('employee_id, date, check_in, check_out')
+        .select('employee_id, date, check_in, check_out, note')
         .eq('organization_id', orgId)
         .gte('date', rangeFrom)
         .lte('date', rangeTo)
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   const employees: { id: string; target_hours: number }[] = empRes.data ?? [];
 
   const empIds = new Set(employees.map((e) => e.id));
-  const relevantLogs = allLogs.filter((l) => empIds.has(l.employee_id) && l.check_in && l.check_out);
+  const relevantLogs = allLogs.filter((l) => empIds.has(l.employee_id) && l.check_in && l.check_out && l.note !== VACATION_LOG_NOTE);
   // Monthly target = sum of all employees' target_hours (contractual monthly obligation)
   const totalTarget = employees.reduce((s, e) => s + (e.target_hours ?? 160), 0);
 
