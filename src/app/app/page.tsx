@@ -13,7 +13,6 @@ import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistantPlanner from '@/components/ShiftAssistantPlanner'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
-import TabIcon from '@/components/TabIcons'
 import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
 import TourSelectModal from '@/components/TourSelectModal'
@@ -322,42 +321,21 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-[#EFEDE8] overflow-hidden">
+    <div className="tf-sans h-dvh flex flex-col bg-[#fbfaf8] overflow-hidden">
       {/* Navbar */}
-      <nav className={`${theme.navBg} ${theme.navText} shadow-xl border-b ${theme.navBorder} z-10`}>
-        {/* Desktop row */}
-        <div className="hidden md:flex max-w-screen-2xl mx-auto px-6 h-16 items-center gap-6">
+      <nav className={`${theme.navBg} ${theme.navText} border-b ${theme.navBorder} z-10`}>
+        {/* Desktop row — 50px, 18px padding (spec 4a) */}
+        <div className="hidden md:flex max-w-screen-2xl mx-auto px-[18px] h-[50px] items-center gap-5">
           {/* TeamFlow logo */}
-          <div className="flex items-center gap-3 shrink-0">
-            <svg width="36" height="36" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
-              <polygon points="25,72 125,130 125,244 25,187" fill="#E09828"/>
-              <polygon points="125,15 225,72 213,72 125,22" fill="#EDB84A"/>
-              <polygon points="25,72 125,15 125,22 37,72" fill="#E09828"/>
-              <polygon points="225,72 125,130 125,122 213,72" fill="#96560A"/>
-              <polygon points="125,130 25,72 37,72 125,122" fill="#AE6A10"/>
-              <polygon points="37,72 125,22 125,122" fill="#2A4878"/>
-              <polygon points="213,72 125,22 125,122" fill="#05080F"/>
-              <line x1="125" y1="22" x2="125" y2="122" stroke="#1A2E58" strokeWidth="1.5"/>
-              <polyline points="125,22 213,72 125,122 37,72 125,22" fill="none" stroke="#182840" strokeWidth="1.8"/>
-              <polygon points="35,98 115,145 115,163 35,117" fill="#7A4808"/>
-              <polygon points="61,139 89,155 89,210 61,194" fill="#7A4808"/>
-              <polygon points="135,145 215,98 215,117 135,163" fill="#6A3806"/>
-              <polygon points="135,170 153,159 153,211 135,221" fill="#6A3806"/>
-              <polygon points="157,171 200,146 200,163 157,188" fill="#6A3806"/>
-              <polyline points="25,72 125,15 225,72" fill="none" stroke="#C07010" strokeWidth="2.5" strokeLinejoin="round"/>
-              <line x1="25" y1="72" x2="25" y2="187" stroke="#C07010" strokeWidth="2"/>
-              <line x1="225" y1="72" x2="225" y2="187" stroke="#8A4A08" strokeWidth="2"/>
-              <line x1="25" y1="187" x2="125" y2="244" stroke="#B07010" strokeWidth="2"/>
-              <line x1="225" y1="187" x2="125" y2="244" stroke="#8A4A08" strokeWidth="2"/>
-              <line x1="125" y1="130" x2="125" y2="244" stroke="#9A5C10" strokeWidth="2.5"/>
-            </svg>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="w-[22px] h-[22px] rounded-[6px] bg-white inline-block" />
+            <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
           </div>
-          <div className={`h-6 w-px ${theme.divider}`} />
+          <div className={`h-5 w-px ${theme.divider}`} />
           {orgLogoUrl
             ? /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={orgLogoUrl} alt={orgName} className="h-8 w-auto max-w-[140px] object-contain" />
-            : <span className="text-slate-400 text-sm font-medium">{orgName}</span>
+              <img src={orgLogoUrl} alt={orgName} className="h-7 w-auto max-w-[130px] object-contain" />
+            : <span className="text-[12.5px] font-medium opacity-70">{orgName}</span>
           }
           <div className="flex-1 flex justify-center">
             <div className={`flex items-center rounded-xl p-1 gap-0.5 ${theme.tabsBg}`}>
@@ -371,51 +349,53 @@ export default function HomePage() {
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
-                  title={lang === 'en' ? tab.labelEn : tab.labelCs}
-                  className={`px-3.5 lg:px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 whitespace-nowrap
+                  className={`px-3 py-[7px] rounded-md text-[12.5px] transition-colors duration-150 whitespace-nowrap
                     ${activeTab === tab.id
-                      ? (theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20')
-                      : theme.tabInactive
+                      ? `font-medium ${theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'}`
+                      : `font-normal ${theme.tabInactive}`
                     }`}
                 >
-                  <TabIcon id={tab.id} />
-                  {/* Narrow screens: icon only */}
-                  <span className="hidden lg:inline">{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
+                  {lang === 'en' ? tab.labelEn : tab.labelCs}
                 </button>
               ))}
             </div>
           </div>
           <div className="shrink-0">
             {isManagerMode ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                  <span className="text-emerald-400 text-sm font-medium">{t('Manažer', 'Manager')}</span>
+                  <span className="text-emerald-400 text-[12.5px] font-medium">{t('Manažer', 'Manager')}</span>
                 </div>
                 {managerScope?.isAdmin !== false && (
                   <button
                     onClick={() => setShowLayoutEditor(true)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}
-                    title="Upravit rozhraní"
+                    className={`px-2.5 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}
+                    title={t('Upravit rozhraní', 'Edit layout')}
                   >
-                    ✏️
+                    {t('Upravit', 'Edit')}
                   </button>
                 )}
-                <button onClick={handleManagerLogout} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${theme.logoutBtnClass}`}>
+                <button onClick={handleManagerLogout} className={`px-2.5 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}>
                   {t('Odhlásit', 'Log out')}
                 </button>
               </div>
             ) : (
-              <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${theme.managerBtnClass}`}>
-                <span>🔐</span>
-                <span>{t('Manažer', 'Manager')}</span>
+              <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`px-3 py-[7px] rounded-md text-[12.5px] transition-colors duration-150 ${theme.managerBtnClass}`}>
+                {t('Manažer', 'Manager')}
               </button>
             )}
           </div>
-          <div className="shrink-0 flex items-center">
-            <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${theme.logoutBtnClass}`}>
-              {lang === 'cs' ? 'EN' : 'CS'}
-            </button>
+          {/* Language switch — CZ | EN pair (spec 4a) */}
+          <div className="shrink-0 flex items-center rounded-md overflow-hidden border border-white/15">
+            <button
+              onClick={() => setLang('cs')}
+              className={`px-2 py-1 text-[11px] font-medium transition-colors ${lang === 'cs' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
+            >CZ</button>
+            <button
+              onClick={() => setLang('en')}
+              className={`px-2 py-1 text-[11px] font-medium transition-colors ${lang === 'en' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
+            >EN</button>
           </div>
         </div>
 
@@ -443,7 +423,7 @@ export default function HomePage() {
                       className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}
                       title="Upravit rozhraní"
                     >
-                      ✏️
+                      {t('Upravit', 'Edit')}
                     </button>
                   )}
                   <button onClick={handleManagerLogout} className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}>
@@ -452,7 +432,6 @@ export default function HomePage() {
                 </>
               ) : (
                 <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${theme.managerBtnClass}`}>
-                  <span>🔐</span>
                   <span>{t('Manažer', 'Manager')}</span>
                 </button>
               )}
@@ -477,7 +456,6 @@ export default function HomePage() {
                       : theme.tabInactive
                     }`}
                 >
-                  <TabIcon id={tab.id} className="w-4 h-4" />
                   <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
                 </button>
               ))}
@@ -487,7 +465,7 @@ export default function HomePage() {
       </nav>
 
       {/* Content — kiosk tabs fill height, others scroll */}
-      <main className="flex-1 overflow-hidden bg-[#EFEDE8] flex flex-col">
+      <main className="flex-1 overflow-hidden bg-[#fbfaf8] flex flex-col">
         {/* Kiosk tabs: fill remaining height, no outer scroll */}
         {activeTab === 'attendance' && (
           <AttendanceKiosk orgId={orgId} />

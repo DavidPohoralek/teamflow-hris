@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { managerFetch, getManagerToken } from '@/lib/managerFetch';
 import { eachDayISO } from '@/lib/vacationDays';
+import { catColors } from '@/lib/categoryColors';
 import { useT } from '@/lib/i18n';
 import TimeSelect from '@/components/TimeSelect';
 
@@ -893,7 +894,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   const legendTotalHours = useMemo(() => {
     const source = viewMode === 'week' ? plansMap : fullPlansMap;
     let minutes = 0;
-    for (const entries of source.values()) {
+    for (const entries of Array.from(source.values())) {
       for (const e of entries) {
         if (e.startTime && e.endTime) {
           const [sh, sm] = e.startTime.split(':').map(Number);
@@ -1166,11 +1167,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   // ── Cell rendering ────────────────────────────────────────────────────────
 
-  const DOV_HATCH = 'repeating-linear-gradient(-45deg, #eff6ff 0px, #eff6ff 5px, #dbeafe 5px, #dbeafe 7px)';
-  const XXX_HATCH = 'repeating-linear-gradient(-45deg, #f9fafb 0px, #f9fafb 6px, #e9eef5 6px, #e9eef5 8px)';
-  // Closed days (zavřeno) — light whitish-gray stripes, clearly distinct from
-  // open cells and from the subtle dimmed-day tint
-  const CLOSED_HATCH = 'repeating-linear-gradient(-45deg, #f8fafc 0px, #f8fafc 5px, #e2e8f0 5px, #e2e8f0 8px)';
 
   // Chip pattern per work type — stored in work_types.icon ('stripes' | 'dots')
   const wtPatternMap = useMemo(() => {
@@ -1224,16 +1220,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       if (isVacation) {
         return (
           <div className="flex items-center justify-center h-full w-full">
-            <div title={t('Schválená dovolená', 'Approved vacation')} className="tf-mono w-full max-w-[92px] text-[10px] font-semibold text-center px-2 py-[3px] leading-tight truncate" style={{ backgroundColor: '#EAE8E1', color: '#8A877D', borderRadius: '7px' }}>
+            <div title={t('Schválená dovolená', 'Approved vacation')} className="tf-mono w-full text-[10px] font-medium tracking-[.06em] text-center py-[4px] leading-tight truncate" style={{ backgroundColor: '#eef1f4', color: '#7d8792', borderRadius: '4px' }}>
               {t('DOV', 'VAC')}
             </div>
           </div>
         );
       }
-      // Empty cell — quiet center dot (mockup), instead of the noisy XXX hatch
+      // Empty cell — quiet center dot (spec: no hatching, no XXX)
       return (
         <div className="flex items-center justify-center h-full w-full">
-          <span className="select-none text-[13px] leading-none" style={{ color: '#D5D2C8', userSelect: 'none' }}>·</span>
+          <span className="select-none text-[13px] leading-none" style={{ color: '#dad7d1', userSelect: 'none' }}>·</span>
         </div>
       );
     }
@@ -1241,8 +1237,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     return (
       <div className="flex flex-col gap-1 items-stretch justify-center h-full">
         {entries.map((e) => {
-          const raw = e.workTypeColor ?? '#94a3b8';
-          const { bg, text } = pastelizeColor(raw);
+          const cat = catColors(e.workTypeColor);
           const isHoChip = /^(ho|home\s?office)$/i.test((e.workTypeName ?? '').trim());
           const label = e.startTime && e.endTime
             ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}`
@@ -1250,13 +1245,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           return (
             <div
               key={e.id}
-              title={[e.workTypeName, e.startTime && e.endTime ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}` : null, e.note ? `📝 ${e.note}` : null].filter(Boolean).join(' · ')}
+              title={[e.workTypeName, e.startTime && e.endTime ? `${formatTime(e.startTime)}–${formatTime(e.endTime)}` : null, e.note ? `Poznámka: ${e.note}` : null].filter(Boolean).join(' · ')}
               style={isHoChip
-                // Home office — dashed outline chip (mockup)
-                ? { background: 'transparent', color: '#6B6860', border: '1.5px dashed #B4B1A6', borderRadius: '8px' }
-                // Shift — pastel fill with a solid color bar on the left (mockup)
-                : { ...chipPatternStyle(e, bg), color: text, borderLeft: `3px solid ${raw}`, borderRadius: '8px' }}
-              className="tf-mono w-full text-[11px] font-semibold px-1.5 py-[3.5px] leading-tight flex items-center justify-center gap-1 min-w-0"
+                // Home office — no fill, dashed border in the category's solid color
+                ? { background: 'transparent', color: cat.text, border: `1px dashed ${cat.solid}`, borderRadius: '4px' }
+                // Shift — category fill + inset left bar in the solid color
+                : { ...chipPatternStyle(e, cat.fill), color: cat.text, boxShadow: `inset 3px 0 0 ${cat.solid}`, borderRadius: '4px' }}
+              className="tf-mono w-full text-[11px] font-medium py-[4px] px-1 leading-tight flex items-center justify-center gap-1 min-w-0"
               onContextMenu={(ev) => {
                 if (!canInteract) return;
                 ev.preventDefault();
@@ -1267,24 +1262,20 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               <span className="truncate">{isHoChip && !(e.startTime && e.endTime) ? 'HO' : label}</span>
               {e.isEvening && (
                 <span
-                  className="shrink-0 inline-flex items-center justify-center rounded-full"
-                  style={{ background: text, width: '13px', height: '13px' }}
+                  className="shrink-0 inline-flex items-center justify-center rounded-full text-white text-[9px] leading-none"
+                  style={{ background: cat.solid, width: '13px', height: '13px' }}
                   title={t('Večerní směna', 'Evening shift')}
-                >
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="#F6F4EE">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                  </svg>
-                </span>
+                >☾</span>
               )}
-              {e.note && <span className="shrink-0 text-[9px] opacity-70">📝</span>}
+              {e.note && <span className="shrink-0 w-1 h-1 rounded-full" style={{ background: cat.solid }} title={e.note} />}
             </div>
           );
         })}
         {isVacation && (
           <div
             title={t('Schválená dovolená', 'Approved vacation')}
-            className="tf-mono w-full text-[10px] font-semibold px-1.5 py-[2px] leading-tight text-center"
-            style={{ backgroundColor: '#EAE8E1', color: '#8A877D', borderRadius: '7px' }}
+            className="tf-mono w-full text-[10px] font-medium tracking-[.06em] py-[3px] leading-tight text-center"
+            style={{ backgroundColor: '#eef1f4', color: '#7d8792', borderRadius: '4px' }}
           >
             {t('DOV', 'VAC')}
           </div>
@@ -1348,23 +1339,23 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       const deptColor = emp.department ? (deptColorMap.get(emp.department) ?? '#94a3b8') : null;
       return (
         <tr key={`${emp.id}-${wDays[0]}`}
-          className={`group border-b border-gray-100 last:border-b-0 transition-colors duration-75 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-          <td className="sticky left-0 z-10 px-2 py-1 border-r border-gray-200 bg-inherit group-hover:bg-blue-100/60 transition-colors duration-75">
+          className="group border-b border-[#f4f2ef] last:border-b-0 bg-white transition-colors duration-75">
+          <td className="sticky left-0 z-10 px-3.5 py-[3px] border-r border-[#ececea] bg-inherit group-hover:bg-[#fbfaf8] transition-colors duration-75 h-[31px]">
             <div className="flex items-center gap-1.5 min-w-0">
               {/* Narrow screens: department shown as a color dot before the name */}
               {emp.department && deptColor && (
                 <span
-                  className="xl:hidden flex-shrink-0 w-2 h-2 rounded-[3px]"
-                  style={{ background: deptColor }}
+                  className="xl:hidden flex-shrink-0 w-2 h-2 rounded-full"
+                  style={{ background: catColors(deptColor).solid }}
                   title={emp.department}
                 />
               )}
-              <span className="text-xs font-semibold text-gray-800 leading-tight truncate" title={emp.name}>{emp.name}</span>
-              {/* Wide screens: uppercase department label */}
+              <span className="text-[12.5px] font-normal leading-tight truncate" style={{ color: '#111820' }} title={emp.name}>{emp.name}</span>
+              {/* Wide screens: uppercase department label (category fill/text) */}
               {emp.department && deptColor && (
                 <span
-                  className="hidden xl:inline flex-shrink-0 text-[8.5px] font-bold uppercase tracking-wide leading-none px-1.5 py-[3px] rounded whitespace-nowrap"
-                  style={{ background: deptColor + '26', color: deptColor }}
+                  className="hidden xl:inline flex-shrink-0 text-[9.5px] font-normal uppercase tracking-[.05em] leading-none px-1.5 py-[3px] rounded-[3px] whitespace-nowrap"
+                  style={{ background: catColors(deptColor).fill, color: catColors(deptColor).text }}
                 >
                   {emp.department}
                 </span>
@@ -1380,9 +1371,11 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isDimmed = !isOpenDay(date);
             const isToday = date === today;
             const isStaged = clipboard != null && stagedPastes.has(`${emp.id}|${date}`);
+            // Weekend / closed columns: flat quiet background (spec: #faf9f7)
+            const isQuietDay = isClosed || isDimmed;
             return (
               <td key={date}
-                className={`px-1.5 py-1 border-r last:border-r-0 align-middle group-hover:bg-blue-100/50 transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50 border-blue-200' : 'border-gray-100'}`}
+                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#f5f3ef] transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50/60 border-blue-200' : 'border-[#f4f2ef]'}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
@@ -1391,8 +1384,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 }}
                 style={{
                   cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default',
-                  // Closed by date or by operating hours — whitish-gray stripes
-                  ...((isClosed || isDimmed) && !isStaged && !isToday ? { backgroundImage: CLOSED_HATCH } : {}),
+                  ...(isQuietDay && !isStaged && !isToday ? { backgroundColor: '#faf9f7' } : {}),
                 }}
               >
                 {isStaged
@@ -1435,42 +1427,42 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       {/* Header toolbar — sticky */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 px-4 md:px-6 py-3 flex flex-wrap items-center gap-3"
+        className="sticky top-0 z-30 bg-[#fbfaf8]/95 backdrop-blur-sm border-b border-[#e9e7e3] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-3 text-[12.5px]"
       >
-        {/* View mode toggle */}
-        <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
+        {/* View mode toggle — text pair, active underlined (spec) */}
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setViewMode('week')}
-            className={`px-3 py-1.5 transition-colors ${viewMode === 'week' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            className={`transition-colors ${viewMode === 'week' ? 'font-medium text-[#111820] border-b-2 border-[#111820] pb-px' : 'font-normal text-[#8a929c] hover:text-[#111820]'}`}
           >
             {t('Týden', 'Week')}
           </button>
           <button
             onClick={() => setViewMode('month')}
-            className={`px-3 py-1.5 transition-colors ${viewMode === 'month' ? 'bg-slate-700 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            className={`transition-colors ${viewMode === 'month' ? 'font-medium text-[#111820] border-b-2 border-[#111820] pb-px' : 'font-normal text-[#8a929c] hover:text-[#111820]'}`}
           >
             {t('Měsíc', 'Month')}
           </button>
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
+          <span className="tf-mono text-[13px] font-normal min-w-[150px] text-center" style={{ color: '#111820' }}>{navLabel}</span>
           <button onClick={goToPrev}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            className="px-1.5 py-1 rounded-md hover:bg-black/5 transition-colors" style={{ color: '#5c6672' }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">{navLabel}</span>
           <button onClick={goToNext}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            className="px-1.5 py-1 rounded-md hover:bg-black/5 transition-colors" style={{ color: '#5c6672' }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
           <button
             onClick={goToToday}
-            className="ml-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors"
+            className="ml-1.5 px-2.5 py-[5px] rounded-md border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] transition-colors"
             title={t('Přejít na dnešek', 'Go to today')}
           >
             {t('Dnes', 'Today')}
@@ -1483,7 +1475,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             <div className="relative" ref={deptDropdownRef}>
               <button
                 onClick={() => setDeptDropdownOpen((v) => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilters.length > 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+                className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${deptFilters.length > 0 ? 'font-medium text-[#111820] bg-black/5' : 'font-normal text-[#5c6672] hover:text-[#111820]'}`}
               >
                 {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
                 <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -1514,18 +1506,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {!hiddenElements.includes('schedule_activity_btn') && workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${activityFilter ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-purple-600 border-purple-200 hover:border-purple-400'}`}
+              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${activityFilter ? 'font-medium text-[#111820] bg-black/5' : 'font-normal text-[#5c6672] hover:text-[#111820]'}`}
             >
-              🎯 {t('Aktivity', 'Activities')}
+              {t('Aktivity', 'Activities')}
+              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
             </button>
           )}
 
           {!hiddenElements.includes('schedule_evening_btn') && (
             <button
               onClick={() => setEveningFilter((v) => !v)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${eveningFilter ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-orange-500 border-orange-200 hover:border-orange-400'}`}
+              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${eveningFilter ? 'font-medium text-[#111820] bg-black/5' : 'font-normal text-[#5c6672] hover:text-[#111820]'}`}
             >
-              🌙 {t('Večerní', 'Evening')}
+              {t('Večerní', 'Evening')}
             </button>
           )}
 
@@ -1535,7 +1528,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </svg>
             <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
               placeholder={t('Hledat…', 'Search…')}
-              className="pl-7 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition w-36" />
+              className="pl-7 pr-3 py-[5px] rounded-md text-[12.5px] bg-transparent text-[#111820] placeholder-[#8a929c] border border-transparent focus:border-[#e2e0dc] focus:bg-white focus:outline-none transition w-32" />
             {nameSearch && (
               <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
             )}
@@ -1630,8 +1623,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               {viewMode === 'month' ? (
                 <tr>
                   <th
-                    className="sticky left-0 z-10 px-2 py-2 text-left border-r border-slate-500"
-                    style={{ background: 'linear-gradient(to right, #334155, #3b4f66)' }}
+                    className="sticky left-0 z-10 px-3.5 py-2 text-left border-r border-[#e9e7e3] bg-[#fbfaf8]"
                   >
                     {(() => {
                       const f = new Date(stickyDays[0] + 'T00:00:00');
@@ -1643,8 +1635,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         : f.toLocaleDateString('cs-CZ', { month: 'long' });
                       return (
                         <div className="flex flex-col leading-tight">
-                          <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">{monthLabel}</span>
-                          <span className="text-[11px] font-bold text-slate-100">{wLabel}</span>
+                          <span className="text-[9px] font-normal uppercase tracking-[.1em]" style={{ color: '#8a929c' }}>{monthLabel}</span>
+                          <span className="tf-mono text-[11px] font-medium" style={{ color: '#111820' }}>{wLabel}</span>
                         </div>
                       );
                     })()}
@@ -1652,53 +1644,36 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                   {stickyDays.map((d, i) => {
                     const isOutside = d.slice(0, 7) !== weekDays[3].slice(0, 7);
                     if (isOutside) {
-                      return <th key={d} className="border-r border-slate-600 last:border-r-0" style={{ background: '#1e293b' }} />;
+                      return <th key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#fbfaf8]" />;
                     }
                     const dayNum = new Date(d + 'T00:00:00').getDate();
                     const isToday = d === today;
-                    // "Closed" from the user's view = explicit closed date OR closed
-                    // by operating hours (e.g. Sundays) — both flip to light gray
-                    // so they pop out of the dark header
                     const isNonWorking = !isOpenDay(d);
-                    const bg = isNonWorking ? '#e2e8f0' : '#334155';
                     return (
-                      <th key={d} className="py-2 text-center border-r border-slate-500 last:border-r-0 font-normal" style={{ background: bg }}>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className={`text-[9px] uppercase tracking-wider font-semibold ${isNonWorking ? 'text-slate-400' : 'text-slate-400'}`}>
-                            {DAY_NAMES[i]}
-                          </span>
-                          <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
-                            isToday ? 'bg-blue-500 text-white' : isNonWorking ? 'text-slate-500' : 'text-slate-200'
-                          }`}>
-                            {dayNum}
-                          </span>
-                        </div>
+                      <th key={d} className={`tf-mono py-2 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#e9e7e3] last:border-r-0 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
+                        style={{ color: isNonWorking ? '#8a929c' : '#111820' }}
+                      >
+                        <span className={isToday ? 'border-b-2 border-[#111820] pb-0.5' : ''}>{DAY_NAMES[i]} {dayNum}</span>
                       </th>
                     );
                   })}
                 </tr>
               ) : (
-                <tr>
-                  <th className="sticky left-0 z-10 px-2 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200 bg-gray-50">
+                <tr className="bg-white">
+                  <th className="sticky left-0 z-10 px-3.5 py-2.5 text-left text-[10px] font-normal uppercase tracking-[.1em] border-r border-[#ececea] bg-white" style={{ color: '#8a929c', borderBottom: '2px solid #111820' }}>
                     {t('Zaměstnanec', 'Employee')}
                   </th>
                   {DAY_NAMES.map((name, i) => {
                     const date = weekDays[i];
-                    const isClosed = closedDates.has(date);
                     const isToday = date === today;
-                    const isDimmed = !isOpenDay(date);
+                    const isQuiet = !isOpenDay(date);
                     const dayNum = new Date(date + 'T00:00:00').getDate();
                     return (
                       <th key={i}
-                        className={`px-1 py-2.5 text-center text-xs font-semibold border-r border-gray-200 last:border-r-0 transition-colors duration-150 ${isClosed || isDimmed ? 'bg-slate-200 text-slate-400' : 'bg-gray-50 text-gray-600'}`}
+                        className={`tf-mono px-1 py-2.5 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#f4f2ef] last:border-r-0 ${isQuiet ? 'bg-[#faf9f7]' : 'bg-white'}`}
+                        style={{ color: isQuiet ? '#8a929c' : '#111820', borderBottom: '2px solid #111820' }}
                       >
-                        <div className="inline-flex flex-col items-center gap-0.5">
-                          <span className="text-[10px] uppercase tracking-wider">{name}</span>
-                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-inherit'}`}>
-                            {dayNum}
-                          </span>
-                          {isClosed && <span className="text-[9px] text-red-400 font-normal normal-case">zavřeno</span>}
-                        </div>
+                        <span className={isToday ? 'border-b-2 border-[#111820] pb-0.5' : ''}>{name} {dayNum}</span>
                       </th>
                     );
                   })}
@@ -1765,30 +1740,26 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                       className="group/sep"
                     >
                       <td
-                        className="sticky left-0 z-10 px-2 py-0.5 border-r border-slate-500 group-hover/sep:py-1.5 transition-all duration-150"
-                        style={{ background: 'linear-gradient(to right, #334155, #3b4f66)' }}
+                        className="sticky left-0 z-10 px-3.5 py-0.5 border-r border-[#e9e7e3] bg-[#fbfaf8] group-hover/sep:py-1.5 transition-all duration-150"
                       >
-                        <span className="text-[10px] font-bold text-slate-300 leading-tight">{wLabel}</span>
+                        <span className="tf-mono text-[10px] font-medium leading-tight" style={{ color: '#5c6672' }}>{wLabel}</span>
                       </td>
                       {wDays.map((d, i) => {
                         const isOutside = d.slice(0, 7) !== currentMonth;
                         if (isOutside) {
-                          return <td key={d} className="border-r border-slate-600 last:border-r-0" style={{ background: '#1e293b' }} />;
+                          return <td key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#f3f1ed]" />;
                         }
                         const dayNum = new Date(d + 'T00:00:00').getDate();
                         const isToday = d === today;
-                        // Closed by date or by operating hours — light gray in the dark row
                         const isNonWorking = !isOpenDay(d);
-                        const bg = isNonWorking ? '#e2e8f0' : '#334155';
                         return (
-                          <td key={d} className="py-0.5 text-center border-r border-slate-500 last:border-r-0 group-hover/sep:py-1 transition-all duration-150" style={{ background: bg }}>
+                          <td key={d} className={`tf-mono py-0.5 text-center border-r border-[#e9e7e3] last:border-r-0 group-hover/sep:py-1 transition-all duration-150 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}>
                             <div className="flex flex-col items-center gap-0">
-                              <span className={`text-[8px] uppercase tracking-wider font-semibold hidden group-hover/sep:block ${isNonWorking ? 'text-slate-400' : 'text-slate-400'}`}>
+                              <span className="text-[8px] uppercase tracking-[.04em] font-medium hidden group-hover/sep:block" style={{ color: '#8a929c' }}>
                                 {DAY_NAMES[i]}
                               </span>
-                              <span className={`text-[10px] font-bold leading-tight ${
-                                isToday ? 'text-blue-400' : isNonWorking ? 'text-slate-500' : 'text-slate-300'
-                              }`}>
+                              <span className={`text-[10px] font-medium leading-tight ${isToday ? 'border-b border-[#111820]' : ''}`}
+                                style={{ color: isNonWorking ? '#8a929c' : '#5c6672' }}>
                                 {dayNum}
                               </span>
                             </div>
@@ -1806,30 +1777,28 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       </div>{/* end overflow-x-auto body scroll div */}
       </div>{/* end grid outer container */}
 
-      {/* Legend — below the grid (mockup): categories, chip meanings, total hours */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 py-2.5 text-[11px]">
-        <span className="tf-mono font-semibold uppercase tracking-widest text-[10px]" style={{ color: '#A09D93' }}>{t('Kategorie', 'Categories')}</span>
+      {/* Legend — below the grid (spec 4a): categories, chip meanings, total hours */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3.5 py-2.5 text-[11px] bg-[#fbfaf8] border-t border-[#e9e7e3]" style={{ color: '#5c6672' }}>
+        <span className="font-normal uppercase tracking-[.1em] text-[10px]" style={{ color: '#8a929c' }}>{t('Kategorie', 'Categories')}</span>
         {Array.from(new Set(displayEmployees.map((e) => e.department).filter((d): d is string => !!d))).map((dept) => (
-          <span key={dept} className="flex items-center gap-1.5 font-medium" style={{ color: '#5C594F' }}>
-            <span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: deptColorMap.get(dept) ?? '#94a3b8' }} />
+          <span key={dept} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: catColors(deptColorMap.get(dept)).solid }} />
             {dept}
           </span>
         ))}
-        <span className="flex items-center gap-1.5 font-medium" style={{ color: '#5C594F' }}>
-          <span className="tf-mono text-[9px] font-semibold px-1.5 py-[1px] rounded" style={{ background: '#EAE8E1', color: '#8A877D' }}>{t('DOV', 'VAC')}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="tf-mono text-[9px] font-medium tracking-[.06em] px-1.5 py-[1px] rounded-[4px]" style={{ background: '#eef1f4', color: '#7d8792' }}>{t('DOV', 'VAC')}</span>
           {t('Dovolená', 'Vacation')}
         </span>
-        <span className="flex items-center gap-1.5 font-medium" style={{ color: '#5C594F' }}>
-          <span className="tf-mono text-[9px] font-semibold px-1.5 py-[1px] rounded" style={{ border: '1.5px dashed #B4B1A6', color: '#6B6860' }}>HO</span>
+        <span className="flex items-center gap-1.5">
+          <span className="tf-mono text-[9px] font-medium tracking-[.06em] px-1.5 py-[1px] rounded-[4px]" style={{ border: '1px dashed #8a929c', color: '#5c6672' }}>HO</span>
           {t('Home office', 'Home office')}
         </span>
-        <span className="flex items-center gap-1.5 font-medium" style={{ color: '#5C594F' }}>
-          <span className="inline-flex items-center justify-center rounded-full" style={{ background: '#3E4148', width: '13px', height: '13px' }}>
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="#F6F4EE"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-          </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex items-center justify-center rounded-full text-white text-[9px] leading-none" style={{ background: '#111820', width: '13px', height: '13px' }}>☾</span>
           {t('Večerní směna', 'Evening shift')}
         </span>
-        <span className="tf-mono ml-auto font-semibold text-[12px]" style={{ color: '#3E4148' }}>
+        <span className="tf-mono ml-auto font-medium text-[12px]" style={{ color: '#111820' }}>
           {legendTotalHours} h / {viewMode === 'week' ? t('týden', 'week') : t('měsíc', 'month')}
         </span>
       </div>
