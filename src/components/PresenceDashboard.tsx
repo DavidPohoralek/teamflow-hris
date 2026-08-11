@@ -243,19 +243,19 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3">
-              {summaryTypes.map((type) => {
+              {/* Only departments with someone present — no zero clutter */}
+              {summaryTypes.filter((type) => (countByType[type] ?? 0) > 0).map((type) => {
                 const count = countByType[type] ?? 0;
-                const hex = workTypeColorMap.get(type) ?? '#94a3b8';
+                const cat = catColors(workTypeColorMap.get(type));
                 return (
                   <button
                     key={type}
-                    onClick={() => count > 0 ? setMobileDetailType(type) : null}
-                    disabled={count === 0}
-                    className="flex flex-col items-center justify-center rounded-2xl py-4 px-2 transition-all active:scale-95 disabled:opacity-40"
-                    style={{ backgroundColor: `${hex}18`, border: `2px solid ${hex}44` }}
+                    onClick={() => setMobileDetailType(type)}
+                    className="flex flex-col items-center justify-center rounded-[9px] py-4 px-2 transition-all active:scale-95"
+                    style={{ backgroundColor: cat.fill, border: `1px solid ${cat.solid}55` }}
                   >
-                    <span className="text-3xl font-extrabold leading-none" style={{ color: hex }}>{count}</span>
-                    <span className="text-[11px] font-medium mt-1.5 text-center leading-tight" style={{ color: hex }}>{type}</span>
+                    <span className="tf-mono text-3xl font-medium leading-none" style={{ color: cat.text }}>{count}</span>
+                    <span className="text-[11px] font-medium mt-1.5 text-center leading-tight" style={{ color: cat.text }}>{type}</span>
                   </button>
                 );
               })}
@@ -337,22 +337,25 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
         </div>
       </div>
 
-      {/* Summary cards (spec 4a: white cards, mono counts, total highlighted) */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(summaryTypes.length + 1, 7)}, minmax(120px, 1fr))` }}>
-        <div className="rounded-[9px] border px-4 py-3" style={{ background: '#f1f6f1', borderColor: '#cfdfd2' }}>
-          <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: '#111820' }}>{totalCount}</div>
-          <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{t('Celkem přítomno', 'Total present')}</div>
-        </div>
-        {summaryTypes.map((type) => {
-          const count = countByType[type] ?? 0;
-          return (
-            <div key={type} className="rounded-[9px] border border-[#e2e0dc] bg-white px-4 py-3">
-              <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: count > 0 ? '#111820' : '#8a929c' }}>{count}</div>
-              <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{type}</div>
+      {/* Summary cards (spec 4a: white cards, mono counts, total highlighted).
+          Only departments with someone present are shown — no zero clutter. */}
+      {(() => {
+        const activeTypes = summaryTypes.filter((type) => (countByType[type] ?? 0) > 0);
+        return (
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(activeTypes.length + 1, 7)}, minmax(120px, 1fr))` }}>
+            <div className="rounded-[9px] border px-4 py-3" style={{ background: '#f1f6f1', borderColor: '#cfdfd2' }}>
+              <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: '#111820' }}>{totalCount}</div>
+              <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{t('Celkem přítomno', 'Total present')}</div>
             </div>
-          );
-        })}
-      </div>
+            {activeTypes.map((type) => (
+              <div key={type} className="rounded-[9px] border border-[#e2e0dc] bg-white px-4 py-3">
+                <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: '#111820' }}>{countByType[type]}</div>
+                <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{type}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 

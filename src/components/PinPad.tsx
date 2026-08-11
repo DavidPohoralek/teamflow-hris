@@ -8,10 +8,17 @@ interface PinPadProps {
   onConfirm: (pin: string) => Promise<void> | void;
   loading?: boolean;
   error?: string | null;
-  /** If provided, renders a separate big button below pad instead of using ✓ key */
+  /** If provided, renders a separate big button below pad instead of using the submit key */
   confirmLabel?: string;
   maxLength?: number;
+  /** Live clock + date header (kiosk); off for embedded logins */
+  showClock?: boolean;
+  /** Muted helper line under the pad, e.g. "Zapomenutý PIN? …" */
+  footer?: string;
 }
+
+const CZ_DAYS = ['NEDĚLE', 'PONDĚLÍ', 'ÚTERÝ', 'STŘEDA', 'ČTVRTEK', 'PÁTEK', 'SOBOTA'];
+const CZ_MONTHS_GEN = ['LEDNA', 'ÚNORA', 'BŘEZNA', 'DUBNA', 'KVĚTNA', 'ČERVNA', 'ČERVENCE', 'SRPNA', 'ZÁŘÍ', 'ŘÍJNA', 'LISTOPADU', 'PROSINCE'];
 
 export default function PinPad({
   title,
@@ -21,8 +28,19 @@ export default function PinPad({
   error = null,
   confirmLabel,
   maxLength = 8,
+  showClock = true,
+  footer,
 }: PinPadProps) {
   const [pin, setPin] = useState('');
+  const [now, setNow] = useState<Date | null>(null);
+
+  // Live clock (spec 4a kiosk: date + big mono time)
+  useEffect(() => {
+    if (!showClock) return;
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 10_000);
+    return () => clearInterval(id);
+  }, [showClock]);
 
   // Keyboard support
   useEffect(() => {
@@ -57,46 +75,57 @@ export default function PinPad({
     await onConfirm(current);
   };
 
-  // Layout: 1-9 on rows 1-3, then ⌫ / 0 / ✓
+  // Layout: 1-9 on rows 1-3, then ⌫ / 0 / submit (→)
   const buttons: string[] = confirmLabel
-    ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫']
-    : ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
+    ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
+    : ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
 
   return (
-    <div className="flex-1 bg-[#1e293b] flex flex-col items-center justify-center p-6 select-none">
-      <div className="w-full max-w-xs flex flex-col items-center gap-7">
+    <div className="tf-sans flex-1 bg-[#fbfaf8] flex flex-col items-center justify-center p-6 select-none overflow-auto">
+      <div className="w-full max-w-[340px] flex flex-col items-center gap-6">
+        {/* Clock header */}
+        {showClock && now && (
+          <div className="text-center">
+            <p className="tf-mono text-[12px] tracking-[.18em]" style={{ color: '#8a929c' }}>
+              {CZ_DAYS[now.getDay()]} {now.getDate()}. {CZ_MONTHS_GEN[now.getMonth()]}
+            </p>
+            <p className="tf-mono text-[56px] font-medium leading-tight" style={{ color: '#111820' }}>
+              {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
+            </p>
+          </div>
+        )}
+
         {/* Title */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white">{title}</h1>
-          {subtitle && <p className="text-slate-400 text-sm mt-1">{subtitle}</p>}
+        <div className="text-center -mt-1">
+          <h1 className="text-[15px] font-medium" style={{ color: '#111820' }}>{title}</h1>
+          {subtitle && <p className="text-[12.5px] mt-1" style={{ color: '#8a929c' }}>{subtitle}</p>}
         </div>
 
         {/* PIN dots */}
-        <div className="flex gap-4 items-center justify-center h-10">
+        <div className="flex gap-3.5 items-center justify-center h-6 -mt-1">
           {Array.from({ length: Math.max(pin.length, 4) }).map((_, i) => (
             <div
               key={i}
-              className={`w-4 h-4 rounded-full transition-all duration-150 ${
-                i < pin.length ? 'bg-white scale-110' : 'bg-slate-600'
-              }`}
+              className="w-3 h-3 rounded-full transition-all duration-150"
+              style={{ background: i < pin.length ? '#111820' : '#d8d5cf' }}
             />
           ))}
         </div>
 
         {/* Error */}
         {error && (
-          <p className="text-red-400 text-sm font-medium animate-pulse -mt-3 text-center px-2">
+          <p className="text-[13px] font-medium animate-pulse -mt-3 text-center px-2" style={{ color: '#9c4a3f' }}>
             {error}
           </p>
         )}
 
-        {/* Keypad */}
+        {/* Keypad — white key cards, dark submit (spec 4a) */}
         <div className="grid grid-cols-3 gap-3 w-full">
           {buttons.map((btn, idx) => {
             if (btn === '') return <div key={idx} />;
-            const isDelete = btn === '⌫';
-            const isConfirm = btn === '✓';
-            const disabled = loading || (isConfirm && pin.length < 4) || ((isConfirm || isDelete) && loading);
+            const isDelete = btn === 'del';
+            const isConfirm = btn === 'ok';
+            const disabled = loading || (isConfirm && pin.length < 4);
 
             return (
               <button
@@ -108,17 +137,24 @@ export default function PinPad({
                   else handleDigit(btn);
                 }}
                 className={[
-                  'min-h-[68px] text-2xl font-bold rounded-2xl transition-all duration-100 active:scale-95',
+                  'min-h-[64px] rounded-[9px] transition-all duration-100 active:scale-[.97] flex items-center justify-center',
                   isConfirm
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-30 disabled:cursor-not-allowed'
-                    : isDelete
-                    ? 'bg-slate-600 hover:bg-slate-500 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-white',
+                    ? 'bg-[#111820] hover:bg-[#2a333e] text-white disabled:opacity-30 disabled:cursor-not-allowed'
+                    : 'bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[22px] font-medium text-[#111820]',
                   'disabled:cursor-not-allowed',
                 ].join(' ')}
               >
                 {loading && isConfirm ? (
                   <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : isDelete ? (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 6H8l-5 6 5 6h13a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Z" />
+                    <path d="m12 9 6 6M18 9l-6 6" />
+                  </svg>
+                ) : isConfirm ? (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
                 ) : btn}
               </button>
             );
@@ -130,12 +166,16 @@ export default function PinPad({
           <button
             onClick={handleConfirm}
             disabled={pin.length < 4 || loading}
-            className="w-full min-h-[56px] bg-blue-600 hover:bg-blue-500 text-white text-lg font-bold rounded-2xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full min-h-[52px] bg-[#111820] hover:bg-[#2a333e] text-white text-[15px] font-medium rounded-[9px] transition-all active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {loading ? (
               <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : confirmLabel}
           </button>
+        )}
+
+        {footer && (
+          <p className="text-[12.5px] text-center" style={{ color: '#8a929c' }}>{footer}</p>
         )}
       </div>
     </div>

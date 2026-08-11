@@ -458,7 +458,7 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 overflow-y-auto max-h-[92dvh]">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">⚡ {t('Plošné zadání směn', 'Bulk shift assignment')}</h2>
+            <h2 className="text-lg font-semibold text-gray-800">{t('Plošné zadání směn', 'Bulk shift assignment')}</h2>
             {!isManagerMode && sessionEmployee && (
               <p className="text-xs text-gray-400 mt-0.5">{sessionEmployee.name}</p>
             )}
@@ -1545,28 +1545,48 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           </div>
         </div>
 
-        {/* PIN session */}
+        {/* Actions (spec 4a): secondary bulk, dark primary add — session chip rightmost */}
+        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
+          <button
+            onClick={() => setShowBulkModal(true)}
+            className="ml-auto px-3 py-[7px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-[12.5px] font-medium rounded-md transition-colors"
+            title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
+          >
+            {t('Plošné zadání', 'Bulk assign')}
+          </button>
+        )}
+        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
+          <button
+            onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
+            className="px-3.5 py-[7px] bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium rounded-md transition-colors"
+          >
+            + {t('Přidat směnu', 'Add shift')}
+          </button>
+        )}
+
+        {/* PIN session — kept green, docked to the far right */}
         {!isManagerMode && (
           sessionEmployee ? (
-            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 ml-auto">
+            <div className="flex items-center gap-2 rounded-md px-3 py-1.5" style={{ background: '#eef6ef', border: '1px solid #cfdfd2' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <div className="flex flex-col leading-tight">
-                <span className="text-emerald-700 text-xs font-semibold">{sessionEmployee.name}</span>
+                <span className="text-[12px] font-medium" style={{ color: '#41654a' }}>{sessionEmployee.name}</span>
                 {(() => {
                   const hw = computePlannedHours(sessionEmployee.id, stickyDays);
                   const hm = computeMonthlyHours(sessionEmployee.id);
                   const fmt = (h: number) => Number.isInteger(h) ? String(h) : h.toFixed(1);
                   return (
                     <>
-                      {hw > 0 && <span className="text-emerald-500 text-[10px] font-medium">{fmt(hw)} h {t('tento týden', 'this week')}</span>}
-                      {hm > 0 && <span className="text-emerald-400 text-[10px]">{fmt(hm)} h {t('tento měsíc', 'this month')}</span>}
+                      {hw > 0 && <span className="tf-mono text-[10px]" style={{ color: '#5f7f66' }}>{fmt(hw)} h {t('tento týden', 'this week')}</span>}
+                      {hm > 0 && <span className="tf-mono text-[10px]" style={{ color: '#7f9884' }}>{fmt(hm)} h {t('tento měsíc', 'this month')}</span>}
                     </>
                   );
                 })()}
               </div>
               <button
                 onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
-                className="text-emerald-400 hover:text-emerald-700 text-xs ml-1"
+                className="text-xs ml-1 transition-colors"
+                style={{ color: '#7f9884' }}
               >✕</button>
             </div>
           ) : (
@@ -1575,35 +1595,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
                 onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
                 placeholder={t('Váš PIN', 'Your PIN')}
-                className={`w-28 text-sm px-3 py-1.5 rounded-lg border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-slate-200'} focus:outline-none focus:ring-2 focus:ring-blue-400 tracking-widest`}
+                className={`w-28 text-[12.5px] px-3 py-[7px] rounded-md border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-[#e2e0dc] bg-white'} focus:outline-none focus:border-[#8a929c] tracking-widest`}
               />
               <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
-                className="px-3 py-1.5 bg-slate-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
+                className="px-3 py-[7px] bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium rounded-md disabled:opacity-40 transition-colors">
                 {pinInputLoading ? '…' : 'OK'}
               </button>
             </form>
           )
-        )}
-
-        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
-          <button
-            onClick={() => setShowBulkModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
-            title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
-          >
-            ⚡ {t('Plošné zadání', 'Bulk assign')}
-          </button>
-        )}
-        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
-          <button
-            onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
-            className={`${!isManagerMode ? 'ml-auto' : ''} flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            {t('Přidat směnu', 'Add shift')}
-          </button>
         )}
       </div>
 

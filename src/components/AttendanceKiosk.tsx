@@ -624,19 +624,20 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         onConfirm={handlePinConfirm}
         loading={loading}
         error={pinError ? t('Nesprávný PIN. Zkuste to znovu.', 'Incorrect PIN. Please try again.') : null}
+        footer={t('Zapomenutý PIN? Obraťte se na manažera.', 'Forgot your PIN? Ask your manager.')}
       />
     );
   }
 
   return (
-    <div className="flex-1 bg-[#1e293b] text-white flex flex-col items-center justify-center p-4 select-none overflow-auto">
+    <div className="tf-sans flex-1 bg-[#fbfaf8] text-[#111820] flex flex-col items-center justify-center p-4 select-none overflow-auto">
       {/* Check-in Screen */}
       {screen === 'checkin' && (
         <div className="w-full max-w-2xl flex flex-col items-center gap-4 sm:gap-8">
-          <h1 className="text-2xl sm:text-4xl font-bold text-slate-100 text-center">
+          <h1 className="text-2xl sm:text-4xl font-bold text-[#111820] text-center">
             {t('Dobrý den', 'Hello')}, {employeeName}!
           </h1>
-          <p className="text-slate-400 text-sm sm:text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
+          <p className="text-[#8a929c] text-sm sm:text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
 
           {/* Work type selection */}
           {(() => {
@@ -722,7 +723,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                     {primaryWt && !showAllWorkTypes && (
                       <button
                         onClick={() => setShowAllWorkTypes(true)}
-                        className="text-slate-400 hover:text-slate-200 text-sm font-medium underline underline-offset-2 transition-colors mt-1"
+                        className="text-[#8a929c] hover:text-[#111820] text-sm font-medium underline underline-offset-2 transition-colors mt-1"
                       >
                         {t('Více možností', 'More options')}
                       </button>
@@ -733,7 +734,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 {/* Activity types — "Aktivity" */}
                 {activityTypes.length > 0 && (
                   <>
-                    <div className="w-full border-t border-slate-700/50 pt-3">
+                    <div className="w-full border-t border-[#e9e7e3] pt-3">
                       <p className="text-xs text-purple-400 uppercase tracking-widest mb-3">🎯 {t('Aktivity', 'Activities')}</p>
                       {/* Mobile list */}
                       <div className="flex flex-col gap-2 sm:hidden">
@@ -774,14 +775,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           <div className="flex gap-3 w-full mt-1">
             <button
               onClick={() => { setScreen('pin'); setPin(''); }}
-              className="flex-1 min-h-[48px] sm:min-h-[64px] bg-slate-700 hover:bg-slate-600 text-white text-base sm:text-xl font-semibold rounded-xl transition-all active:scale-95"
+              className="flex-1 min-h-[48px] sm:min-h-[64px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base sm:text-xl font-semibold rounded-xl transition-all active:scale-95"
             >
               {t('Zpět', 'Back')}
             </button>
             <button
               onClick={handleCheckin}
               disabled={!selectedWorkType || loading}
-              className="flex-[2] min-h-[48px] sm:min-h-[64px] bg-emerald-600 hover:bg-emerald-500 text-white text-base sm:text-xl font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-[2] min-h-[48px] sm:min-h-[64px] bg-[#111820] hover:bg-[#2a333e] text-white text-base sm:text-xl font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -797,22 +798,22 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-lg flex flex-col items-center gap-8">
           <div className="text-center">
             <div className="text-6xl mb-4">👋</div>
-            <h1 className="text-4xl font-bold text-slate-100">
+            <h1 className="text-4xl font-bold text-[#111820]">
               {employeeName},
             </h1>
-            <p className="text-2xl text-slate-300 mt-2">
+            <p className="text-2xl text-[#5c6672] mt-2">
               {t('přejete si odejít?', 'would you like to clock out?')}
             </p>
           </div>
 
           {presence && (
-            <div className="bg-slate-700 rounded-2xl p-6 w-full text-center space-y-2">
-              <p className="text-slate-400 text-lg">{t('Přihlášen/a od', 'Logged in since')}</p>
+            <div className="bg-white border border-[#e2e0dc] rounded-[9px] p-6 w-full text-center space-y-2">
+              <p className="text-[#8a929c] text-lg">{t('Přihlášen/a od', 'Logged in since')}</p>
               <p className="text-3xl font-bold text-white">
                 {formatTime(presence.checkIn)}
               </p>
               {presence.workTypeName && (
-                <p className="text-slate-300 text-xl">({presence.workTypeName})</p>
+                <p className="text-[#5c6672] text-xl">({presence.workTypeName})</p>
               )}
             </div>
           )}
@@ -826,39 +827,39 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 setCorrectionTimeIn('');
                 setCorrectionNote('');
               }}
-              className="text-slate-400 hover:text-slate-200 text-sm underline underline-offset-2 transition-colors"
+              className="text-[#8a929c] hover:text-[#111820] text-sm underline underline-offset-2 transition-colors"
             >
               ✏️ {t('Opravit čas příchodu', 'Correct arrival time')}
             </button>
           ) : (
-            <div className="w-full bg-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+            <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-5 flex flex-col gap-4">
               {correctionSuccess ? (
                 <p className="text-emerald-400 font-semibold text-center text-lg">
                   ✓ {t('Žádost o opravu odeslána', 'Correction request sent')}
                 </p>
               ) : (
                 <>
-                  <p className="text-slate-300 font-semibold text-base">
+                  <p className="text-[#5c6672] font-semibold text-base">
                     ✏️ {t('Oprava času příchodu', 'Arrival time correction')}
                   </p>
                   <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-sm">{t('Správný čas příchodu', 'Correct arrival time')}</label>
+                    <label className="text-[#8a929c] text-sm">{t('Správný čas příchodu', 'Correct arrival time')}</label>
                     <TimeSelect value={correctionTimeIn} onChange={setCorrectionTimeIn} dark />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-sm">{t('Poznámka (volitelné)', 'Note (optional)')}</label>
+                    <label className="text-[#8a929c] text-sm">{t('Poznámka (volitelné)', 'Note (optional)')}</label>
                     <input
                       type="text"
                       value={correctionNote}
                       onChange={(e) => setCorrectionNote(e.target.value)}
                       placeholder={t('Např. zapomněl/a jsem přijít', 'E.g. forgot to clock in')}
-                      className="bg-slate-700 text-white rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
+                      className="bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
                     />
                   </div>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowCheckinCorrection(false)}
-                      className="flex-1 min-h-[48px] bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all"
+                      className="flex-1 min-h-[48px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] rounded-xl font-semibold transition-all"
                     >
                       {t('Zrušit', 'Cancel')}
                     </button>
@@ -879,7 +880,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           <div className="flex gap-4 w-full">
             <button
               onClick={() => { setScreen('pin'); setPin(''); }}
-              className="flex-1 min-h-[64px] bg-slate-700 hover:bg-slate-600 text-white text-xl font-semibold rounded-xl transition-all active:scale-95"
+              className="flex-1 min-h-[64px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-xl font-semibold rounded-xl transition-all active:scale-95"
             >
               {t('Zpět', 'Back')}
             </button>
@@ -902,13 +903,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-lg flex flex-col items-center gap-5">
           <div className="text-center">
             <div className="text-5xl mb-2">🏠</div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-100">{t('HomeOffice — Zpětné zadání', 'HomeOffice — Retrospective entry')}</h1>
-            <p className="text-slate-400 mt-1 text-base">{t('Zadejte kdy jste pracoval(a) z domova', 'Enter when you worked from home')}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#111820]">{t('HomeOffice — Zpětné zadání', 'HomeOffice — Retrospective entry')}</h1>
+            <p className="text-[#8a929c] mt-1 text-base">{t('Zadejte kdy jste pracoval(a) z domova', 'Enter when you worked from home')}</p>
           </div>
 
           {/* Date picker with quick buttons */}
-          <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-            <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Datum', 'Date')}</label>
+          <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-4 flex flex-col gap-3">
+            <label className="text-[#8a929c] text-sm font-medium uppercase tracking-wider">{t('Datum', 'Date')}</label>
             <div className="flex gap-2 flex-wrap">
               {[0, 1].map((back) => {
                 const d = localDateStr(back);
@@ -917,7 +918,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                   <button
                     key={back}
                     onClick={() => setHoFormDate(d)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${hoFormDate === d ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${hoFormDate === d ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:bg-[#f4f2ef]'}`}
                   >
                     {label}
                   </button>
@@ -928,31 +929,31 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 value={hoFormDate}
                 max={localDateStr(0)}
                 onChange={(e) => setHoFormDate(e.target.value)}
-                className="flex-1 min-w-[140px] bg-slate-700 text-white rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                className="flex-1 min-w-[140px] bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
               />
             </div>
           </div>
 
           {/* Time range / Hours / Stopwatch toggle */}
-          <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+          <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
-              <div className="flex rounded-lg overflow-hidden border border-slate-600 text-sm">
+              <label className="text-[#8a929c] text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
+              <div className="flex rounded-lg overflow-hidden border border-[#e2e0dc] text-sm">
                 <button
                   onClick={() => setHoFormMode('range')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'range' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'range' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
                 >
                   {t('Od / Do', 'From / To')}
                 </button>
                 <button
                   onClick={() => setHoFormMode('hours')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'hours' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'hours' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
                 >
                   {t('Počet hodin', 'Total hours')}
                 </button>
                 <button
                   onClick={() => setHoFormMode('stopwatch')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'stopwatch' ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'stopwatch' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
                 >
                   ⏱ {t('Stopky', 'Timer')}
                 </button>
@@ -963,13 +964,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               <>
                 <div className="flex gap-3 items-center">
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-slate-400 text-xs">{t('Od', 'From')}</span>
-                    <TimeSelect value={hoFormStart} onChange={setHoFormStart} dark selectClassName="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <span className="text-[#8a929c] text-xs">{t('Od', 'From')}</span>
+                    <TimeSelect value={hoFormStart} onChange={setHoFormStart} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <span className="text-slate-500 text-2xl mt-4">–</span>
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-slate-400 text-xs">{t('Do', 'To')}</span>
-                    <TimeSelect value={hoFormEnd} onChange={setHoFormEnd} dark selectClassName="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <span className="text-[#8a929c] text-xs">{t('Do', 'To')}</span>
+                    <TimeSelect value={hoFormEnd} onChange={setHoFormEnd} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 </div>
                 {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (
@@ -988,7 +989,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             ) : (
               <>
                 <div className="flex flex-col gap-1">
-                  <span className="text-slate-400 text-xs">{t('Odpracováno hodin', 'Hours worked')}</span>
+                  <span className="text-[#8a929c] text-xs">{t('Odpracováno hodin', 'Hours worked')}</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -999,9 +1000,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       value={hoFormHours}
                       onChange={(e) => setHoFormHours(e.target.value)}
                       placeholder="8"
-                      className="w-full bg-slate-700 text-white rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+                      className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
                     />
-                    <span className="text-slate-400 text-base font-medium whitespace-nowrap">hod.</span>
+                    <span className="text-[#8a929c] text-base font-medium whitespace-nowrap">hod.</span>
                   </div>
                 </div>
                 {hoFormHours && !isNaN(parseFloat(hoFormHours.replace(',', '.'))) && parseFloat(hoFormHours.replace(',', '.')) > 0 && (
@@ -1013,13 +1014,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             )}
             {hoFormMode === 'stopwatch' && (
               <div className="flex flex-col items-center gap-4 py-2">
-                <p className="text-slate-400 text-sm text-center">
+                <p className="text-[#8a929c] text-sm text-center">
                   {t('Stopky se spustí hned po kliknutí. Kdykoli se vrátíte a zadáte PIN — stopky zastavíte a docházka se uloží.', 'The timer starts immediately. Come back anytime, enter your PIN — stop the timer and your attendance is saved.')}
                 </p>
                 <button
                   type="button"
                   onClick={handleHoStopwatchStart}
-                  className="w-full min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-lg font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+                  className="w-full min-h-[56px] bg-[#111820] hover:bg-[#2a333e] text-white text-lg font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
                 >
                   <span className="text-2xl">⏱</span>
                   {t('Spustit stopky', 'Start timer')}
@@ -1029,14 +1030,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           </div>
 
           {/* Activity summary */}
-          <div className="w-full bg-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-            <label className="text-slate-400 text-sm font-medium uppercase tracking-wider">{t('Popis činnosti (volitelné)', 'Activity summary (optional)')}</label>
+          <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-4 flex flex-col gap-3">
+            <label className="text-[#8a929c] text-sm font-medium uppercase tracking-wider">{t('Popis činnosti (volitelné)', 'Activity summary (optional)')}</label>
             <textarea
               value={hoFormSummary}
               onChange={(e) => setHoFormSummary(e.target.value)}
               placeholder={t('Např. Zpracování faktur, videokonference, příprava prezentace...', 'E.g. Invoice processing, video call, preparing presentation...')}
               rows={3}
-              className="w-full bg-slate-700 text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+              className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
             />
           </div>
 
@@ -1049,7 +1050,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           <div className="flex gap-3 w-full">
             <button
               onClick={() => setScreen('checkin')}
-              className="flex-1 min-h-[56px] bg-slate-700 hover:bg-slate-600 text-white text-base font-semibold rounded-xl transition-all active:scale-95"
+              className="flex-1 min-h-[56px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base font-semibold rounded-xl transition-all active:scale-95"
             >
               {t('Zpět', 'Back')}
             </button>
@@ -1057,7 +1058,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               <button
                 onClick={handleHoRecord}
                 disabled={!hoFormDate || (hoFormMode === 'range' ? (!hoFormStart || !hoFormEnd) : (!hoFormHours || parseFloat(hoFormHours.replace(',', '.')) <= 0)) || hoLoading}
-                className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-[2] min-h-[56px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {hoLoading ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
                 {t('Uložit docházku', 'Save attendance')}
@@ -1072,14 +1073,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-lg flex flex-col items-center gap-6">
           <div className="text-center">
             <div className="text-5xl mb-2">⏱</div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-100">{hoSw.workTypeName}</h1>
-            <p className="text-slate-400 mt-1 text-sm">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#111820]">{hoSw.workTypeName}</h1>
+            <p className="text-[#8a929c] mt-1 text-sm">
               {t('Zahájeno', 'Started')}: {new Date(hoSw.startAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
 
           {/* Big timer display */}
-          <div className="bg-slate-800 rounded-2xl px-10 py-8 text-center w-full">
+          <div className="bg-white border border-[#e2e0dc] rounded-[9px] px-10 py-8 text-center w-full">
             <div className="text-6xl sm:text-7xl font-mono font-bold text-emerald-400 tracking-widest tabular-nums">
               {hoSwDisplay}
             </div>
@@ -1093,7 +1094,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           <div className="flex gap-3 w-full">
             <button
               onClick={() => { setHoFormError(''); setScreen('pin'); setPin(''); }}
-              className="flex-1 min-h-[56px] bg-slate-700 hover:bg-slate-600 text-white text-base font-semibold rounded-xl transition-all active:scale-95"
+              className="flex-1 min-h-[56px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base font-semibold rounded-xl transition-all active:scale-95"
             >
               {t('Zpět na kiosk', 'Back to kiosk')}
             </button>
@@ -1114,14 +1115,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-lg flex flex-col items-center gap-6">
           <div className="text-center">
             <div className="text-6xl mb-3">🏠</div>
-            <h1 className="text-3xl font-bold text-slate-100">{t('Zpráva o činnosti', 'Activity report')}</h1>
-            <p className="text-slate-400 mt-2 text-lg">{t('Co jste dnes na HomeOffice dělal(a)?', 'What did you work on from home today?')}</p>
+            <h1 className="text-3xl font-bold text-[#111820]">{t('Zpráva o činnosti', 'Activity report')}</h1>
+            <p className="text-[#8a929c] mt-2 text-lg">{t('Co jste dnes na HomeOffice dělal(a)?', 'What did you work on from home today?')}</p>
           </div>
           <textarea
             value={hoNote}
             onChange={(e) => setHoNote(e.target.value)}
             placeholder={t('Např. Zpracování faktur, videokonference s klientem, příprava prezentace...', 'E.g. Invoice processing, client video call, preparing presentation...')}
-            className="w-full bg-slate-700 text-white rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+            className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
             rows={5}
             autoFocus
           />
@@ -1131,14 +1132,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           <div className="flex gap-3 w-full">
             <button
               onClick={() => handleHoNoteSubmit(true)}
-              className="flex-1 min-h-[56px] bg-slate-700 hover:bg-slate-600 text-white text-base font-semibold rounded-xl transition-all active:scale-95"
+              className="flex-1 min-h-[56px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base font-semibold rounded-xl transition-all active:scale-95"
             >
               {t('Přeskočit', 'Skip')}
             </button>
             <button
               onClick={() => handleHoNoteSubmit(false)}
               disabled={!hoNote.trim() || hoLoading}
-              className="flex-[2] min-h-[56px] bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-[2] min-h-[56px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {hoLoading
                 ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
