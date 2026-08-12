@@ -1437,19 +1437,19 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       {/* Header toolbar — sticky */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-30 bg-[#fbfaf8]/95 backdrop-blur-sm border-b border-[#e9e7e3] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-3 text-[12.5px]"
+        className="sticky top-0 z-30 bg-[#262b31] border-b border-black/20 px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-3 text-[12.5px]"
       >
         {/* View mode toggle — text pair, active underlined (spec) */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setViewMode('week')}
-            className={`transition-colors ${viewMode === 'week' ? 'font-medium text-[#111820] border-b-2 border-[#111820] pb-px' : 'font-normal text-[#8a929c] hover:text-[#111820]'}`}
+            className={`transition-colors ${viewMode === 'week' ? 'font-medium text-white border-b-2 border-white pb-px' : 'font-normal text-[#9aa4ae] hover:text-white'}`}
           >
             {t('Týden', 'Week')}
           </button>
           <button
             onClick={() => setViewMode('month')}
-            className={`transition-colors ${viewMode === 'month' ? 'font-medium text-[#111820] border-b-2 border-[#111820] pb-px' : 'font-normal text-[#8a929c] hover:text-[#111820]'}`}
+            className={`transition-colors ${viewMode === 'month' ? 'font-medium text-white border-b-2 border-white pb-px' : 'font-normal text-[#9aa4ae] hover:text-white'}`}
           >
             {t('Měsíc', 'Month')}
           </button>
@@ -1457,22 +1457,22 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
         {/* Navigation */}
         <div className="flex items-center gap-0.5">
-          <span className="tf-mono text-[13px] font-normal min-w-[150px] text-center" style={{ color: '#111820' }}>{navLabel}</span>
+          <span className="tf-mono text-[13px] font-normal min-w-[150px] text-center" style={{ color: '#e4e8ec' }}>{navLabel}</span>
           <button onClick={goToPrev}
-            className="px-1.5 py-1 rounded-md hover:bg-black/5 transition-colors" style={{ color: '#5c6672' }}>
+            className="px-1.5 py-1 rounded-md hover:bg-white/10 transition-colors" style={{ color: '#9aa4ae' }}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <button onClick={goToNext}
-            className="px-1.5 py-1 rounded-md hover:bg-black/5 transition-colors" style={{ color: '#5c6672' }}>
+            className="px-1.5 py-1 rounded-md hover:bg-white/10 transition-colors" style={{ color: '#9aa4ae' }}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
           <button
             onClick={goToToday}
-            className="ml-1.5 px-2.5 py-[5px] rounded-md border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] transition-colors"
+            className="ml-1.5 px-2.5 py-[5px] rounded-md border border-white/20 bg-transparent text-[#e4e8ec] hover:bg-white/10 transition-colors"
             title={t('Přejít na dnešek', 'Go to today')}
           >
             {t('Dnes', 'Today')}
@@ -1485,7 +1485,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             <div className="relative" ref={deptDropdownRef}>
               <button
                 onClick={() => setDeptDropdownOpen((v) => !v)}
-                className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${deptFilters.length > 0 ? 'font-medium text-[#111820] bg-black/5' : 'font-normal text-[#5c6672] hover:text-[#111820]'}`}
+                className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${deptFilters.length > 0 ? 'font-medium text-white bg-white/10' : 'font-normal text-[#c2cbd4] hover:text-white'}`}
               >
                 {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
                 <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -1516,7 +1516,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {!hiddenElements.includes('schedule_activity_btn') && workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
-              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${activityFilter ? 'font-medium text-[#111820] bg-black/5' : 'font-normal text-[#5c6672] hover:text-[#111820]'}`}
+              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${activityFilter ? 'font-medium text-white bg-white/10' : 'font-normal text-[#c2cbd4] hover:text-white'}`}
             >
               {t('Aktivity', 'Activities')}
               <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
@@ -1526,21 +1526,21 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {!hiddenElements.includes('schedule_evening_btn') && (
             <button
               onClick={() => setEveningFilter((v) => !v)}
-              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${eveningFilter ? 'font-medium text-[#111820] bg-black/5' : 'font-normal text-[#5c6672] hover:text-[#111820]'}`}
+              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${eveningFilter ? 'font-medium text-white bg-white/10' : 'font-normal text-[#c2cbd4] hover:text-white'}`}
             >
               {t('Večerní', 'Evening')}
             </button>
           )}
 
           <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9aa4ae] pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
             </svg>
             <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
               placeholder={t('Hledat…', 'Search…')}
-              className="pl-7 pr-3 py-[5px] rounded-md text-[12.5px] bg-transparent text-[#111820] placeholder-[#8a929c] border border-transparent focus:border-[#e2e0dc] focus:bg-white focus:outline-none transition w-32" />
+              className="pl-7 pr-3 py-[5px] rounded-md text-[12.5px] bg-transparent text-white placeholder-[#9aa4ae] border border-transparent focus:border-white/25 focus:bg-white/10 focus:outline-none transition w-32" />
             {nameSearch && (
-              <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+              <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9aa4ae] hover:text-white text-xs">✕</button>
             )}
           </div>
         </div>
@@ -1549,7 +1549,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
           <button
             onClick={() => setShowBulkModal(true)}
-            className="ml-auto px-3 py-[7px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-[12.5px] font-medium rounded-md transition-colors"
+            className="ml-auto px-3 py-[7px] bg-white/10 border border-white/20 hover:bg-white/[0.18] text-[#e4e8ec] text-[12.5px] font-medium rounded-md transition-colors"
             title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
           >
             {t('Plošné zadání', 'Bulk assign')}
@@ -1558,7 +1558,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
           <button
             onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
-            className="px-3.5 py-[7px] bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium rounded-md transition-colors"
+            className="px-3.5 py-[7px] bg-white hover:bg-[#eef0f2] text-[#1a2028] text-[12.5px] font-medium rounded-md transition-colors"
           >
             + {t('Přidat směnu', 'Add shift')}
           </button>
@@ -1595,10 +1595,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
                 onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
                 placeholder={t('Váš PIN', 'Your PIN')}
-                className={`w-28 text-[12.5px] px-3 py-[7px] rounded-md border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-[#e2e0dc] bg-white'} focus:outline-none focus:border-[#8a929c] tracking-widest`}
+                className={`w-28 text-[12.5px] px-3 py-[7px] rounded-md border text-white placeholder-[#9aa4ae] ${pinInputError ? 'border-red-400 bg-red-500/15' : 'border-white/20 bg-white/10'} focus:outline-none focus:border-white/40 tracking-widest`}
               />
               <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
-                className="px-3 py-[7px] bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium rounded-md disabled:opacity-40 transition-colors">
+                className="px-3 py-[7px] bg-white hover:bg-[#eef0f2] text-[#1a2028] text-[12.5px] font-medium rounded-md disabled:opacity-40 transition-colors">
                 {pinInputLoading ? '…' : 'OK'}
               </button>
             </form>
