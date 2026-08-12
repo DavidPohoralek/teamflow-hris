@@ -1758,21 +1758,21 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     >
                       <td
                         className="sticky left-0 z-10 px-3.5 py-1 border-r border-[#e9e7e3] bg-[#fbfaf8] group-hover/sep:py-2 transition-all duration-150"
-                        style={{ borderTop: '2px solid #111820' }}
+                        style={{ borderTop: '2px solid #111820', borderBottom: '2px solid #111820' }}
                       >
                         <span className="tf-mono text-[11px] font-medium leading-tight" style={{ color: '#111820' }}>{wLabel}</span>
                       </td>
                       {wDays.map((d, i) => {
                         const isOutside = d.slice(0, 7) !== currentMonth;
                         if (isOutside) {
-                          return <td key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#f3f1ed]" style={{ borderTop: '2px solid #111820' }} />;
+                          return <td key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#f3f1ed]" style={{ borderTop: '2px solid #111820', borderBottom: '2px solid #111820' }} />;
                         }
                         const dayNum = new Date(d + 'T00:00:00').getDate();
                         const isToday = d === today;
                         const isNonWorking = !isOpenDay(d);
                         return (
                           <td key={d} className={`tf-mono py-1 text-center border-r border-[#e9e7e3] last:border-r-0 group-hover/sep:py-1.5 transition-all duration-150 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
-                            style={{ borderTop: '2px solid #111820' }}>
+                            style={{ borderTop: '2px solid #111820', borderBottom: '2px solid #111820' }}>
                             <span className={`text-[10.5px] font-medium uppercase tracking-[.04em] leading-tight ${isToday ? 'border-b-2 border-[#111820] pb-px' : ''}`}
                               style={{ color: isNonWorking ? '#8a929c' : '#111820' }}>
                               {DAY_NAMES[i]} {dayNum}
