@@ -323,14 +323,13 @@ export default function HomePage() {
 
   return (
     <div className="tf-sans h-dvh flex flex-col bg-[#fbfaf8] overflow-hidden">
-      {/* Navbar — floating rounded ink bar (mockup) */}
-      <div className="px-[14px] pt-[14px] shrink-0">
-      <nav className={`${theme.navBg} ${theme.navText} rounded-[12px] z-10`}>
-        {/* Desktop row — 60px floating bar */}
-        <div className="hidden md:flex px-4 h-[60px] items-center gap-3">
+      {/* Navbar — full-width bar, colour driven by theme */}
+      <nav className={`${theme.navBg} ${theme.navText} border-b ${theme.navBorder} z-10 shrink-0`}>
+        {/* Desktop row — 56px */}
+        <div className="hidden md:flex px-4 h-[56px] items-center gap-3">
           {/* TeamFlow logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <span className="w-[24px] h-[24px] rounded-[7px] bg-white inline-block" />
+            <span className={`w-[24px] h-[24px] rounded-[7px] inline-block ${theme.key === 'paper' ? 'bg-[#111820]' : 'bg-white'}`} />
             <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
           </div>
           <div className={`h-5 w-px ${theme.divider}`} />
@@ -365,8 +364,8 @@ export default function HomePage() {
             {isManagerMode ? (
               <div className="flex items-center gap-1">
                 <div className="flex items-center gap-1.5 px-1.5">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                  <span className="text-emerald-400 text-[12.5px] font-medium">{t('Manažer', 'Manager')}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${theme.managerLiveText === 'text-emerald-600' ? 'bg-emerald-600' : 'bg-emerald-400'}`} />
+                  <span className={`${theme.managerLiveText ?? 'text-emerald-400'} text-[12.5px] font-medium`}>{t('Manažer', 'Manager')}</span>
                 </div>
                 {managerScope?.isAdmin !== false && (
                   <button
@@ -387,15 +386,15 @@ export default function HomePage() {
               </button>
             )}
           </div>
-          {/* Language switch — CZ | EN segmented pair (mockup) */}
-          <div className="shrink-0 flex items-center rounded-md overflow-hidden border border-white/15 p-0.5 gap-0.5">
+          {/* Language switch — CZ | EN segmented pair */}
+          <div className={`shrink-0 flex items-center rounded-md overflow-hidden border ${theme.chromeBorder ?? 'border-white/15'} p-0.5 gap-0.5`}>
             <button
               onClick={() => setLang('cs')}
-              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'cs' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
+              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'cs' ? (theme.tabActive ?? 'bg-white text-[#111820]') : theme.tabInactive}`}
             >CZ</button>
             <button
               onClick={() => setLang('en')}
-              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'en' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
+              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'en' ? (theme.tabActive ?? 'bg-white text-[#111820]') : theme.tabInactive}`}
             >EN</button>
           </div>
         </div>
@@ -465,7 +464,6 @@ export default function HomePage() {
           </div>
         </div>
       </nav>
-      </div>
 
       {/* Content — kiosk tabs fill height, others scroll */}
       <main className="flex-1 overflow-hidden bg-[#fbfaf8] flex flex-col">
