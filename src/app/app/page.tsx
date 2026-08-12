@@ -104,6 +104,8 @@ export default function HomePage() {
     session: { name: string; department: string | null; hoursWeek: number; hoursMonth: number } | null
     categories: { name: string; count: number; color: string }[]
   }>({ session: null, categories: [] })
+  // Vacation dashboard published by VacationPlanner — used/planned/remaining hours
+  const [vacationCtx, setVacationCtx] = useState<{ scope: 'org' | 'me'; usedHours: number; plannedHours: number; remainingHours: number } | null>(null)
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
     const now = new Date()
@@ -131,6 +133,13 @@ export default function HomePage() {
     const handler = (e: Event) => setShiftsCtx((e as CustomEvent).detail)
     window.addEventListener('tf:shifts-context', handler)
     return () => window.removeEventListener('tf:shifts-context', handler)
+  }, [])
+
+  // Vacation dashboard context from VacationPlanner
+  useEffect(() => {
+    const handler = (e: Event) => setVacationCtx((e as CustomEvent).detail)
+    window.addEventListener('tf:vacation-context', handler)
+    return () => window.removeEventListener('tf:vacation-context', handler)
   }, [])
 
   // Manager token expired mid-session (fired by managerFetch on 401) →
@@ -454,6 +463,42 @@ export default function HomePage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Vacation dashboard — used / planned / remaining (Dovolená tab, expanded) */}
+        {!sidebarCollapsed && activeTab === 'vacation' && vacationCtx && (
+          <div className={`px-3 pb-1 pt-1 border-t ${sideFootBorder}`}>
+            <div className={`text-[10px] font-normal uppercase tracking-[.12em] mt-2.5 mb-2 ${darkSide ? 'text-[#7e8b98]' : 'text-[#8a929c]'}`}>
+              {vacationCtx.scope === 'me' ? t('Moje dovolená', 'My vacation') : t('Dovolená týmu', 'Team vacation')}
+            </div>
+            {(() => {
+              const total = Math.max(1, vacationCtx.usedHours + vacationCtx.plannedHours + vacationCtx.remainingHours)
+              const seg = (h: number) => `${(h / total) * 100}%`
+              const rows: { label: string; hours: number; dot: string }[] = [
+                { label: t('Vyčerpáno', 'Used'), hours: vacationCtx.usedHours, dot: '#c25b52' },
+                { label: t('Naplánováno', 'Planned'), hours: vacationCtx.plannedHours, dot: '#c99a3a' },
+                { label: t('Zbývá', 'Remaining'), hours: vacationCtx.remainingHours, dot: '#3f9e6a' },
+              ]
+              return (
+                <>
+                  <div className="flex h-2 rounded-full overflow-hidden mb-3" style={{ background: darkSide ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+                    <div style={{ width: seg(vacationCtx.usedHours), background: '#c25b52' }} />
+                    <div style={{ width: seg(vacationCtx.plannedHours), background: '#c99a3a' }} />
+                    <div style={{ width: seg(vacationCtx.remainingHours), background: '#3f9e6a' }} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {rows.map((r) => (
+                      <div key={r.label} className="flex items-center gap-2.5">
+                        <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: r.dot }} />
+                        <span className={`text-[12.5px] ${sideTextCls}`}>{r.label}</span>
+                        <span className={`ml-auto tf-mono text-[12.5px] font-medium ${sideTextCls}`}>{r.hours} h</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         )}
 

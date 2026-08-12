@@ -625,13 +625,44 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
     if (!isManagerMode) return;
     managerFetch(`/api/manager/vacation-balances?year=${balancesYear}`)
       .then((r) => r.json())
-      .then((j: { balances?: { employeeId: string; totalDays: number; usedDays: number; remainingDays: number }[] }) => {
+      .then((j: { balances?: { employeeId: string; totalDays: number; usedDays: number; consumedDays?: number; plannedDays?: number; remainingDays: number; hasPaidVacation?: boolean }[] }) => {
         const map = new Map<string, { totalDays: number; usedDays: number; remainingDays: number }>();
-        for (const b of j.balances ?? []) map.set(b.employeeId, { totalDays: b.totalDays, usedDays: b.usedDays, remainingDays: b.remainingDays });
+        let consumed = 0, planned = 0, remaining = 0;
+        for (const b of j.balances ?? []) {
+          map.set(b.employeeId, { totalDays: b.totalDays, usedDays: b.usedDays, remainingDays: b.remainingDays });
+          if (b.hasPaidVacation !== false) {
+            consumed += b.consumedDays ?? 0;
+            planned += b.plannedDays ?? 0;
+            remaining += b.remainingDays ?? 0;
+          }
+        }
         setBalances(map);
+        // Publish org-wide vacation dashboard to the sidebar (in hours)
+        window.dispatchEvent(new CustomEvent('tf:vacation-context', { detail: {
+          scope: 'org',
+          usedHours: Math.round(consumed * 8),
+          plannedHours: Math.round(planned * 8),
+          remainingHours: Math.round(remaining * 8),
+        } }));
       })
       .catch(() => {});
   }, [isManagerMode, balancesYear, requests]);
+
+  // Employee (non-manager) view: publish the person's own balance to the sidebar
+  useEffect(() => {
+    if (isManagerMode || !vacBalance || !vacBalance.hasPaidVacation) return;
+    window.dispatchEvent(new CustomEvent('tf:vacation-context', { detail: {
+      scope: 'me',
+      usedHours: Math.round(vacBalance.consumedHours),
+      plannedHours: Math.round(vacBalance.futurePlannedHours),
+      remainingHours: Math.round(vacBalance.remainingHours),
+    } }));
+  }, [isManagerMode, vacBalance]);
+
+  // Clear the sidebar dashboard when leaving the Dovolená tab
+  useEffect(() => {
+    return () => { window.dispatchEvent(new CustomEvent('tf:vacation-context', { detail: null })); };
+  }, []);
 
   const days = buildDays(month);
   const [year, mo] = month.split('-').map(Number);

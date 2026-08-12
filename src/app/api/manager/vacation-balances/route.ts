@@ -2,7 +2,7 @@
 // Returns vacation balance for all active employees
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
-import { vacationDaysInRange } from '@/lib/vacationDays';
+import { vacationDaysInRange, pragueToday } from '@/lib/vacationDays';
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveOrgId(req);
@@ -50,15 +50,24 @@ export async function GET(req: NextRequest) {
     const totalDays = emp.vacation_days_per_year ?? defaultVacationDays;
     const offsetHours = Number(emp.vacation_hours_offset ?? 0);
     const effectiveStartDays = offsetHours > 0 ? offsetHours / hoursPerDay : totalDays;
-    const usedDays = byEmployee[emp.id]?.used.size ?? 0;
+    const usedSet = byEmployee[emp.id]?.used ?? new Set<string>();
+    const usedDays = usedSet.size;
     const pendingDays = byEmployee[emp.id]?.pending.size ?? 0;
     const remainingDays = Math.max(0, effectiveStartDays - usedDays);
+    // Split approved (used) days into already-consumed (past) vs planned (future)
+    // relative to today — powers the "vyčerpáno / naplánováno / zbývá" dashboard.
+    const todayIso = pragueToday();
+    let consumedDays = 0;
+    for (const iso of Array.from(usedSet)) { if (iso < todayIso) consumedDays++; }
+    const plannedDays = usedDays - consumedDays;
     return {
       employeeId: emp.id,
       employeeName: emp.name,
       hasPaidVacation,
       totalDays,
       usedDays,
+      consumedDays,
+      plannedDays,
       pendingDays,
       remainingDays,
       remainingAfterPendingDays: Math.max(0, effectiveStartDays - usedDays - pendingDays),
