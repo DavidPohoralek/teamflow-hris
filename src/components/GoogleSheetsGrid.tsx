@@ -1434,58 +1434,61 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   return (
     <div className="max-w-full">
-      {/* Header toolbar — sticky */}
+      {/* Header toolbar — sticky, light with pill controls */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-30 bg-[#262b31] border-b border-black/20 px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-3 text-[12.5px]"
+        className="sticky top-0 z-30 bg-white border-b border-[#e9e7e3] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-2 text-[12.5px]"
       >
-        {/* View mode toggle — text pair, active underlined (spec) */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setViewMode('week')}
-            className={`transition-colors ${viewMode === 'week' ? 'font-medium text-white border-b-2 border-white pb-px' : 'font-normal text-[#9aa4ae] hover:text-white'}`}
-          >
-            {t('Týden', 'Week')}
-          </button>
-          <button
-            onClick={() => setViewMode('month')}
-            className={`transition-colors ${viewMode === 'month' ? 'font-medium text-white border-b-2 border-white pb-px' : 'font-normal text-[#9aa4ae] hover:text-white'}`}
-          >
-            {t('Měsíc', 'Month')}
-          </button>
-        </div>
-
-        {/* Navigation */}
+        {/* Left: section title + date nav */}
+        <span className="text-[15px] font-semibold tracking-tight text-[#111820]">{t('Směny', 'Shifts')}</span>
+        <span className="w-px h-4 bg-[#e5e3df] mx-0.5" />
+        <span className="tf-mono text-[13px] font-normal text-[#5c6672]">{navLabel}</span>
         <div className="flex items-center gap-0.5">
-          <span className="tf-mono text-[13px] font-normal min-w-[150px] text-center" style={{ color: '#e4e8ec' }}>{navLabel}</span>
           <button onClick={goToPrev}
-            className="px-1.5 py-1 rounded-md hover:bg-white/10 transition-colors" style={{ color: '#9aa4ae' }}>
+            className="px-1.5 py-1 rounded-md text-[#8a929c] hover:bg-black/5 hover:text-[#111820] transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <button onClick={goToNext}
-            className="px-1.5 py-1 rounded-md hover:bg-white/10 transition-colors" style={{ color: '#9aa4ae' }}>
+            className="px-1.5 py-1 rounded-md text-[#8a929c] hover:bg-black/5 hover:text-[#111820] transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
+        </div>
+
+        {/* Right cluster — pill controls */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
             onClick={goToToday}
-            className="ml-1.5 px-2.5 py-[5px] rounded-md border border-white/20 bg-transparent text-[#e4e8ec] hover:bg-white/10 transition-colors"
+            className="px-3 py-[6px] rounded-full border border-[#e2e0dc] bg-white text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc] transition-colors"
             title={t('Přejít na dnešek', 'Go to today')}
           >
             {t('Dnes', 'Today')}
           </button>
-        </div>
 
-        {/* Filter bar */}
-        <div className="flex flex-wrap items-center gap-2">
+          {/* View mode toggle — pills */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-3.5 py-[6px] rounded-full transition-colors ${viewMode === 'week' ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
+            >
+              {t('Týden', 'Week')}
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-3.5 py-[6px] rounded-full transition-colors ${viewMode === 'month' ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
+            >
+              {t('Měsíc', 'Month')}
+            </button>
+          </div>
+
           {departments.length > 0 && (
             <div className="relative" ref={deptDropdownRef}>
               <button
                 onClick={() => setDeptDropdownOpen((v) => !v)}
-                className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${deptFilters.length > 0 ? 'font-medium text-white bg-white/10' : 'font-normal text-[#c2cbd4] hover:text-white'}`}
+                className={`flex items-center gap-1 px-3 py-[6px] rounded-full transition-colors ${deptFilters.length > 0 ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
               >
                 {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
                 <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -1493,7 +1496,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 </svg>
               </button>
               {deptDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
+                <div className="absolute right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
                   {departments.map((dept) => (
                     <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors">
                       <input type="checkbox" checked={deptFilters.includes(dept)}
@@ -1516,94 +1519,93 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {!hiddenElements.includes('schedule_activity_btn') && workTypes.some((w) => w.category === 'activity') && (
             <button
               onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
-              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${activityFilter ? 'font-medium text-white bg-white/10' : 'font-normal text-[#c2cbd4] hover:text-white'}`}
+              className={`flex items-center gap-1 px-3 py-[6px] rounded-full transition-colors ${activityFilter ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
             >
               {t('Aktivity', 'Activities')}
-              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
             </button>
           )}
 
           {!hiddenElements.includes('schedule_evening_btn') && (
             <button
               onClick={() => setEveningFilter((v) => !v)}
-              className={`flex items-center gap-1 px-2 py-[5px] rounded-md transition-colors ${eveningFilter ? 'font-medium text-white bg-white/10' : 'font-normal text-[#c2cbd4] hover:text-white'}`}
+              className={`flex items-center gap-1 px-3 py-[6px] rounded-full transition-colors ${eveningFilter ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
             >
               {t('Večerní', 'Evening')}
             </button>
           )}
 
           <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9aa4ae] pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8a929c] pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
             </svg>
             <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
               placeholder={t('Hledat…', 'Search…')}
-              className="pl-7 pr-3 py-[5px] rounded-md text-[12.5px] bg-transparent text-white placeholder-[#9aa4ae] border border-transparent focus:border-white/25 focus:bg-white/10 focus:outline-none transition w-32" />
+              className="pl-8 pr-3 py-[6px] rounded-full text-[12.5px] bg-white text-[#111820] placeholder-[#8a929c] border border-[#e2e0dc] hover:border-[#d5d2cc] focus:border-[#8a929c] focus:outline-none transition w-32" />
             {nameSearch && (
-              <button onClick={() => setNameSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9aa4ae] hover:text-white text-xs">✕</button>
+              <button onClick={() => setNameSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a929c] hover:text-[#111820] text-xs">✕</button>
             )}
           </div>
-        </div>
 
-        {/* Actions (spec 4a): secondary bulk, dark primary add — session chip rightmost */}
-        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
-          <button
-            onClick={() => setShowBulkModal(true)}
-            className="ml-auto px-3 py-[7px] bg-white/10 border border-white/20 hover:bg-white/[0.18] text-[#e4e8ec] text-[12.5px] font-medium rounded-md transition-colors"
-            title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
-          >
-            {t('Plošné zadání', 'Bulk assign')}
-          </button>
-        )}
-        {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
-          <button
-            onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
-            className="px-3.5 py-[7px] bg-white hover:bg-[#eef0f2] text-[#1a2028] text-[12.5px] font-medium rounded-md transition-colors"
-          >
-            + {t('Přidat směnu', 'Add shift')}
-          </button>
-        )}
+          {/* Actions: bulk (secondary pill), add (dark pill) */}
+          {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="px-3.5 py-[6px] rounded-full border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] font-medium transition-colors"
+              title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
+            >
+              {t('Plošné zadání', 'Bulk assign')}
+            </button>
+          )}
+          {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
+            <button
+              onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
+              className="px-3.5 py-[6px] rounded-full bg-[#111820] hover:bg-[#2a333e] text-white font-medium transition-colors"
+            >
+              + {t('Přidat směnu', 'Add shift')}
+            </button>
+          )}
 
-        {/* PIN session — kept green, docked to the far right */}
-        {!isManagerMode && (
-          sessionEmployee ? (
-            <div className="flex items-center gap-2 rounded-md px-3 py-1.5" style={{ background: '#eef6ef', border: '1px solid #cfdfd2' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <div className="flex flex-col leading-tight">
-                <span className="text-[12px] font-medium" style={{ color: '#41654a' }}>{sessionEmployee.name}</span>
-                {(() => {
-                  const hw = computePlannedHours(sessionEmployee.id, stickyDays);
-                  const hm = computeMonthlyHours(sessionEmployee.id);
-                  const fmt = (h: number) => Number.isInteger(h) ? String(h) : h.toFixed(1);
-                  return (
-                    <>
-                      {hw > 0 && <span className="tf-mono text-[10px]" style={{ color: '#5f7f66' }}>{fmt(hw)} h {t('tento týden', 'this week')}</span>}
-                      {hm > 0 && <span className="tf-mono text-[10px]" style={{ color: '#7f9884' }}>{fmt(hm)} h {t('tento měsíc', 'this month')}</span>}
-                    </>
-                  );
-                })()}
+          {/* PIN session — kept green */}
+          {!isManagerMode && (
+            sessionEmployee ? (
+              <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: '#eef6ef', border: '1px solid #cfdfd2' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[12px] font-medium" style={{ color: '#41654a' }}>{sessionEmployee.name}</span>
+                  {(() => {
+                    const hw = computePlannedHours(sessionEmployee.id, stickyDays);
+                    const hm = computeMonthlyHours(sessionEmployee.id);
+                    const fmt = (h: number) => Number.isInteger(h) ? String(h) : h.toFixed(1);
+                    return (
+                      <>
+                        {hw > 0 && <span className="tf-mono text-[10px]" style={{ color: '#5f7f66' }}>{fmt(hw)} h {t('tento týden', 'this week')}</span>}
+                        {hm > 0 && <span className="tf-mono text-[10px]" style={{ color: '#7f9884' }}>{fmt(hm)} h {t('tento měsíc', 'this month')}</span>}
+                      </>
+                    );
+                  })()}
+                </div>
+                <button
+                  onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
+                  className="text-xs ml-1 transition-colors"
+                  style={{ color: '#7f9884' }}
+                >✕</button>
               </div>
-              <button
-                onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
-                className="text-xs ml-1 transition-colors"
-                style={{ color: '#7f9884' }}
-              >✕</button>
-            </div>
-          ) : (
-            <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2 ml-auto">
-              <input
-                type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
-                onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
-                placeholder={t('Váš PIN', 'Your PIN')}
-                className={`w-28 text-[12.5px] px-3 py-[7px] rounded-md border text-white placeholder-[#9aa4ae] ${pinInputError ? 'border-red-400 bg-red-500/15' : 'border-white/20 bg-white/10'} focus:outline-none focus:border-white/40 tracking-widest`}
-              />
-              <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
-                className="px-3 py-[7px] bg-white hover:bg-[#eef0f2] text-[#1a2028] text-[12.5px] font-medium rounded-md disabled:opacity-40 transition-colors">
-                {pinInputLoading ? '…' : 'OK'}
-              </button>
-            </form>
-          )
-        )}
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2">
+                <input
+                  type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
+                  onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
+                  placeholder={t('Váš PIN', 'Your PIN')}
+                  className={`w-28 text-[12.5px] px-3.5 py-[6px] rounded-full border text-[#111820] placeholder-[#8a929c] ${pinInputError ? 'border-red-400 bg-red-50' : 'border-[#e2e0dc] bg-white'} focus:outline-none focus:border-[#8a929c] tracking-widest`}
+                />
+                <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
+                  className="px-4 py-[6px] rounded-full bg-[#111820] hover:bg-[#2a333e] text-white font-medium disabled:opacity-40 transition-colors">
+                  {pinInputLoading ? '…' : 'OK'}
+                </button>
+              </form>
+            )
+          )}
+        </div>
       </div>
 
       <div className="px-4 md:px-6 pb-4 md:pb-6 pt-4">
