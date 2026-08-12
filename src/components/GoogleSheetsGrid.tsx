@@ -1432,6 +1432,45 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       : getWeekDays(monthWeeks[0])
     : weekDays;
 
+  // Category legend with per-department people counts — shown in the redesign
+  // sidebar. Ordered by the work-type sort order.
+  const sidebarCategories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of displayEmployees) {
+      if (e.department) counts.set(e.department, (counts.get(e.department) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => (deptOrder.get(a[0]) ?? 999) - (deptOrder.get(b[0]) ?? 999))
+      .map(([name, count]) => ({ name, count, color: catColors(deptColorMap.get(name)).solid }));
+  }, [displayEmployees, deptOrder, deptColorMap]);
+
+  // Publish shifts context (PIN session + category legend) to the sidebar in
+  // page.tsx via a window event. The sidebar renders it in the dark rail.
+  useEffect(() => {
+    const sess = sessionEmployee
+      ? {
+          name: sessionEmployee.name,
+          department: baseEmployees.find((e) => e.id === sessionEmployee.id)?.department ?? null,
+          hoursWeek: Math.round(computePlannedHours(sessionEmployee.id, stickyDays)),
+          hoursMonth: Math.round(computeMonthlyHours(sessionEmployee.id)),
+        }
+      : null;
+    window.dispatchEvent(new CustomEvent('tf:shifts-context', { detail: { session: sess, categories: sidebarCategories } }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionEmployee, sidebarCategories, plansMap, monthPlansMap, stickyDays.join(',')]);
+
+  // Clear the shifts context when this grid unmounts (leaving the Směny tab)
+  useEffect(() => {
+    return () => { window.dispatchEvent(new CustomEvent('tf:shifts-context', { detail: { session: null, categories: [] } })); };
+  }, []);
+
+  // Sidebar "Odhlásit" for the PIN session
+  useEffect(() => {
+    const handler = () => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } };
+    window.addEventListener('tf:shifts-pin-logout', handler);
+    return () => window.removeEventListener('tf:shifts-pin-logout', handler);
+  }, []);
+
   return (
     <div className="max-w-full">
       {/* Header toolbar — sticky, light with pill controls */}
@@ -1791,8 +1830,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       </div>{/* end overflow-x-auto body scroll div */}
       </div>{/* end grid outer container */}
 
-      {/* Legend — below the grid (spec 4a): categories, chip meanings, total hours */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3.5 py-2.5 text-[11px] bg-[#fbfaf8] border-t border-[#e9e7e3]" style={{ color: '#5c6672' }}>
+      {/* Legend — below the grid (spec 4a): categories, chip meanings, total hours.
+          Hidden on desktop (md+), where the dark sidebar shows the richer legend. */}
+      <div className="md:hidden flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3.5 py-2.5 text-[11px] bg-[#fbfaf8] border-t border-[#e9e7e3]" style={{ color: '#5c6672' }}>
         <span className="font-normal uppercase tracking-[.1em] text-[10px]" style={{ color: '#8a929c' }}>{t('Kategorie', 'Categories')}</span>
         {Array.from(new Set(displayEmployees.map((e) => e.department).filter((d): d is string => !!d))).map((dept) => (
           <span key={dept} className="flex items-center gap-1.5">

@@ -98,6 +98,12 @@ export default function HomePage() {
     try { localStorage.setItem('tf_sidebar_collapsed', next ? '1' : '0') } catch { /* ignore */ }
     return next
   })
+  // Shifts context published by GoogleSheetsGrid — PIN session + category legend
+  // with people counts, shown in the dark sidebar rail.
+  const [shiftsCtx, setShiftsCtx] = useState<{
+    session: { name: string; department: string | null; hoursWeek: number; hoursMonth: number } | null
+    categories: { name: string; count: number; color: string }[]
+  }>({ session: null, categories: [] })
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
     const now = new Date()
@@ -118,6 +124,13 @@ export default function HomePage() {
     const handler = (e: Event) => setShiftViewMode((e as CustomEvent).detail as 'teamflow' | 'googlesheets')
     window.addEventListener('tf:shift-view-change', handler)
     return () => window.removeEventListener('tf:shift-view-change', handler)
+  }, [])
+
+  // Shifts context (PIN session + category legend) from the shifts grid
+  useEffect(() => {
+    const handler = (e: Event) => setShiftsCtx((e as CustomEvent).detail)
+    window.addEventListener('tf:shifts-context', handler)
+    return () => window.removeEventListener('tf:shifts-context', handler)
   }, [])
 
   // Manager token expired mid-session (fired by managerFetch on 401) →
@@ -392,6 +405,57 @@ export default function HomePage() {
         <div className="flex-1 overflow-y-auto scrollbar-none py-0.5">
           {renderNavItems(sidebarCollapsed)}
         </div>
+
+        {/* Shifts context — PIN session + category legend (Směny tab, expanded) */}
+        {!sidebarCollapsed && activeTab === 'schedule' && (shiftsCtx.session || shiftsCtx.categories.length > 0) && (
+          <div className={`px-3 pb-1 pt-1 border-t ${sideFootBorder}`}>
+            {shiftsCtx.session && (
+              <div className={`relative rounded-[10px] px-3 py-3 mt-2.5 ${darkSide ? 'bg-white/[0.05]' : 'bg-black/[0.03]'}`}>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('tf:shifts-pin-logout'))}
+                  title={t('Odhlásit ze směn', 'Log out of shifts')}
+                  className={`absolute top-2 right-2 text-xs ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#8a929c] hover:text-[#111820]'}`}
+                >✕</button>
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-medium shrink-0 ${darkSide ? 'bg-[#26313d] text-[#dfe5ea]' : 'bg-[#e9e7e3] text-[#5c6672]'}`}>
+                    {shiftsCtx.session.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <div className={`text-[13px] font-medium leading-tight truncate ${sideTextCls}`}>{shiftsCtx.session.name}</div>
+                    {shiftsCtx.session.department && (
+                      <div className={`text-[11.5px] leading-tight truncate ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{shiftsCtx.session.department}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-5 mt-3">
+                  <div>
+                    <div className={`tf-mono text-[19px] font-semibold leading-none ${sideTextCls}`}>{shiftsCtx.session.hoursWeek} <span className="text-[12px] font-normal">h</span></div>
+                    <div className={`text-[10.5px] mt-1 ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('tento týden', 'this week')}</div>
+                  </div>
+                  <div>
+                    <div className={`tf-mono text-[19px] font-semibold leading-none ${sideTextCls}`}>{shiftsCtx.session.hoursMonth} <span className="text-[12px] font-normal">h</span></div>
+                    <div className={`text-[10.5px] mt-1 ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('tento měsíc', 'this month')}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {shiftsCtx.categories.length > 0 && (
+              <div className="mt-3">
+                <div className={`text-[10px] font-normal uppercase tracking-[.12em] mb-1.5 ${darkSide ? 'text-[#7e8b98]' : 'text-[#8a929c]'}`}>{t('Kategorie', 'Categories')}</div>
+                <div className="flex flex-col gap-1">
+                  {shiftsCtx.categories.map((c) => (
+                    <div key={c.name} className="flex items-center gap-2.5 py-0.5">
+                      <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: c.color }} />
+                      <span className={`text-[12.5px] truncate ${sideTextCls}`}>{c.name}</span>
+                      <span className={`ml-auto tf-mono text-[12px] ${darkSide ? 'text-[#8e9aa6]' : 'text-[#8a929c]'}`}>{c.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer — manager status + language */}
         <div className={`mt-auto border-t ${sideFootBorder} ${sidebarCollapsed ? 'pt-3 flex flex-col items-center gap-2.5 pb-1' : 'px-4 pt-3.5 pb-1'}`}>
