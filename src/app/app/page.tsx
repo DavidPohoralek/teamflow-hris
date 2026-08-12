@@ -323,14 +323,15 @@ export default function HomePage() {
 
   return (
     <div className="tf-sans h-dvh flex flex-col bg-[#fbfaf8] overflow-hidden">
-      {/* Navbar */}
-      <nav className={`${theme.navBg} ${theme.navText} border-b ${theme.navBorder} z-10`}>
-        {/* Desktop row — 50px, 18px padding (spec 4a) */}
-        <div className="hidden md:flex max-w-screen-2xl mx-auto px-[18px] h-[50px] items-center gap-5">
+      {/* Navbar — floating rounded ink bar (mockup) */}
+      <div className="px-[14px] pt-[14px] shrink-0">
+      <nav className={`${theme.navBg} ${theme.navText} rounded-[12px] z-10`}>
+        {/* Desktop row — 60px floating bar */}
+        <div className="hidden md:flex px-4 h-[60px] items-center gap-3">
           {/* TeamFlow logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <span className="w-[22px] h-[22px] rounded-[6px] bg-white inline-block" />
-            <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
+            <span className="w-[24px] h-[24px] rounded-[7px] bg-white inline-block" />
+            <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
           </div>
           <div className={`h-5 w-px ${theme.divider}`} />
           {orgLogoUrl
@@ -338,8 +339,7 @@ export default function HomePage() {
               <img src={orgLogoUrl} alt={orgName} className="h-7 w-auto max-w-[130px] object-contain" />
             : <span className="text-[12.5px] font-medium opacity-70">{orgName}</span>
           }
-          <div className="flex-1 flex justify-center">
-            <div className={`flex items-center rounded-xl p-1 gap-0.5 ${theme.tabsBg}`}>
+          <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-x-auto scrollbar-none">
               {layout.tabs
                 .filter(lt => lt.visible)
                 .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
@@ -350,7 +350,7 @@ export default function HomePage() {
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-[7px] rounded-md text-[12.5px] transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5
+                  className={`px-2.5 py-2 rounded-lg text-[13px] transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5
                     ${activeTab === tab.id
                       ? `font-medium ${theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'}`
                       : `font-normal ${theme.tabInactive}`
@@ -360,25 +360,24 @@ export default function HomePage() {
                   {lang === 'en' ? tab.labelEn : tab.labelCs}
                 </button>
               ))}
-            </div>
           </div>
           <div className="shrink-0">
             {isManagerMode ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2">
+              <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5 px-1.5">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                   <span className="text-emerald-400 text-[12.5px] font-medium">{t('Manažer', 'Manager')}</span>
                 </div>
                 {managerScope?.isAdmin !== false && (
                   <button
                     onClick={() => setShowLayoutEditor(true)}
-                    className={`px-2.5 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}
+                    className={`px-2 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}
                     title={t('Upravit rozhraní', 'Edit layout')}
                   >
                     {t('Upravit', 'Edit')}
                   </button>
                 )}
-                <button onClick={handleManagerLogout} className={`px-2.5 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}>
+                <button onClick={handleManagerLogout} className={`px-2 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}>
                   {t('Odhlásit', 'Log out')}
                 </button>
               </div>
@@ -388,15 +387,15 @@ export default function HomePage() {
               </button>
             )}
           </div>
-          {/* Language switch — CZ | EN pair (spec 4a) */}
-          <div className="shrink-0 flex items-center rounded-md overflow-hidden border border-white/15">
+          {/* Language switch — CZ | EN segmented pair (mockup) */}
+          <div className="shrink-0 flex items-center rounded-md overflow-hidden border border-white/15 p-0.5 gap-0.5">
             <button
               onClick={() => setLang('cs')}
-              className={`px-2 py-1 text-[11px] font-medium transition-colors ${lang === 'cs' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
+              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'cs' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
             >CZ</button>
             <button
               onClick={() => setLang('en')}
-              className={`px-2 py-1 text-[11px] font-medium transition-colors ${lang === 'en' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
+              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'en' ? 'bg-white text-[#111820]' : 'text-[#8e9aa6] hover:text-white'}`}
             >EN</button>
           </div>
         </div>
@@ -441,7 +440,7 @@ export default function HomePage() {
           </div>
           {/* Scrollable tabs row */}
           <div className={`overflow-x-auto scrollbar-none border-t ${theme.navBorder}`}>
-            <div className={`flex items-center gap-0.5 p-1 min-w-max ${theme.tabsBg} mx-2 mb-2 rounded-xl`}>
+            <div className="flex items-center gap-0.5 px-2 py-1.5 min-w-max">
               {layout.tabs
                 .filter(lt => lt.visible)
                 .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
@@ -466,6 +465,7 @@ export default function HomePage() {
           </div>
         </div>
       </nav>
+      </div>
 
       {/* Content — kiosk tabs fill height, others scroll */}
       <main className="flex-1 overflow-hidden bg-[#fbfaf8] flex flex-col">
