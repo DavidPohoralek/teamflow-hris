@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toISODateLocal } from '@/lib/vacationDays';
 import { managerFetch } from '@/lib/managerFetch';
 import { useT } from '@/lib/i18n';
+import { catColors } from '@/lib/categoryColors';
 import { NotifyModal, type NotifyTarget } from './ShiftAssistant';
 import ShiftAssistantMatrix from './ShiftAssistantMatrix';
 
@@ -81,6 +82,7 @@ const MONTH_NAMES = [
   'Červenec','Srpen','Září','Říjen','Listopad','Prosinec',
 ];
 const DAY_ABBREVS = ['Ne','Po','Út','St','Čt','Pá','So'];
+const DAY_NAMES_LONG = ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'];
 
 function getAllDaysInMonth(month: string): string[] {
   const [y, m] = month.split('-').map(Number);
@@ -437,37 +439,40 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
   const draftCount = pendingDrafts.size;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
+    <div className="tf-sans flex flex-col h-full bg-[#fbfaf8] overflow-hidden">
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
 
-      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 bg-white shrink-0">
-        <button onClick={() => onMonthChange?.(shiftMonth(month, -1))} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" aria-label="Předchozí měsíc">
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      {/* ── Top bar (spec 4a) ───────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-4 md:px-[18px] py-2.5 border-b border-[#e9e7e3] bg-white shrink-0">
+        <span className="tf-mono text-[13px] min-w-[110px]" style={{ color: '#111820' }}>{monthLabel}</span>
+        <button onClick={() => onMonthChange?.(shiftMonth(month, -1))} className="px-1.5 py-1 rounded-md hover:bg-black/5 transition-colors" style={{ color: '#5c6672' }} aria-label="Předchozí měsíc">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
-        <span className="text-sm font-bold text-slate-700 min-w-[120px] text-center">{monthLabel}</span>
-        <button onClick={() => onMonthChange?.(shiftMonth(month, 1))} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors" aria-label="Následující měsíc">
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <button onClick={() => onMonthChange?.(shiftMonth(month, 1))} className="px-1.5 py-1 rounded-md hover:bg-black/5 transition-colors" style={{ color: '#5c6672' }} aria-label="Následující měsíc">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
 
         <button
           onClick={onSwitchView}
-          className="ml-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+          className="ml-1 px-3 py-[6px] rounded-md text-[12.5px] font-medium border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] transition-colors"
           title={t('Přepnout na tabulkové zobrazení', 'Switch to table view')}
         >
-          🗓 {t('Tabulka', 'Table')}
+          {t('Tabulka', 'Table')}
         </button>
 
         <div className="flex-1" />
 
         {analyzeResult && (
-          <div className="hidden md:flex items-center gap-3 text-xs mr-1">
+          <div className="hidden md:flex items-center gap-4 text-[12.5px] mr-1">
             {problemDays.length > 0 ? (
-              <span className="font-semibold text-red-600">⚠ {problemDays.length} {t('krizových dnů', 'crisis days')}</span>
+              <span className="font-medium" style={{ color: '#9c4a3f' }}><span className="tf-mono">{problemDays.length}</span> {t('krizových dnů', 'crisis days')}</span>
             ) : (
-              <span className="font-semibold text-emerald-600">✓ {t('Vše obsazeno', 'All covered')}</span>
+              <span className="font-medium" style={{ color: '#41654a' }}>{t('Vše obsazeno', 'All covered')}</span>
             )}
-            {draftCount > 0 && <span className="font-semibold text-indigo-600">{draftCount} {t('návrhů', 'drafts')}</span>}
+            {draftCount > 0 && <span style={{ color: '#111820' }}><span className="tf-mono">{draftCount}</span> {t('návrhů', 'drafts')}</span>}
+            <span style={{ color: '#8a929c' }}>
+              <span className="tf-mono">{analyzeResult.summary.totalDays}</span> {t('prac. dnů', 'work days')} · <span className="tf-mono">{employees.length}</span> {t('zaměstnanců', 'employees')}
+            </span>
           </div>
         )}
 
@@ -528,63 +533,62 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
         </div>
       </div>
 
-      {/* ── Mini calendar overview ──────────────────────────────────────────── */}
-      <div className="px-4 py-2 border-b border-slate-200 bg-white shrink-0 overflow-x-auto">
-        <div className="flex gap-1 min-w-max">
+      {/* ── Mini calendar overview (spec 4a: tinted day pills, ink = today) ─── */}
+      <div className="px-4 md:px-[18px] py-2.5 border-b border-[#e9e7e3] bg-white shrink-0 overflow-x-auto">
+        <div className="flex gap-1.5 min-w-max">
           {allDays.map(date => {
             const dow = new Date(date + 'T00:00:00').getDay();
             const isCrisis = crisisDays.has(date);
             const isToday = date === today;
             const isWeekend = dow === 0 || dow === 6;
             const hasStaff = (staffByDay.get(date)?.length ?? 0) > 0;
+            const pill = isToday
+              ? { background: '#111820', color: '#fff' }
+              : isCrisis
+              ? { background: '#f7e9e7', color: '#9c4a3f' }
+              : analyzeResult && hasStaff && !isWeekend
+              ? { background: '#e7efe8', color: '#41654a' }
+              : isWeekend
+              ? { background: '#f3f1ed', color: '#b3aca0' }
+              : { background: '#f4f2ef', color: '#8a929c' };
             return (
               <button
                 key={date}
                 onClick={() => isCrisis && scrollToCard(date)}
                 title={`${parseInt(date.slice(8), 10)}. ${m}. — ${DAY_ABBREVS[dow]}${isCrisis ? ` · ${t('krizový den', 'crisis day')}` : ''}`}
-                className={`flex flex-col items-center justify-center w-8 h-9 rounded-lg text-[10px] font-bold leading-none transition-all shrink-0 ${
-                  isCrisis
-                    ? 'bg-red-500 text-white shadow-sm hover:bg-red-600 cursor-pointer'
-                    : analyzeResult && hasStaff && !isWeekend
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : isWeekend
-                        ? 'bg-slate-100 text-slate-300'
-                        : 'bg-slate-100 text-slate-500'
-                } ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''} ${!isCrisis ? 'cursor-default' : ''}`}
+                className={`tf-mono flex flex-col items-center justify-center w-9 h-10 rounded-lg leading-none transition-all shrink-0 ${isCrisis ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+                style={pill}
               >
-                <span>{parseInt(date.slice(8), 10)}</span>
-                <span className="text-[7px] font-medium opacity-70 mt-0.5">{DAY_ABBREVS[dow]}</span>
+                <span className="text-[12px] font-medium">{parseInt(date.slice(8), 10)}</span>
+                <span className="text-[8px] uppercase tracking-[.04em] opacity-70 mt-0.5">{DAY_ABBREVS[dow]}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* ── Action strip ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-slate-200 shrink-0">
+      {/* ── Action strip (spec 4a: dark primary, green confirm right) ───────── */}
+      <div className="flex items-center gap-3 px-4 md:px-[18px] py-2.5 bg-white border-b border-[#e9e7e3] shrink-0">
         <button
           onClick={handleAnalyze}
           disabled={analyzing}
-          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            analyzing ? 'bg-indigo-100 text-indigo-400 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+          className={`px-4 py-[8px] rounded-md text-[12.5px] font-medium transition-colors ${
+            analyzing ? 'bg-[#f4f2ef] text-[#8a929c] cursor-wait' : 'bg-[#111820] hover:bg-[#2a333e] text-white'
           }`}
         >
-          {analyzing ? t('Počítám…', 'Analyzing…') : `🧮 ${t('Dopočítat záskoky', 'Find cover')}`}
+          {analyzing ? t('Počítám…', 'Analyzing…') : t('Dopočítat záskoky', 'Find cover')}
         </button>
         {draftCount > 0 && (
+          <span className="text-[12.5px] hidden sm:inline" style={{ color: '#8a929c' }}>
+            <span className="tf-mono">{draftCount}</span> {t('návrhů — zatím neuloženo', 'suggestions — not saved yet')}
+          </span>
+        )}
+        {(analyzeError || applyError) && (
+          <span className="text-[12.5px] font-medium" style={{ color: '#9c4a3f' }}>{analyzeError ?? applyError}</span>
+        )}
+        <div className="flex-1" />
+        {draftCount > 0 && (
           <>
-            <span className="text-xs text-slate-500 hidden sm:inline">
-              {draftCount} {t('návrhů — zatím neuloženo', 'suggestions — not saved yet')}
-            </span>
-            <button
-              onClick={handleApplyAll}
-              disabled={applying}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                applying ? 'bg-emerald-100 text-emerald-400 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-              }`}
-            >
-              {applying ? t('Ukládám…', 'Saving…') : `✓ ${t('Potvrdit a přidat', 'Confirm & add')} (${draftCount})`}
-            </button>
             <button
               onClick={() => {
                 if (confirm(t('Zahodit všechny návrhy? Nic se neuložilo.', 'Discard all suggestions? Nothing was saved.'))) {
@@ -594,56 +598,90 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
                 }
               }}
               disabled={applying}
-              className="px-3 py-2 rounded-xl text-sm font-medium text-slate-500 border border-slate-200 hover:bg-slate-100 transition-colors"
+              className="px-3.5 py-[8px] rounded-md text-[12.5px] font-medium text-[#111820] border border-[#e2e0dc] bg-white hover:bg-[#f4f2ef] transition-colors"
             >
-              ✕ {t('Zrušit návrhy', 'Discard')}
+              {t('Zrušit návrhy', 'Discard')}
+            </button>
+            <button
+              onClick={handleApplyAll}
+              disabled={applying}
+              className={`px-4 py-[8px] rounded-md text-[12.5px] font-medium transition-colors ${
+                applying ? 'bg-[#e7efe8] text-[#7f9884] cursor-wait' : 'bg-[#2f7d46] hover:bg-[#28683b] text-white'
+              }`}
+            >
+              {applying ? t('Ukládám…', 'Saving…') : `${t('Potvrdit a přidat', 'Confirm & add')} (${draftCount})`}
             </button>
           </>
         )}
-        {(analyzeError || applyError) && (
-          <span className="text-xs text-red-600 font-medium">{analyzeError ?? applyError}</span>
-        )}
-        <div className="flex-1" />
-        {analyzeResult && (
-          <span className="text-[10px] text-slate-400">
-            {analyzeResult.summary.totalDays} {t('prac. dnů', 'work days')} · {employees.length} {t('zaměstnanců', 'employees')}
-          </span>
-        )}
       </div>
 
-      {/* ── Day cards ───────────────────────────────────────────────────────── */}
+      {/* ── Day cards + crisis-day sidebar (mockup layout) ──────────────────── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
+        <div className="max-w-[1180px] mx-auto px-4 md:px-[18px] py-5 xl:grid xl:grid-cols-[270px_1fr] xl:gap-6 xl:items-start">
+
+          {/* Sidebar — list of crisis days, click scrolls to the card */}
+          {analyzeResult && problemDays.length > 0 && (
+            <aside className="hidden xl:block sticky top-4">
+              <div className="text-[10px] font-normal uppercase tracking-[.1em] mb-2.5 px-1" style={{ color: '#8a929c' }}>
+                {t('Krizové dny', 'Crisis days')}
+              </div>
+              <div className="space-y-1.5">
+                {problemDays.slice(0, 9).map(day => {
+                  const dow = new Date(day.date + 'T00:00:00').getDay();
+                  return (
+                    <button
+                      key={day.date}
+                      onClick={() => scrollToCard(day.date)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[9px] border border-transparent hover:border-[#e2e0dc] hover:bg-white text-left transition-colors"
+                    >
+                      <span className="tf-mono text-[14px] font-medium w-6 shrink-0" style={{ color: '#111820' }}>{parseInt(day.date.slice(8), 10)}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="tf-mono block text-[11px]" style={{ color: '#5c6672' }}>
+                          {DAY_ABBREVS[dow]} · {day.assignedCount}/{day.requiredTotal} {t('obsazeno', 'assigned')}
+                        </span>
+                      </span>
+                      <span className="tf-mono text-[13px] font-medium shrink-0" style={{ color: '#9c4a3f' }}>−{day.missingCount}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {problemDays.length > 9 && (
+                <div className="px-3 pt-2 text-[12px]" style={{ color: '#8a929c' }}>
+                  + {t('dalších', 'more')} {problemDays.length - 9} {t('dnů', 'days')}
+                </div>
+              )}
+            </aside>
+          )}
+
+          <div className="space-y-4 min-w-0">
 
           {!analyzeResult && !analyzing && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
-              <div className="text-4xl mb-3">🤖</div>
-              <h3 className="text-base font-bold text-slate-700">{t('Plánovač záskoků', 'Cover planner')}</h3>
-              <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+            <div className="bg-white border border-[#e2e0dc] rounded-[9px] p-8 text-center">
+              <h3 className="text-[15px] font-semibold" style={{ color: '#111820' }}>{t('Plánovač záskoků', 'Cover planner')}</h3>
+              <p className="text-[13px] mt-1.5 max-w-sm mx-auto leading-relaxed" style={{ color: '#8a929c' }}>
                 {t('Spusťte výpočet — asistent projde měsíc, najde dny, kde chybí lidi, a navrhne, kdo může zaskočit.',
                    'Run the analysis — the assistant scans the month, finds understaffed days and suggests who can cover.')}
               </p>
               <button
                 onClick={handleAnalyze}
-                className="mt-5 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all"
+                className="mt-5 px-5 py-[9px] rounded-md bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium transition-colors"
               >
-                🧮 {t('Dopočítat záskoky', 'Find cover')}
+                {t('Dopočítat záskoky', 'Find cover')}
               </button>
             </div>
           )}
 
           {analyzing && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
-              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-sm text-slate-400 mt-4">{t('Analyzuji obsazení měsíce…', 'Analyzing coverage…')}</p>
+            <div className="bg-white border border-[#e2e0dc] rounded-[9px] p-10 text-center">
+              <div className="w-7 h-7 border-[3px] border-[#111820] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-[13px] mt-4" style={{ color: '#8a929c' }}>{t('Analyzuji obsazení měsíce…', 'Analyzing coverage…')}</p>
             </div>
           )}
 
           {analyzeResult && problemDays.length === 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center">
-              <div className="text-4xl mb-2">🎉</div>
-              <p className="text-base font-bold text-emerald-700">{t('Vše je obsazeno!', 'All days covered!')}</p>
-              <p className="text-sm text-emerald-600 mt-1">{t('Žádné krizové dny v tomto měsíci.', 'No crisis days this month.')}</p>
+            <div className="rounded-[9px] border p-8 text-center" style={{ background: '#f1f6f1', borderColor: '#cfdfd2' }}>
+              <p className="text-[15px] font-semibold" style={{ color: '#2f5d3c' }}>{t('Vše je obsazeno!', 'All days covered!')}</p>
+              <p className="text-[13px] mt-1" style={{ color: '#5f7f66' }}>{t('Žádné krizové dny v tomto měsíci.', 'No crisis days this month.')}</p>
             </div>
           )}
 
@@ -662,54 +700,59 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
             const vacationList = Array.from(onVacation).map(id => vacationNames.get(id) ?? '—');
 
             return (
-              <div key={day.date} id={`plan-day-${day.date}`} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm scroll-mt-4">
-                {/* Header */}
-                <div className="flex items-center gap-3 px-4 py-3 bg-red-50/60 border-b border-red-100">
-                  <div className="w-11 h-11 rounded-xl bg-white border border-red-200 flex flex-col items-center justify-center shrink-0 shadow-sm">
-                    <span className="text-base font-extrabold text-red-600 leading-none">{parseInt(day.date.slice(8), 10)}</span>
-                    <span className="text-[9px] text-red-400 leading-none mt-0.5">{DAY_ABBREVS[dow]}</span>
-                  </div>
+              <div key={day.date} id={`plan-day-${day.date}`} className="bg-white border border-[#e2e0dc] rounded-[9px] overflow-hidden scroll-mt-4">
+                {/* Header (mockup: title + status, red occupancy pill right) */}
+                <div className="flex items-center gap-3 px-4 md:px-5 py-3.5 border-b border-[#f4f2ef]">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-slate-800">{day.statusLabel}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      {day.assignedCount}/{day.requiredTotal} {t('obsazeno', 'assigned')}
-                      {recommended.length > 0 && <> · {recommended.length} {t('návrhů', 'suggested')}</>}
-                    </div>
-                  </div>
-                  {day.missingCount > 0 && (
-                    <span className="shrink-0 px-2 py-1 rounded-lg bg-red-500 text-white text-xs font-bold">
-                      −{day.missingCount}
+                    <span className="text-[16px] font-semibold" style={{ color: '#111820' }}>
+                      {DAY_NAMES_LONG[dow]} {parseInt(day.date.slice(8), 10)}. {m}.
                     </span>
-                  )}
+                    <span className="ml-2 text-[13px]" style={{ color: '#8a929c' }}>{day.statusLabel}</span>
+                  </div>
+                  <span className="tf-mono shrink-0 px-2.5 py-[3px] rounded-md text-[11.5px] font-medium" style={{ background: '#f7e9e7', color: '#9c4a3f' }}>
+                    {day.assignedCount}/{day.requiredTotal} {t('obsazeno', 'assigned')}
+                  </span>
                 </div>
 
-                {/* Suggestions */}
-                <div className="divide-y divide-slate-50">
+                {/* Suggestions (mockup: DOPORUČENÍ ASISTENTA) */}
+                <div className="px-4 md:px-5 pt-3 text-[10px] font-normal uppercase tracking-[.1em]" style={{ color: '#8a929c' }}>
+                  {t('Doporučení asistenta', 'Assistant suggestions')}
+                </div>
+                <div className="divide-y divide-[#f4f2ef]">
                   {recommended.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-slate-400">
+                    <div className="px-4 md:px-5 py-3 text-[12.5px]" style={{ color: '#8a929c' }}>
                       {t('Žádné návrhy — přidejte někoho ručně níže.', 'No suggestions — add someone manually below.')}
                     </div>
                   )}
                   {recommended.map(sugg => {
                     const empId = sugg.id.split('__')[1];
                     const emp = empId ? empById.get(empId) : undefined;
-                    const color = sugg.suggestionType === 'CLOSING_ASSIST' ? DRAFT_COLORS.CLOSING_ASSIST : DRAFT_COLORS.FULL_DAY_STORE;
+                    const deptCat = catColors(emp?.department ? wtColorMap.get(emp.department) : undefined);
+                    const targetCat = catColors(wtColorMap.get(t('Prodejna', 'Store')) ?? wtColorMap.get('Prodejna'));
                     const busy = applyingSingle === sugg.id;
                     return (
-                      <div key={sugg.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ background: color }}>
+                      <div key={sugg.id} className="flex items-center gap-3 px-4 md:px-5 py-3">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0" style={{ background: deptCat.fill, color: deptCat.text }}>
                           {initials(sugg.employeeName)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-slate-800 truncate">{sugg.employeeName}</div>
-                          <div className="text-[11px] text-slate-400">
-                            {emp?.department ?? ''}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[13.5px] font-medium truncate" style={{ color: '#111820' }}>{sugg.employeeName}</span>
+                            {emp?.department && (
+                              <span className="shrink-0 text-[9.5px] font-normal uppercase tracking-[.05em] px-1.5 py-[3px] rounded-[3px]" style={{ background: deptCat.fill, color: deptCat.text }}>
+                                {emp.department}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[12px] mt-0.5" style={{ color: '#8a929c' }}>
+                            {sugg.suggestionType === 'CLOSING_ASSIST'
+                              ? `${t('večerní záskok', 'evening cover')} · ${sugg.timeLabel || '17–19'}`
+                              : t('celodenní záskok', 'full-day cover')}
                           </div>
                         </div>
-                        <span className="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-lg" style={{ background: color + '15', color }}>
-                          {sugg.suggestionType === 'CLOSING_ASSIST'
-                            ? `🌙 ${sugg.timeLabel || '17–19'}`
-                            : `🏪 ${t('Prodejna', 'Store')}`}
+                        <span className="hidden sm:inline shrink-0 text-[12px]" style={{ color: '#8a929c' }}>{t('jde na', 'goes to')}</span>
+                        <span className="shrink-0 text-[11.5px] font-medium px-2.5 py-[4px] rounded-full" style={{ background: targetCat.fill, color: targetCat.text }}>
+                          {sugg.suggestionType === 'CLOSING_ASSIST' ? `${t('Prodejna', 'Store')} ${sugg.timeLabel || '17–19'}` : t('Prodejna', 'Store')}
                         </span>
                         <button
                           onClick={() => {
@@ -729,30 +772,30 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
                         </button>
                         <button
                           onClick={() => removeSuggFromState(sugg.id)}
-                          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-md border border-[#e2e0dc] bg-white text-[#8a929c] hover:text-[#9c4a3f] hover:bg-[#f4f2ef] transition-colors"
                           title={t('Odebrat návrh', 'Dismiss')}
                         >
-                          ✕
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                         </button>
                         <button
                           onClick={() => handleApplySingle(sugg.id)}
                           disabled={busy || applying}
-                          className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+                          className="shrink-0 px-3.5 py-[7px] rounded-md bg-[#111820] hover:bg-[#2a333e] disabled:opacity-50 text-white text-[12.5px] font-medium transition-colors"
                         >
-                          {busy ? '…' : `✓ ${t('Schválit', 'Approve')}`}
+                          {busy ? '…' : t('Schválit', 'Approve')}
                         </button>
                       </div>
                     );
                   })}
 
                   {/* Custom pick */}
-                  <div className="px-4 py-2.5">
+                  <div className="px-4 md:px-5 py-2.5">
                     <select
                       value=""
                       onChange={(e) => { handleAddCustomPick(day.date, e.target.value); e.target.value = ''; }}
-                      className="w-full text-xs text-slate-500 border border-dashed border-slate-300 rounded-lg px-2.5 py-2 bg-white hover:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300 cursor-pointer"
+                      className="w-full text-[12.5px] text-[#5c6672] border border-dashed border-[#c9c5bb] rounded-md px-2.5 py-2 bg-white hover:border-[#8a929c] focus:outline-none cursor-pointer"
                     >
-                      <option value="">＋ {t('Přidat vlastní výběr…', 'Add your own pick…')}</option>
+                      <option value="">+ {t('Přidat vlastní výběr…', 'Add your own pick…')}</option>
                       {sortedEmployees.filter(emp => !usedIds.has(emp.id)).map(emp => (
                         <option key={emp.id} value={emp.id}>
                           {emp.name}{emp.department ? ` (${emp.department})` : ''}
@@ -762,51 +805,56 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
                   </div>
                 </div>
 
-                {/* On vacation that day — can't cover */}
-                {vacationList.length > 0 && (
-                  <div className="border-t border-amber-100 bg-amber-50/50 px-4 py-2.5">
-                    <div className="text-[11px] font-semibold text-amber-700 mb-1.5">🏖️ {t('Na dovolené', 'On vacation')} ({vacationList.length})</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {vacationList.map((name, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-white border border-amber-200 text-amber-800">
-                          {name}
-                        </span>
-                      ))}
+                {/* Bottom cards (mockup): on vacation + who already works */}
+                {(vacationList.length > 0 || staff.length > 0) && (
+                  <div className="grid sm:grid-cols-2 gap-3 px-4 md:px-5 pb-4 pt-1">
+                    {vacationList.length > 0 && (
+                      <div className="rounded-[9px] border border-[#e9e7e3] bg-[#fbfaf8] p-3.5 sm:self-start">
+                        <div className="text-[10px] font-normal uppercase tracking-[.1em] mb-2.5" style={{ color: '#8a929c' }}>
+                          {t('Na dovolené', 'On vacation')} ({vacationList.length})
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {vacationList.map((name, i) => (
+                            <span key={i} className="inline-flex items-center px-2.5 py-[5px] rounded-full text-[12px]" style={{ background: '#eef1f4', color: '#7d8792' }}>
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className={`rounded-[9px] border border-[#e9e7e3] bg-[#fbfaf8] p-3.5 sm:self-start ${vacationList.length === 0 ? 'sm:col-span-2' : ''}`}>
+                      <div className="text-[10px] font-normal uppercase tracking-[.1em] mb-2.5" style={{ color: '#8a929c' }}>
+                        {t('Kdo už ten den pracuje', 'Who already works that day')} ({staff.length})
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {staff.length === 0 && <span className="text-[12px]" style={{ color: '#b3aca0' }}>{t('Nikdo', 'Nobody')}</span>}
+                        {staff.slice(0, 8).map(s => {
+                          const cat = catColors(s.workTypeColor ?? wtColorMap.get(s.workTypeName ?? ''));
+                          return (
+                            <span
+                              key={s.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-[5px] rounded-full text-[12px] bg-white border border-[#e2e0dc]"
+                              style={{ color: '#111820' }}
+                              title={`${s.workTypeName ?? ''}${s.startTime && s.endTime ? ` · ${fmtShort(s.startTime)}–${fmtShort(s.endTime)}` : ''}`}
+                            >
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cat.solid }} />
+                              {s.employeeName}
+                            </span>
+                          );
+                        })}
+                        {staff.length > 8 && (
+                          <span className="inline-flex items-center px-2 py-[5px] text-[12px]" style={{ color: '#8a929c' }}>
+                            +{staff.length - 8} {t('dalších', 'more')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
-
-                {/* Current staffing */}
-                <details className="border-t border-slate-100 group">
-                  <summary className="px-4 py-2 text-[11px] font-semibold text-slate-400 cursor-pointer hover:bg-slate-50 select-none list-none flex items-center gap-1.5">
-                    <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                    </svg>
-                    {t('Kdo už ten den pracuje', 'Who already works that day')} ({staff.length})
-                  </summary>
-                  <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-                    {staff.length === 0 && <span className="text-xs text-slate-300">{t('Nikdo', 'Nobody')}</span>}
-                    {staff.map(s => {
-                      const color = s.workTypeColor ?? wtColorMap.get(s.workTypeName ?? '') ?? '#94a3b8';
-                      return (
-                        <span
-                          key={s.id}
-                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium"
-                          style={{ background: color + '15', color: '#334155', borderLeft: `3px solid ${color}` }}
-                          title={s.workTypeName ?? ''}
-                        >
-                          {s.employeeName}
-                          {s.startTime && s.endTime && (
-                            <span className="text-slate-400">{fmtShort(s.startTime)}–{fmtShort(s.endTime)}</span>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </details>
               </div>
             );
           })}
+          </div>
         </div>
       </div>
 

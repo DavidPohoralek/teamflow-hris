@@ -13,6 +13,7 @@ import VacationPlanner from '@/components/VacationPlanner'
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistantPlanner from '@/components/ShiftAssistantPlanner'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
+import TabIcon from '@/components/TabIcons'
 import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
 import TourSelectModal from '@/components/TourSelectModal'
@@ -349,12 +350,13 @@ export default function HomePage() {
                   key={tab.id}
                   data-tour={`tab-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-[7px] rounded-md text-[12.5px] transition-colors duration-150 whitespace-nowrap
+                  className={`px-3 py-[7px] rounded-md text-[12.5px] transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5
                     ${activeTab === tab.id
                       ? `font-medium ${theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'}`
                       : `font-normal ${theme.tabInactive}`
                     }`}
                 >
+                  <TabIcon id={tab.id} className="w-4 h-4" />
                   {lang === 'en' ? tab.labelEn : tab.labelCs}
                 </button>
               ))}
@@ -456,6 +458,7 @@ export default function HomePage() {
                       : theme.tabInactive
                     }`}
                 >
+                  <TabIcon id={tab.id} className="w-4 h-4" />
                   <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
                 </button>
               ))}
