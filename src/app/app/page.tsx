@@ -341,8 +341,8 @@ export default function HomePage() {
   const sideBg = theme.key === 'graphite' ? 'bg-[#262b31]' : theme.key === 'paper' ? 'bg-white' : 'bg-[#111820]'
   const sideBorder = darkSide ? 'border-black/30' : 'border-[#e2e0dc]'
   const sideFootBorder = darkSide ? 'border-[#1e2833]' : 'border-[#eceae6]'
-  const itemActiveCls = darkSide ? 'bg-[#232f3c] text-white' : 'bg-[#f1efe9] text-[#111820]'
-  const itemInactiveCls = darkSide ? 'text-[#8e9aa6] hover:text-white hover:bg-white/[0.06]' : 'text-[#5c6672] hover:text-[#111820] hover:bg-black/[0.04]'
+  const itemActiveCls = darkSide ? 'bg-[#2c3b4a] text-white' : 'bg-[#f1efe9] text-[#111820]'
+  const itemInactiveCls = darkSide ? 'text-[#bcc5cf] hover:text-white hover:bg-white/[0.06]' : 'text-[#5c6672] hover:text-[#111820] hover:bg-black/[0.04]'
   const logoSquareCls = darkSide ? 'bg-white' : 'bg-[#111820]'
   const chromeBorderCls = darkSide ? 'border-[#2b3742]' : 'border-[#e2e0dc]'
   const activeRuleColor = darkSide ? '#ffffff' : '#111820'
@@ -362,9 +362,9 @@ export default function HomePage() {
             style={active ? { boxShadow: `inset 2px 0 0 ${activeRuleColor}` } : undefined}
             className={collapsed
               ? `w-[38px] h-[38px] rounded-[9px] flex items-center justify-center transition-colors ${active ? itemActiveCls : itemInactiveCls}`
-              : `flex items-center gap-2.5 px-3 py-2 rounded-[7px] text-[12.5px] transition-colors ${active ? `font-medium ${itemActiveCls}` : itemInactiveCls}`}
+              : `flex items-center gap-2.5 px-3 py-[9px] rounded-[7px] text-[13px] transition-colors ${active ? `font-medium ${itemActiveCls}` : `font-normal ${itemInactiveCls}`}`}
           >
-            <TabIcon id={tab.id} className={collapsed ? 'w-[19px] h-[19px]' : 'w-[17px] h-[17px]'} />
+            <TabIcon id={tab.id} className={collapsed ? 'w-[19px] h-[19px]' : 'w-[18px] h-[18px]'} />
             {!collapsed && <span className="truncate">{label}</span>}
           </button>
         )
@@ -379,13 +379,13 @@ export default function HomePage() {
         {sidebarCollapsed ? (
           <>
             <div className={`w-[22px] h-[22px] rounded-[6px] ${logoSquareCls} mx-auto mt-3.5 mb-1.5`} />
-            <button onClick={toggleSidebar} title={t('Rozbalit', 'Expand')} className={`w-[38px] h-[26px] mx-auto mb-3 flex items-center justify-center rounded-[7px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>»</button>
+            <button onClick={toggleSidebar} title={t('Rozbalit', 'Expand')} className={`w-[38px] h-[26px] mx-auto mb-3 flex items-center justify-center rounded-[7px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>»</button>
           </>
         ) : (
           <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
             <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
             <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
-            <button onClick={toggleSidebar} title={t('Sbalit', 'Collapse')} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>«</button>
+            <button onClick={toggleSidebar} title={t('Sbalit', 'Collapse')} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>«</button>
           </div>
         )}
 
@@ -406,7 +406,7 @@ export default function HomePage() {
                   <TabIcon id="management" className="w-[18px] h-[18px]" />
                 </button>
               )}
-              <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`text-[10px] ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+              <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`text-[10px] ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                 {lang === 'cs' ? 'CZ' : 'EN'}
               </button>
             </>
@@ -421,7 +421,7 @@ export default function HomePage() {
                     <div className={`text-[11.5px] font-medium leading-tight truncate ${sideTextCls}`}>{managerScope?.role === 'admin' ? t('Administrátor', 'Administrator') : t('Manažer', 'Manager')}</div>
                     <div className="flex items-center gap-1 leading-tight">
                       <span className={`w-1.5 h-1.5 rounded-full ${darkSide ? 'bg-emerald-400' : 'bg-emerald-600'}`} />
-                      <span className={`text-[10.5px] ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</span>
+                      <span className={`text-[10.5px] ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</span>
                     </div>
                   </div>
                 </div>
@@ -435,19 +435,19 @@ export default function HomePage() {
               {isManagerMode && (
                 <div className="flex items-center gap-2 mt-2.5">
                   {managerScope?.isAdmin !== false && (
-                    <button onClick={() => setShowLayoutEditor(true)} title={t('Upravit rozhraní', 'Edit layout')} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+                    <button onClick={() => setShowLayoutEditor(true)} title={t('Upravit rozhraní', 'Edit layout')} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                       {t('Upravit', 'Edit')}
                     </button>
                   )}
-                  <button onClick={handleManagerLogout} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+                  <button onClick={handleManagerLogout} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                     {t('Odhlásit', 'Log out')}
                   </button>
                 </div>
               )}
               <div className="flex items-center mt-2.5 mb-1.5">
                 <div className={`flex items-center rounded-[6px] overflow-hidden border ${chromeBorderCls} text-[10.5px]`}>
-                  <button onClick={() => setLang('cs')} className={`px-2.5 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>CZ</button>
-                  <button onClick={() => setLang('en')} className={`px-2.5 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>EN</button>
+                  <button onClick={() => setLang('cs')} className={`px-2.5 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>CZ</button>
+                  <button onClick={() => setLang('en')} className={`px-2.5 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>EN</button>
                 </div>
               </div>
             </>
@@ -463,20 +463,20 @@ export default function HomePage() {
             <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
               <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
               <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
-              <button onClick={() => setMobileNavOpen(false)} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'} text-xs`}>✕</button>
+              <button onClick={() => setMobileNavOpen(false)} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'} text-xs`}>✕</button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-none py-0.5">
               {renderNavItems(false, () => setMobileNavOpen(false))}
             </div>
             <div className={`mt-auto border-t ${sideFootBorder} px-4 pt-3.5 pb-3 flex items-center gap-2`}>
               {isManagerMode ? (
-                <button onClick={() => { handleManagerLogout(); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('Odhlásit', 'Log out')}</button>
+                <button onClick={() => { handleManagerLogout(); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'}`}>{t('Odhlásit', 'Log out')}</button>
               ) : (
-                <button onClick={() => { setShowManagerLogin(true); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</button>
+                <button onClick={() => { setShowManagerLogin(true); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</button>
               )}
               <div className={`ml-auto flex items-center rounded-[6px] overflow-hidden border ${chromeBorderCls} text-[10.5px]`}>
-                <button onClick={() => setLang('cs')} className={`px-2 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>CZ</button>
-                <button onClick={() => setLang('en')} className={`px-2 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>EN</button>
+                <button onClick={() => setLang('cs')} className={`px-2 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>CZ</button>
+                <button onClick={() => setLang('en')} className={`px-2 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>EN</button>
               </div>
             </div>
           </aside>
