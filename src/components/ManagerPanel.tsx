@@ -273,6 +273,7 @@ interface Employee {
   is_owner?: boolean;
   managed_departments?: string[] | null;
   manager_permissions?: string[] | null;
+  hidden_from_shifts?: boolean;
 }
 
 interface WorkType {
@@ -867,6 +868,28 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
     }
   };
 
+  // Skrýt / zobrazit zaměstnance v sekci Směny (nemění jeho aktivnost v systému)
+  const [togglingHidden, setTogglingHidden] = useState<string | null>(null);
+  const toggleHidden = async (emp: Employee) => {
+    setTogglingHidden(emp.id);
+    // Optimistic flip so the eye reacts instantly
+    setEmployees((prev) => prev.map((e) => e.id === emp.id ? { ...e, hidden_from_shifts: !emp.hidden_from_shifts } : e));
+    try {
+      const res = await managerFetch(`/api/employees/${emp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden_from_shifts: !emp.hidden_from_shifts }),
+      });
+      if (!res.ok) throw new Error('Nepodařilo se uložit viditelnost.');
+    } catch (e) {
+      // Roll back on failure
+      setEmployees((prev) => prev.map((el) => el.id === emp.id ? { ...el, hidden_from_shifts: emp.hidden_from_shifts } : el));
+      alert(e instanceof Error ? e.message : 'Chyba');
+    } finally {
+      setTogglingHidden(null);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
@@ -960,6 +983,29 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleHidden(emp)}
+                        disabled={togglingHidden === emp.id}
+                        className={`align-middle mr-3 transition-colors disabled:opacity-40 ${emp.hidden_from_shifts ? 'text-amber-600 hover:text-amber-700' : 'text-gray-400 hover:text-gray-700'}`}
+                        title={emp.hidden_from_shifts
+                          ? t('Skryto ze Směn — klikni pro zobrazení', 'Hidden from Shifts — click to show')
+                          : t('Zobrazuje se ve Směnách — klikni pro skrytí', 'Shown in Shifts — click to hide')}
+                        aria-label={t('Skrýt ve Směnách', 'Hide in Shifts')}
+                      >
+                        {emp.hidden_from_shifts ? (
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 3l18 18" />
+                            <path d="M10.6 10.6a3 3 0 0 0 4.2 4.2" />
+                            <path d="M9.9 5.1A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a13.4 13.4 0 0 1-2.16 2.86" />
+                            <path d="M6.6 6.6C3.9 8.2 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 3.36-.6" />
+                          </svg>
+                        ) : (
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
                       <button
                         onClick={() => { setEditingEmployee(emp); setShowForm(true); }}
                         className="text-blue-600 hover:text-blue-800 text-sm mr-3"

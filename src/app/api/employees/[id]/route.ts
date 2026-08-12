@@ -77,6 +77,7 @@ export async function PUT(
     managed_departments,
     manager_permissions,
     hourly_rate,
+    hidden_from_shifts,
   } = body as Record<string, unknown>;
 
   if (name !== undefined && (typeof name !== 'string' || name.trim() === '')) {
@@ -103,6 +104,8 @@ export async function PUT(
   if (target_hours !== undefined)
     update.target_hours = typeof target_hours === 'number' ? target_hours : 160;
   if (active !== undefined) update.active = typeof active === 'boolean' ? active : true;
+  if (hidden_from_shifts !== undefined)
+    update.hidden_from_shifts = typeof hidden_from_shifts === 'boolean' ? hidden_from_shifts : false;
   if (profile_id !== undefined)
     update.profile_id = typeof profile_id === 'string' ? profile_id : null;
   if (pin !== undefined) {

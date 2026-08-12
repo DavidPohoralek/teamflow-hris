@@ -190,7 +190,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
 
   useEffect(() => {
     if (!isManagerMode) return;
-    managerFetch('/api/employees?all=1')
+    managerFetch('/api/employees?all=1&exclude_hidden=1')
       .then((r) => r.json())
       .then((data: { employees?: Employee[] } | Employee[]) => {
         const list = Array.isArray(data) ? data : (data as { employees?: Employee[] }).employees ?? [];
@@ -363,7 +363,7 @@ function EditDayModal({ orgId, dateStr, meta, onClose, onSuccess }: EditDayModal
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    managerFetch('/api/employees?all=1')
+    managerFetch('/api/employees?all=1&exclude_hidden=1')
       .then((r) => r.json())
       .then((data: { employees?: Employee[] } | Employee[]) => {
         const list = Array.isArray(data) ? data : (data as { employees?: Employee[] }).employees ?? [];
@@ -1137,7 +1137,7 @@ function BulkShiftModal({ orgId, month, workTypes, onClose, onSuccess }: BulkShi
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    managerFetch('/api/employees?all=1')
+    managerFetch('/api/employees?all=1&exclude_hidden=1')
       .then((r) => r.json())
       .then((d: { employees?: Employee[] } | Employee[]) => {
         const list = Array.isArray(d) ? d : (d as { employees?: Employee[] }).employees ?? [];
@@ -1478,7 +1478,7 @@ export default function WorkPlanGrid({
   const [employeeTargets, setEmployeeTargets] = useState<Map<string, { name: string; target: number }>>(new Map());
   useEffect(() => {
     if (!isManagerMode) return;
-    managerFetch('/api/employees?all=1')
+    managerFetch('/api/employees?all=1&exclude_hidden=1')
       .then((r) => r.json())
       .then((d: { employees?: { id: string; name: string; target_hours?: number }[] }) => {
         const map = new Map<string, { name: string; target: number }>();
