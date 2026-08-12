@@ -828,6 +828,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [vacBalances, setVacBalances] = useState<Record<string, { remainingDays: number; usedDays: number; pendingDays: number; totalDays: number; hasPaidVacation: boolean }>>({});
+  const [plannedHours, setPlannedHours] = useState<Record<string, number>>({});
   const [logsEmp, setLogsEmp] = useState<{ id: string; name: string } | null>(null);
 
   const fetchEmployees = useCallback(async () => {
@@ -850,6 +851,10 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
       const map: typeof vacBalances = {};
       for (const b of (d.balances ?? [])) map[b.employeeId] = b;
       setVacBalances(map);
+    }).catch(() => {});
+    // Planned hours this month per employee — for the Fond (target vs planned) column
+    managerFetch('/api/manager/planned-hours').then(r => r.json()).then(d => {
+      setPlannedHours(d.hoursByEmployee ?? {});
     }).catch(() => {});
   }, []);
 
@@ -912,7 +917,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), t('Štítky', 'Tags'), t('Cíl. hodiny', 'Target hours'), t('Dovolená', 'Vacation'), 'Tier', t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
+                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), 'Tier', t('Štítky', 'Tags'), t('Fond', 'Quota'), t('Dovolená', 'Vacation'), t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -922,7 +927,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
             <tbody className="bg-white divide-y divide-gray-200">
               {employees.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-400">
                     {t('Žádní zaměstnanci', 'No employees')}
                   </td>
                 </tr>
@@ -952,7 +957,24 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{emp.target_hours ?? 160}</td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {(() => {
+                        const fond = emp.target_hours ?? 160;
+                        const planned = plannedHours[emp.id] ?? 0;
+                        const pct = fond > 0 ? Math.min(100, (planned / fond) * 100) : 0;
+                        const barColor = planned > fond ? 'bg-red-500' : planned >= fond * 0.9 ? 'bg-emerald-500' : 'bg-blue-500';
+                        return (
+                          <div className="min-w-[92px]">
+                            <span className="text-xs font-semibold text-gray-700">
+                              {planned} / {fond} h
+                            </span>
+                            <div className="mt-1 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {(() => {
                         const b = vacBalances[emp.id];
