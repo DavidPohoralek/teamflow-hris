@@ -89,6 +89,15 @@ export default function HomePage() {
   const [shiftViewMode, setShiftViewMode] = useState<'teamflow' | 'googlesheets'>('teamflow')
   const [layout, setLayout] = useState<LayoutConfig>(DEFAULT_LAYOUT)
   const [showLayoutEditor, setShowLayoutEditor] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('tf_sidebar_collapsed') === '1' } catch { return false }
+  })
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const toggleSidebar = () => setSidebarCollapsed(v => {
+    const next = !v
+    try { localStorage.setItem('tf_sidebar_collapsed', next ? '1' : '0') } catch { /* ignore */ }
+    return next
+  })
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
     const now = new Date()
@@ -321,152 +330,174 @@ export default function HomePage() {
     )
   }
 
+  const visibleTabs = layout.tabs
+    .filter(lt => lt.visible)
+    .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
+    .filter((t): t is typeof BASE_TABS[0] => t !== undefined)
+    .filter(t => !MANAGER_TABS.some(mt => mt.id === t.id) || isManagerMode)
+
+  // Sidebar palette — dark for ink/graphite, light for the paper theme
+  const darkSide = theme.key !== 'paper'
+  const sideBg = theme.key === 'graphite' ? 'bg-[#262b31]' : theme.key === 'paper' ? 'bg-white' : 'bg-[#111820]'
+  const sideBorder = darkSide ? 'border-black/30' : 'border-[#e2e0dc]'
+  const sideFootBorder = darkSide ? 'border-[#1e2833]' : 'border-[#eceae6]'
+  const itemActiveCls = darkSide ? 'bg-[#232f3c] text-white' : 'bg-[#f1efe9] text-[#111820]'
+  const itemInactiveCls = darkSide ? 'text-[#8e9aa6] hover:text-white hover:bg-white/[0.06]' : 'text-[#5c6672] hover:text-[#111820] hover:bg-black/[0.04]'
+  const logoSquareCls = darkSide ? 'bg-white' : 'bg-[#111820]'
+  const chromeBorderCls = darkSide ? 'border-[#2b3742]' : 'border-[#e2e0dc]'
+  const activeRuleColor = darkSide ? '#ffffff' : '#111820'
+  const sideTextCls = darkSide ? 'text-white' : 'text-[#111820]'
+
+  const renderNavItems = (collapsed: boolean, onNavigate?: () => void) => (
+    <div className={collapsed ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-0.5 px-2'}>
+      {visibleTabs.map((tab) => {
+        const active = activeTab === tab.id
+        const label = lang === 'en' ? tab.labelEn : tab.labelCs
+        return (
+          <button
+            key={tab.id}
+            data-tour={`tab-${tab.id}`}
+            onClick={() => { setActiveTab(tab.id); onNavigate?.() }}
+            title={collapsed ? label : undefined}
+            style={active ? { boxShadow: `inset 2px 0 0 ${activeRuleColor}` } : undefined}
+            className={collapsed
+              ? `w-[38px] h-[38px] rounded-[9px] flex items-center justify-center transition-colors ${active ? itemActiveCls : itemInactiveCls}`
+              : `flex items-center gap-2.5 px-3 py-2 rounded-[7px] text-[12.5px] transition-colors ${active ? `font-medium ${itemActiveCls}` : itemInactiveCls}`}
+          >
+            <TabIcon id={tab.id} className={collapsed ? 'w-[19px] h-[19px]' : 'w-[17px] h-[17px]'} />
+            {!collapsed && <span className="truncate">{label}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <div className="tf-sans h-dvh flex flex-col bg-[#fbfaf8] overflow-hidden">
-      {/* Navbar — full-width bar, colour driven by theme */}
-      <nav className={`${theme.navBg} ${theme.navText} border-b ${theme.navBorder} z-10 shrink-0`}>
-        {/* Desktop row — 56px */}
-        <div className="hidden md:flex px-4 h-[56px] items-center gap-3">
-          {/* TeamFlow logo */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <span className={`w-[24px] h-[24px] rounded-[7px] inline-block ${theme.key === 'paper' ? 'bg-[#111820]' : 'bg-white'}`} />
-            <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
+    <div className="tf-sans h-dvh flex overflow-hidden bg-[#fbfaf8]">
+      {/* Desktop sidebar */}
+      <aside className={`hidden md:flex flex-col shrink-0 border-r ${sideBorder} ${sideBg} ${theme.navText} transition-[width] duration-200 ${sidebarCollapsed ? 'w-[60px]' : 'w-[210px]'}`}>
+        {sidebarCollapsed ? (
+          <>
+            <div className={`w-[22px] h-[22px] rounded-[6px] ${logoSquareCls} mx-auto mt-3.5 mb-1.5`} />
+            <button onClick={toggleSidebar} title={t('Rozbalit', 'Expand')} className={`w-[38px] h-[26px] mx-auto mb-3 flex items-center justify-center rounded-[7px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>»</button>
+          </>
+        ) : (
+          <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
+            <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
+            <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
+            <button onClick={toggleSidebar} title={t('Sbalit', 'Collapse')} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>«</button>
           </div>
-          <div className={`h-5 w-px ${theme.divider}`} />
-          {orgLogoUrl
-            ? /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={orgLogoUrl} alt={orgName} className="h-7 w-auto max-w-[130px] object-contain" />
-            : <span className="text-[12.5px] font-medium opacity-70">{orgName}</span>
-          }
-          <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-x-auto scrollbar-none">
-              {layout.tabs
-                .filter(lt => lt.visible)
-                .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
-                .filter((t): t is typeof BASE_TABS[0] => t !== undefined)
-                .filter(t => !MANAGER_TABS.some(mt => mt.id === t.id) || isManagerMode)
-                .map((tab) => (
-                <button
-                  key={tab.id}
-                  data-tour={`tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-2.5 py-2 rounded-lg text-[13px] transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5
-                    ${activeTab === tab.id
-                      ? `font-medium ${theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'}`
-                      : `font-normal ${theme.tabInactive}`
-                    }`}
-                >
-                  <TabIcon id={tab.id} className="w-4 h-4" />
-                  {lang === 'en' ? tab.labelEn : tab.labelCs}
-                </button>
-              ))}
-          </div>
-          <div className="shrink-0">
-            {isManagerMode ? (
-              <div className="flex items-center gap-1">
-                <div className="flex items-center gap-1.5 px-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${theme.managerLiveText === 'text-emerald-600' ? 'bg-emerald-600' : 'bg-emerald-400'}`} />
-                  <span className={`${theme.managerLiveText ?? 'text-emerald-400'} text-[12.5px] font-medium`}>{t('Manažer', 'Manager')}</span>
-                </div>
-                {managerScope?.isAdmin !== false && (
-                  <button
-                    onClick={() => setShowLayoutEditor(true)}
-                    className={`px-2 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}
-                    title={t('Upravit rozhraní', 'Edit layout')}
-                  >
-                    {t('Upravit', 'Edit')}
-                  </button>
-                )}
-                <button onClick={handleManagerLogout} className={`px-2 py-[7px] rounded-md text-[12.5px] transition-colors ${theme.logoutBtnClass}`}>
-                  {t('Odhlásit', 'Log out')}
-                </button>
-              </div>
-            ) : (
-              <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`px-3 py-[7px] rounded-md text-[12.5px] transition-colors duration-150 ${theme.managerBtnClass}`}>
-                {t('Manažer', 'Manager')}
-              </button>
-            )}
-          </div>
-          {/* Language switch — CZ | EN segmented pair */}
-          <div className={`shrink-0 flex items-center rounded-md overflow-hidden border ${theme.chromeBorder ?? 'border-white/15'} p-0.5 gap-0.5`}>
-            <button
-              onClick={() => setLang('cs')}
-              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'cs' ? (theme.tabActive ?? 'bg-white text-[#111820]') : theme.tabInactive}`}
-            >CZ</button>
-            <button
-              onClick={() => setLang('en')}
-              className={`px-2.5 py-[5px] rounded-[4px] text-[11.5px] font-medium transition-colors ${lang === 'en' ? (theme.tabActive ?? 'bg-white text-[#111820]') : theme.tabInactive}`}
-            >EN</button>
-          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto scrollbar-none py-0.5">
+          {renderNavItems(sidebarCollapsed)}
         </div>
 
-        {/* Mobile layout */}
-        <div className="md:hidden">
-          {/* Top strip: org logo + manager button */}
-          <div className="flex items-center justify-between px-4 h-12">
-            <div className="flex items-center min-w-0">
-              {orgLogoUrl
-                ? /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={orgLogoUrl} alt={orgName} className="h-7 w-auto max-w-[120px] object-contain" />
-                : <span className="text-sm font-semibold truncate">{orgName}</span>
-              }
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+        {/* Footer — manager status + language */}
+        <div className={`mt-auto border-t ${sideFootBorder} ${sidebarCollapsed ? 'pt-3 flex flex-col items-center gap-2.5 pb-1' : 'px-4 pt-3.5 pb-1'}`}>
+          {sidebarCollapsed ? (
+            <>
               {isManagerMode ? (
-                <>
-                  <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2 py-1">
-                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                    <span className="text-emerald-400 text-xs font-medium">{t('Manažer', 'Manager')}</span>
+                <button onClick={handleManagerLogout} title={t('Odhlásit', 'Log out')} className="w-[26px] h-[26px] rounded-full bg-[#26313d] text-[#dfe5ea] flex items-center justify-center text-[10.5px]">
+                  {managerScope?.role === 'admin' ? 'AD' : 'MG'}
+                </button>
+              ) : (
+                <button onClick={() => setShowManagerLogin(true)} title={t('Manažer', 'Manager')} className={`w-[38px] h-[34px] rounded-[9px] flex items-center justify-center ${itemInactiveCls}`}>
+                  <TabIcon id="management" className="w-[18px] h-[18px]" />
+                </button>
+              )}
+              <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`text-[10px] ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+                {lang === 'cs' ? 'CZ' : 'EN'}
+              </button>
+            </>
+          ) : (
+            <>
+              {isManagerMode ? (
+                <div className="flex items-center gap-2.5">
+                  <span className="w-[26px] h-[26px] rounded-full bg-[#26313d] text-[#dfe5ea] flex items-center justify-center text-[10.5px] shrink-0">
+                    {managerScope?.role === 'admin' ? 'AD' : 'MG'}
+                  </span>
+                  <div className="min-w-0">
+                    <div className={`text-[11.5px] font-medium leading-tight truncate ${sideTextCls}`}>{managerScope?.role === 'admin' ? t('Administrátor', 'Administrator') : t('Manažer', 'Manager')}</div>
+                    <div className="flex items-center gap-1 leading-tight">
+                      <span className={`w-1.5 h-1.5 rounded-full ${darkSide ? 'bg-emerald-400' : 'bg-emerald-600'}`} />
+                      <span className={`text-[10.5px] ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</span>
+                    </div>
                   </div>
+                </div>
+              ) : (
+                <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`flex items-center gap-2 w-full px-2.5 py-2 rounded-[7px] text-[12.5px] ${itemInactiveCls}`}>
+                  <TabIcon id="management" className="w-[17px] h-[17px]" />
+                  {t('Přihlásit jako manažer', 'Manager login')}
+                </button>
+              )}
+
+              {isManagerMode && (
+                <div className="flex items-center gap-2 mt-2.5">
                   {managerScope?.isAdmin !== false && (
-                    <button
-                      onClick={() => setShowLayoutEditor(true)}
-                      className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}
-                      title="Upravit rozhraní"
-                    >
+                    <button onClick={() => setShowLayoutEditor(true)} title={t('Upravit rozhraní', 'Edit layout')} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                       {t('Upravit', 'Edit')}
                     </button>
                   )}
-                  <button onClick={handleManagerLogout} className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${theme.logoutBtnClass}`}>
+                  <button onClick={handleManagerLogout} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                     {t('Odhlásit', 'Log out')}
                   </button>
-                </>
-              ) : (
-                <button data-tour="btn-manager" onClick={() => setShowManagerLogin(true)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${theme.managerBtnClass}`}>
-                  <span>{t('Manažer', 'Manager')}</span>
-                </button>
+                </div>
               )}
+              <div className="flex items-center mt-2.5 mb-1.5">
+                <div className={`flex items-center rounded-[6px] overflow-hidden border ${chromeBorderCls} text-[10.5px]`}>
+                  <button onClick={() => setLang('cs')} className={`px-2.5 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>CZ</button>
+                  <button onClick={() => setLang('en')} className={`px-2.5 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>EN</button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </aside>
+
+      {/* Mobile drawer */}
+      {mobileNavOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
+          <aside className={`relative w-[230px] max-w-[80%] flex flex-col border-r ${sideBorder} ${sideBg} ${theme.navText}`}>
+            <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
+              <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
+              <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
+              <button onClick={() => setMobileNavOpen(false)} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'} text-xs`}>✕</button>
             </div>
-          </div>
-          {/* Scrollable tabs row */}
-          <div className={`overflow-x-auto scrollbar-none border-t ${theme.navBorder}`}>
-            <div className="flex items-center gap-0.5 px-2 py-1.5 min-w-max">
-              {layout.tabs
-                .filter(lt => lt.visible)
-                .map(lt => [...BASE_TABS, ...MANAGER_TABS].find(t => t.id === lt.id))
-                .filter((t): t is typeof BASE_TABS[0] => t !== undefined)
-                .filter(t => !MANAGER_TABS.some(mt => mt.id === t.id) || isManagerMode)
-                .map((tab) => (
-                <button
-                  key={tab.id}
-                  data-tour={`tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap
-                    ${activeTab === tab.id
-                      ? (theme.tabActive ?? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20')
-                      : theme.tabInactive
-                    }`}
-                >
-                  <TabIcon id={tab.id} className="w-4 h-4" />
-                  <span>{lang === 'en' ? tab.labelEn : tab.labelCs}</span>
-                </button>
-              ))}
+            <div className="flex-1 overflow-y-auto scrollbar-none py-0.5">
+              {renderNavItems(false, () => setMobileNavOpen(false))}
             </div>
+            <div className={`mt-auto border-t ${sideFootBorder} px-4 pt-3.5 pb-3 flex items-center gap-2`}>
+              {isManagerMode ? (
+                <button onClick={() => { handleManagerLogout(); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('Odhlásit', 'Log out')}</button>
+              ) : (
+                <button onClick={() => { setShowManagerLogin(true); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</button>
+              )}
+              <div className={`ml-auto flex items-center rounded-[6px] overflow-hidden border ${chromeBorderCls} text-[10.5px]`}>
+                <button onClick={() => setLang('cs')} className={`px-2 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>CZ</button>
+                <button onClick={() => setLang('en')} className={`px-2 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]')}`}>EN</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Content column */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Mobile top bar */}
+        <div className={`md:hidden flex items-center gap-3 px-4 h-12 border-b ${sideBorder} ${sideBg} ${theme.navText} shrink-0`}>
+          <button onClick={() => setMobileNavOpen(true)} className={`w-8 h-8 -ml-1 flex items-center justify-center rounded-[7px] ${itemInactiveCls}`} aria-label={t('Menu', 'Menu')}>
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`w-[18px] h-[18px] rounded-[5px] shrink-0 ${logoSquareCls}`} />
+            <span className="text-[13.5px] font-semibold tracking-tight truncate">TeamFlow</span>
           </div>
         </div>
-      </nav>
 
-      {/* Content — kiosk tabs fill height, others scroll */}
-      <main className="flex-1 overflow-hidden bg-[#fbfaf8] flex flex-col">
+        {/* Content — kiosk tabs fill height, others scroll */}
+        <main className="flex-1 overflow-hidden bg-[#fbfaf8] flex flex-col">
         {/* Kiosk tabs: fill remaining height, no outer scroll */}
         {activeTab === 'attendance' && (
           <AttendanceKiosk orgId={orgId} />
@@ -546,7 +577,8 @@ export default function HomePage() {
         {activeTab === 'management' && isManagerMode && (
           <ManagerPanel orgId={orgId} onClose={() => setActiveTab('schedule')} initialTab={managerPanelTab} scope={managerScope} />
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Manager Login Modal */}
       {showManagerLogin && orgId && (
