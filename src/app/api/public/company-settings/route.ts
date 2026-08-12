@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     kiosk_enabled: r.kiosk_enabled ?? false,
-    ui_theme: r.ui_theme ?? 'slate',
+    ui_theme: r.ui_theme ?? 'graphite',
     saturday_logic_enabled: r.saturday_logic_enabled ?? false,
     weekend_open: r.weekend_open ?? false,
     // Spread extra_settings so WorkPlanGrid can read hours_mon, closed_dates, evening_shift_*, etc.

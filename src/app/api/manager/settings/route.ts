@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     saturday_logic_enabled: s.saturday_logic_enabled ?? false,
     weekend_open: s.weekend_open ?? false,
     managerPasswordSet: Boolean(s.manager_password),
-    ui_theme: s.ui_theme ?? 'slate',
+    ui_theme: s.ui_theme ?? 'graphite',
     // Spread extra_settings so NumberSetting / OperatingHoursSetting can read by key
     ...(s.extra_settings ?? {}),
   });
