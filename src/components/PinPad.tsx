@@ -174,9 +174,9 @@ export default function PinPad({
           </button>
         )}
 
-        {footer && (
-          <p className="text-[12.5px] text-center" style={{ color: '#8a929c' }}>{footer}</p>
-        )}
+        {/* Always render the footer slot so the keypad sits at the same height
+            whether or not a footer is supplied (Příchod/Odchod vs Zaměstnanec). */}
+        <p className="text-[12.5px] text-center min-h-[16px]" style={{ color: '#8a929c' }}>{footer ?? ' '}</p>
       </div>
     </div>
   );
