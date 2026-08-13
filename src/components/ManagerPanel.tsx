@@ -413,10 +413,10 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
   return (
     <div className="fixed inset-0 z-50 flex bg-white">
       {/* Sidebar */}
-      <div className="w-56 flex-shrink-0 bg-[#262b31] flex flex-col tf-sans">
+      <div className="w-[240px] flex-shrink-0 bg-[#262b31] flex flex-col tf-sans">
         <div className="px-4 py-5 border-b border-white/10">
-          <h1 className="text-white font-semibold text-[15px] leading-tight">{t('Správa systému', 'System Management')}</h1>
-          <p className="text-[#8e9aa6] text-xs mt-0.5">Manager Panel</p>
+          <h1 className="text-white font-semibold text-[16px] leading-tight">{t('Správa systému', 'System Management')}</h1>
+          <p className="text-[#8e9aa6] text-[12.5px] mt-0.5">Manager Panel</p>
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1">
           {tabs.map((tab) => (
@@ -425,13 +425,13 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
               data-mgr-tour={`mgr-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               style={activeTab === tab.id ? { boxShadow: 'inset 2px 0 0 #ffffff' } : undefined}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[7px] text-[13px] transition-colors ${
+              className={`w-full flex items-center gap-3 px-3 py-[11px] rounded-[8px] text-[14.5px] transition-colors ${
                 activeTab === tab.id
                   ? 'bg-[#2c3b4a] text-white font-medium'
-                  : 'text-[#bcc5cf] hover:bg-white/[0.06] hover:text-white font-normal'
+                  : 'text-[#c6cfd8] hover:bg-white/[0.06] hover:text-white font-normal'
               }`}
             >
-              <MgrTabIcon id={tab.id} />
+              <MgrTabIcon id={tab.id} className="w-[20px] h-[20px]" />
               <span className="flex-1 text-left">{tab.label}</span>
               {tab.id === 'requests' && pendingCount > 0 && (
                 <span className="flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold">

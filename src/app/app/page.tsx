@@ -364,7 +364,7 @@ export default function HomePage() {
   const sideBorder = darkSide ? 'border-black/30' : 'border-[#e2e0dc]'
   const sideFootBorder = darkSide ? 'border-[#1e2833]' : 'border-[#eceae6]'
   const itemActiveCls = darkSide ? 'bg-[#2c3b4a] text-white' : 'bg-[#f1efe9] text-[#111820]'
-  const itemInactiveCls = darkSide ? 'text-[#bcc5cf] hover:text-white hover:bg-white/[0.06]' : 'text-[#5c6672] hover:text-[#111820] hover:bg-black/[0.04]'
+  const itemInactiveCls = darkSide ? 'text-[#c6cfd8] hover:text-white hover:bg-white/[0.06]' : 'text-[#5c6672] hover:text-[#111820] hover:bg-black/[0.04]'
   const logoSquareCls = darkSide ? 'bg-white' : 'bg-[#111820]'
   const chromeBorderCls = darkSide ? 'border-[#2b3742]' : 'border-[#e2e0dc]'
   const activeRuleColor = darkSide ? '#ffffff' : '#111820'
@@ -384,9 +384,9 @@ export default function HomePage() {
             style={active ? { boxShadow: `inset 2px 0 0 ${activeRuleColor}` } : undefined}
             className={collapsed
               ? `w-[38px] h-[38px] rounded-[9px] flex items-center justify-center transition-colors ${active ? itemActiveCls : itemInactiveCls}`
-              : `flex items-center gap-2.5 px-3 py-[9px] rounded-[7px] text-[13px] transition-colors ${active ? `font-medium ${itemActiveCls}` : `font-normal ${itemInactiveCls}`}`}
+              : `flex items-center gap-3 px-3 py-[11px] rounded-[8px] text-[14.5px] transition-colors ${active ? `font-medium ${itemActiveCls}` : `font-normal ${itemInactiveCls}`}`}
           >
-            <TabIcon id={tab.id} className={collapsed ? 'w-[19px] h-[19px]' : 'w-[18px] h-[18px]'} />
+            <TabIcon id={tab.id} className={collapsed ? 'w-[20px] h-[20px]' : 'w-[20px] h-[20px]'} />
             {!collapsed && <span className="truncate">{label}</span>}
           </button>
         )
@@ -397,17 +397,17 @@ export default function HomePage() {
   return (
     <div className="tf-sans h-dvh flex overflow-hidden bg-[#fbfaf8]">
       {/* Desktop sidebar */}
-      <aside className={`hidden md:flex flex-col shrink-0 border-r ${sideBorder} ${sideBg} ${theme.navText} transition-[width] duration-200 ${sidebarCollapsed ? 'w-[60px]' : 'w-[210px]'}`}>
+      <aside className={`hidden md:flex flex-col shrink-0 border-r ${sideBorder} ${sideBg} ${theme.navText} transition-[width] duration-200 ${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'}`}>
         {sidebarCollapsed ? (
           <>
             <div className={`w-[22px] h-[22px] rounded-[6px] ${logoSquareCls} mx-auto mt-3.5 mb-1.5`} />
-            <button onClick={toggleSidebar} title={t('Rozbalit', 'Expand')} className={`w-[38px] h-[26px] mx-auto mb-3 flex items-center justify-center rounded-[7px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>»</button>
+            <button onClick={toggleSidebar} title={t('Rozbalit', 'Expand')} className={`w-[38px] h-[26px] mx-auto mb-3 flex items-center justify-center rounded-[7px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>»</button>
           </>
         ) : (
           <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
             <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
-            <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
-            <button onClick={toggleSidebar} title={t('Sbalit', 'Collapse')} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>«</button>
+            <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
+            <button onClick={toggleSidebar} title={t('Sbalit', 'Collapse')} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>«</button>
           </div>
         )}
 
@@ -516,7 +516,7 @@ export default function HomePage() {
                   <TabIcon id="management" className="w-[18px] h-[18px]" />
                 </button>
               )}
-              <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`text-[10px] ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+              <button onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')} className={`text-[10px] ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                 {lang === 'cs' ? 'CZ' : 'EN'}
               </button>
             </>
@@ -531,7 +531,7 @@ export default function HomePage() {
                     <div className={`text-[11.5px] font-medium leading-tight truncate ${sideTextCls}`}>{managerScope?.role === 'admin' ? t('Administrátor', 'Administrator') : t('Manažer', 'Manager')}</div>
                     <div className="flex items-center gap-1 leading-tight">
                       <span className={`w-1.5 h-1.5 rounded-full ${darkSide ? 'bg-emerald-400' : 'bg-emerald-600'}`} />
-                      <span className={`text-[10.5px] ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</span>
+                      <span className={`text-[10.5px] ${darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</span>
                     </div>
                   </div>
                 </div>
@@ -545,19 +545,19 @@ export default function HomePage() {
               {isManagerMode && (
                 <div className="flex items-center gap-2 mt-2.5">
                   {managerScope?.isAdmin !== false && (
-                    <button onClick={() => setShowLayoutEditor(true)} title={t('Upravit rozhraní', 'Edit layout')} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+                    <button onClick={() => setShowLayoutEditor(true)} title={t('Upravit rozhraní', 'Edit layout')} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                       {t('Upravit', 'Edit')}
                     </button>
                   )}
-                  <button onClick={handleManagerLogout} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
+                  <button onClick={handleManagerLogout} className={`flex-1 px-2 py-1 rounded-[5px] text-[11.5px] border text-center whitespace-nowrap ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'}`}>
                     {t('Odhlásit', 'Log out')}
                   </button>
                 </div>
               )}
               <div className="flex items-center mt-2.5 mb-1.5">
                 <div className={`flex items-center rounded-[6px] overflow-hidden border ${chromeBorderCls} text-[10.5px]`}>
-                  <button onClick={() => setLang('cs')} className={`px-2.5 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>CZ</button>
-                  <button onClick={() => setLang('en')} className={`px-2.5 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>EN</button>
+                  <button onClick={() => setLang('cs')} className={`px-2.5 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]')}`}>CZ</button>
+                  <button onClick={() => setLang('en')} className={`px-2.5 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]')}`}>EN</button>
                 </div>
               </div>
             </>
@@ -569,24 +569,24 @@ export default function HomePage() {
       {mobileNavOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
-          <aside className={`relative w-[230px] max-w-[80%] flex flex-col border-r ${sideBorder} ${sideBg} ${theme.navText}`}>
+          <aside className={`relative w-[240px] max-w-[82%] flex flex-col border-r ${sideBorder} ${sideBg} ${theme.navText}`}>
             <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
               <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
-              <span className="text-[13.5px] font-semibold tracking-tight">TeamFlow</span>
-              <button onClick={() => setMobileNavOpen(false)} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'} text-xs`}>✕</button>
+              <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
+              <button onClick={() => setMobileNavOpen(false)} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]'} text-xs`}>✕</button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-none py-0.5">
               {renderNavItems(false, () => setMobileNavOpen(false))}
             </div>
             <div className={`mt-auto border-t ${sideFootBorder} px-4 pt-3.5 pb-3 flex items-center gap-2`}>
               {isManagerMode ? (
-                <button onClick={() => { handleManagerLogout(); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'}`}>{t('Odhlásit', 'Log out')}</button>
+                <button onClick={() => { handleManagerLogout(); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]'}`}>{t('Odhlásit', 'Log out')}</button>
               ) : (
-                <button onClick={() => { setShowManagerLogin(true); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</button>
+                <button onClick={() => { setShowManagerLogin(true); setMobileNavOpen(false) }} className={`px-2 py-1 rounded-[5px] text-[11.5px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]'}`}>{t('Manažer', 'Manager')}</button>
               )}
               <div className={`ml-auto flex items-center rounded-[6px] overflow-hidden border ${chromeBorderCls} text-[10.5px]`}>
-                <button onClick={() => setLang('cs')} className={`px-2 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>CZ</button>
-                <button onClick={() => setLang('en')} className={`px-2 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#bcc5cf]' : 'text-[#5c6672]')}`}>EN</button>
+                <button onClick={() => setLang('cs')} className={`px-2 py-[3px] ${lang === 'cs' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]')}`}>CZ</button>
+                <button onClick={() => setLang('en')} className={`px-2 py-[3px] ${lang === 'en' ? (darkSide ? 'bg-[#26313d] text-white' : 'bg-[#111820] text-white') : (darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]')}`}>EN</button>
               </div>
             </div>
           </aside>
@@ -602,7 +602,7 @@ export default function HomePage() {
           </button>
           <div className="flex items-center gap-2 min-w-0">
             <span className={`w-[18px] h-[18px] rounded-[5px] shrink-0 ${logoSquareCls}`} />
-            <span className="text-[13.5px] font-semibold tracking-tight truncate">TeamFlow</span>
+            <span className="text-[15px] font-semibold tracking-tight truncate">TeamFlow</span>
           </div>
         </div>
 
