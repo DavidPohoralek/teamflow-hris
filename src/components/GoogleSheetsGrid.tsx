@@ -1492,123 +1492,121 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
   return (
     <div className="max-w-full">
-      {/* Header toolbar — sticky, light with pill controls */}
+      {/* Header toolbar — sticky panel on a tinted surface (variant B) */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-30 bg-white border-b border-[#e9e7e3] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-2 text-[12.5px]"
+        className="sticky top-0 z-30 bg-[#faf9f7] border-b-2 border-[#111820] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12.5px]"
       >
         {/* Left: section title + date nav */}
         <span className="text-[15px] font-semibold tracking-tight text-[#111820]">{t('Směny', 'Shifts')}</span>
-        <span className="w-px h-4 bg-[#e5e3df] mx-0.5" />
-        <span className="tf-mono text-[13px] font-normal text-[#5c6672]">{navLabel}</span>
-        <div className="flex items-center gap-0.5">
-          <button onClick={goToPrev}
-            className="px-1.5 py-1 rounded-md text-[#8a929c] hover:bg-black/5 hover:text-[#111820] transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+        <span className="w-px h-4 bg-[#e0ddd7]" />
+        <span className="tf-mono text-[13px] font-normal text-[#111820]">{navLabel}</span>
+        <div className="flex items-center gap-1 text-[#8a929c]">
+          <button onClick={goToPrev} className="hover:text-[#111820] transition-colors" aria-label={t('Předchozí', 'Previous')}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <button onClick={goToNext}
-            className="px-1.5 py-1 rounded-md text-[#8a929c] hover:bg-black/5 hover:text-[#111820] transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
+          <button onClick={goToNext} className="hover:text-[#111820] transition-colors" aria-label={t('Další', 'Next')}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </button>
         </div>
 
-        {/* Right cluster — pill controls */}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button
-            onClick={goToToday}
-            className="px-3 py-[6px] rounded-full border border-[#e2e0dc] bg-white text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc] transition-colors"
-            title={t('Přejít na dnešek', 'Go to today')}
-          >
-            {t('Dnes', 'Today')}
-          </button>
-
-          {/* View mode toggle — pills */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-3.5 py-[6px] rounded-full transition-colors ${viewMode === 'week' ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
-            >
+        {/* Right cluster — quiet text controls, grouped with dividers */}
+        <div className="ml-auto flex flex-wrap items-center gap-x-3.5 gap-y-2">
+          {/* View group */}
+          <div className="flex items-center gap-3.5">
+            <button onClick={goToToday} className="text-[#5c6672] hover:text-[#111820] transition-colors" title={t('Přejít na dnešek', 'Go to today')}>
+              {t('Dnes', 'Today')}
+            </button>
+            <button onClick={() => setViewMode('week')}
+              className={`transition-colors ${viewMode === 'week' ? 'text-[#111820] font-medium' : 'text-[#8a929c] hover:text-[#111820]'}`}
+              style={viewMode === 'week' ? { boxShadow: 'inset 0 -2px 0 #111820', paddingBottom: 3 } : undefined}>
               {t('Týden', 'Week')}
             </button>
-            <button
-              onClick={() => setViewMode('month')}
-              className={`px-3.5 py-[6px] rounded-full transition-colors ${viewMode === 'month' ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
-            >
+            <button onClick={() => setViewMode('month')}
+              className={`transition-colors ${viewMode === 'month' ? 'text-[#111820] font-medium' : 'text-[#8a929c] hover:text-[#111820]'}`}
+              style={viewMode === 'month' ? { boxShadow: 'inset 0 -2px 0 #111820', paddingBottom: 3 } : undefined}>
               {t('Měsíc', 'Month')}
             </button>
           </div>
 
-          {departments.length > 0 && (
-            <div className="relative" ref={deptDropdownRef}>
+          <span className="w-px h-4 bg-[#e0ddd7]" />
+
+          {/* Filters group */}
+          <div className="flex items-center gap-3.5">
+            {departments.length > 0 && (
+              <div className="relative" ref={deptDropdownRef}>
+                <button
+                  onClick={() => setDeptDropdownOpen((v) => !v)}
+                  className={`flex items-center gap-1 transition-colors ${deptFilters.length > 0 ? 'text-[#111820] font-medium' : 'text-[#5c6672] hover:text-[#111820]'}`}
+                >
+                  {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
+                  <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {deptDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 bg-white rounded-xl border border-[#e2e0dc] shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
+                    {departments.map((dept) => (
+                      <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-[#f4f2ef] cursor-pointer transition-colors">
+                        <input type="checkbox" checked={deptFilters.includes(dept)}
+                          onChange={() => setDeptFilters((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept])}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-[#111820] focus:ring-[#111820]/20" />
+                        <span className="text-xs font-medium text-[#111820]">{dept}</span>
+                      </label>
+                    ))}
+                    {deptFilters.length > 0 && (
+                      <button onClick={() => { setDeptFilters([]); setDeptDropdownOpen(false); }}
+                        className="w-full px-3 py-1.5 text-xs text-[#8a929c] hover:text-red-500 text-left border-t border-[#f4f2ef] mt-1 transition-colors">
+                        {t('Zrušit výběr', 'Clear')}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!hiddenElements.includes('schedule_activity_btn') && workTypes.some((w) => w.category === 'activity') && (
               <button
-                onClick={() => setDeptDropdownOpen((v) => !v)}
-                className={`flex items-center gap-1 px-3 py-[6px] rounded-full transition-colors ${deptFilters.length > 0 ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
+                onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
+                className={`transition-colors ${activityFilter ? 'text-[#111820] font-medium' : 'text-[#5c6672] hover:text-[#111820]'}`}
               >
-                {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
-                <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                {t('Aktivity', 'Activities')}
               </button>
-              {deptDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 min-w-[160px] py-1 overflow-hidden">
-                  {departments.map((dept) => (
-                    <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors">
-                      <input type="checkbox" checked={deptFilters.includes(dept)}
-                        onChange={() => setDeptFilters((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept])}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-[#111820] focus:ring-[#111820]/20" />
-                      <span className="text-xs font-medium text-slate-700">{dept}</span>
-                    </label>
-                  ))}
-                  {deptFilters.length > 0 && (
-                    <button onClick={() => { setDeptFilters([]); setDeptDropdownOpen(false); }}
-                      className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-red-500 text-left border-t border-slate-100 mt-1 transition-colors">
-                      {t('Zrušit výběr', 'Clear')}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            )}
 
-          {!hiddenElements.includes('schedule_activity_btn') && workTypes.some((w) => w.category === 'activity') && (
-            <button
-              onClick={() => { setActivityFilter((v) => !v); setDeptFilters([]); }}
-              className={`flex items-center gap-1 px-3 py-[6px] rounded-full transition-colors ${activityFilter ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
-            >
-              {t('Aktivity', 'Activities')}
-            </button>
-          )}
+            {!hiddenElements.includes('schedule_evening_btn') && (
+              <button
+                onClick={() => setEveningFilter((v) => !v)}
+                className={`transition-colors ${eveningFilter ? 'text-[#111820] font-medium' : 'text-[#5c6672] hover:text-[#111820]'}`}
+              >
+                {t('Večerní', 'Evening')}
+              </button>
+            )}
+          </div>
 
-          {!hiddenElements.includes('schedule_evening_btn') && (
-            <button
-              onClick={() => setEveningFilter((v) => !v)}
-              className={`flex items-center gap-1 px-3 py-[6px] rounded-full transition-colors ${eveningFilter ? 'bg-[#111820] text-white' : 'bg-white border border-[#e2e0dc] text-[#5c6672] hover:text-[#111820] hover:border-[#d5d2cc]'}`}
-            >
-              {t('Večerní', 'Evening')}
-            </button>
-          )}
+          <span className="w-px h-4 bg-[#e0ddd7]" />
 
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8a929c] pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+          {/* Search — borderless on the surface */}
+          <div className="relative flex items-center">
+            <svg className="w-3.5 h-3.5 text-[#8a929c] pointer-events-none shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
             </svg>
             <input type="text" value={nameSearch} onChange={(e) => setNameSearch(e.target.value)}
               placeholder={t('Hledat…', 'Search…')}
-              className="pl-8 pr-3 py-[6px] rounded-full text-[12.5px] bg-white text-[#111820] placeholder-[#8a929c] border border-[#e2e0dc] hover:border-[#d5d2cc] focus:border-[#8a929c] focus:outline-none transition w-32" />
+              className="pl-2 pr-4 py-[3px] text-[12.5px] bg-transparent text-[#111820] placeholder-[#8a929c] border-0 focus:outline-none transition w-28 focus:w-36" />
             {nameSearch && (
-              <button onClick={() => setNameSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a929c] hover:text-[#111820] text-xs">✕</button>
+              <button onClick={() => setNameSearch('')} className="absolute right-0 text-[#8a929c] hover:text-[#111820] text-xs">✕</button>
             )}
           </div>
 
-          {/* Actions: bulk (secondary pill), add (dark pill) */}
+          {/* Actions: bulk (subtle) + add (dark) */}
+          {((isManagerMode || sessionEmployee) && (!hiddenElements.includes('schedule_bulk_btn') || !hiddenElements.includes('schedule_add_btn'))) && (
+            <span className="w-px h-4 bg-[#e0ddd7]" />
+          )}
           {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_bulk_btn') && (
             <button
               onClick={() => setShowBulkModal(true)}
-              className="px-3.5 py-[6px] rounded-full border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] font-medium transition-colors"
+              className="px-3 py-[6px] rounded-lg border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] font-medium transition-colors"
               title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
             >
               {t('Plošné zadání', 'Bulk assign')}
@@ -1617,16 +1615,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {(isManagerMode || sessionEmployee) && !hiddenElements.includes('schedule_add_btn') && (
             <button
               onClick={() => { setAddModalDate(today); setAddModalEmployeeId(isManagerMode ? undefined : sessionEmployee?.id); setShowAddModal(true); }}
-              className="px-3.5 py-[6px] rounded-full bg-[#111820] hover:bg-[#2a333e] text-white font-medium transition-colors"
+              className="px-3.5 py-[6px] rounded-lg bg-[#111820] hover:bg-[#2a333e] text-white font-medium transition-colors"
             >
               + {t('Přidat směnu', 'Add shift')}
             </button>
           )}
 
-          {/* PIN session — kept green */}
+          {/* PIN session — green pill (unified with Dovolená) OR attached PIN+OK */}
           {!isManagerMode && (
             sessionEmployee ? (
-              // Green login pill — unified with the Dovolená chip
               <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-[7px]">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                 <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
@@ -1637,15 +1634,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 >✕</button>
               </div>
             ) : (
-              <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className="flex items-center gap-2">
+              <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className={`flex items-center rounded-lg overflow-hidden border ${pinInputError ? 'border-red-400' : 'border-[#e2e0dc]'} bg-white`}>
                 <input
                   type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
                   onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
                   placeholder={t('Váš PIN', 'Your PIN')}
-                  className={`w-28 text-[12.5px] px-3.5 py-[6px] rounded-full border text-[#111820] placeholder-[#8a929c] ${pinInputError ? 'border-red-400 bg-red-50' : 'border-[#e2e0dc] bg-white'} focus:outline-none focus:border-[#8a929c] tracking-widest`}
+                  className="w-24 text-[12.5px] px-3 py-[6px] border-0 bg-transparent text-[#111820] placeholder-[#8a929c] focus:outline-none tracking-widest"
                 />
                 <button type="submit" disabled={pinInputValue.length < 4 || pinInputLoading}
-                  className="px-4 py-[6px] rounded-full bg-[#111820] hover:bg-[#2a333e] text-white font-medium disabled:opacity-40 transition-colors">
+                  className="px-4 py-[6px] bg-[#111820] hover:bg-[#2a333e] text-white font-medium disabled:opacity-40 transition-colors">
                   {pinInputLoading ? '…' : 'OK'}
                 </button>
               </form>
