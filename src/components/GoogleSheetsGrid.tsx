@@ -644,6 +644,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
   // ── PIN session ──────────────────────────────────────────────────────────
   const [sessionPin, setSessionPin] = useState('');
   const [sessionEmployee, setSessionEmployee] = useState<{ id: string; name: string } | null>(null);
+  // Actually-worked hours this month (attendance) for the PIN session — sidebar card
+  const [sessionWorkedMonth, setSessionWorkedMonth] = useState<number | null>(null);
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinInputError, setPinInputError] = useState(false);
   const [pinInputLoading, setPinInputLoading] = useState(false);
@@ -1444,6 +1446,17 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       .map(([name, count]) => ({ name, count, color: catColors(deptColorMap.get(name)).solid }));
   }, [displayEmployees, deptOrder, deptColorMap]);
 
+  // Actually-worked hours this month for the PIN session (from attendance logs)
+  useEffect(() => {
+    if (!sessionEmployee || !sessionPin) { setSessionWorkedMonth(null); return; }
+    let cancelled = false;
+    fetch(`/api/public/employee-hours?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(sessionPin)}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setSessionWorkedMonth(Math.round(d?.thisMonth?.hours ?? 0)); })
+      .catch(() => { if (!cancelled) setSessionWorkedMonth(null); });
+    return () => { cancelled = true; };
+  }, [sessionEmployee, sessionPin, orgId]);
+
   // Publish shifts context (PIN session + category legend) to the sidebar in
   // page.tsx via a window event. The sidebar renders it in the dark rail.
   useEffect(() => {
@@ -1451,13 +1464,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       ? {
           name: sessionEmployee.name,
           department: baseEmployees.find((e) => e.id === sessionEmployee.id)?.department ?? null,
-          hoursWeek: Math.round(computePlannedHours(sessionEmployee.id, stickyDays)),
+          workedMonth: sessionWorkedMonth ?? 0,
           hoursMonth: Math.round(computeMonthlyHours(sessionEmployee.id)),
         }
       : null;
     window.dispatchEvent(new CustomEvent('tf:shifts-context', { detail: { session: sess, categories: sidebarCategories } }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionEmployee, sidebarCategories, plansMap, monthPlansMap, stickyDays.join(',')]);
+  }, [sessionEmployee, sessionWorkedMonth, sidebarCategories, plansMap, monthPlansMap, stickyDays.join(',')]);
 
   // Clear the shifts context when this grid unmounts (leaving the Směny tab)
   useEffect(() => {

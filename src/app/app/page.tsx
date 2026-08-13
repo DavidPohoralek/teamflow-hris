@@ -101,7 +101,7 @@ export default function HomePage() {
   // Shifts context published by GoogleSheetsGrid — PIN session + category legend
   // with people counts, shown in the dark sidebar rail.
   const [shiftsCtx, setShiftsCtx] = useState<{
-    session: { name: string; department: string | null; hoursWeek: number; hoursMonth: number } | null
+    session: { name: string; department: string | null; workedMonth: number; hoursMonth: number } | null
     categories: { name: string; count: number; color: string }[]
   }>({ session: null, categories: [] })
   // Vacation dashboard published by VacationPlanner — used/planned/remaining hours
@@ -438,12 +438,12 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-5 mt-3">
                   <div>
-                    <div className={`tf-mono text-[19px] font-semibold leading-none ${sideTextCls}`}>{shiftsCtx.session.hoursWeek} <span className="text-[12px] font-normal">h</span></div>
-                    <div className={`text-[10.5px] mt-1 ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('tento týden', 'this week')}</div>
+                    <div className={`tf-mono text-[19px] font-semibold leading-none ${sideTextCls}`}>{shiftsCtx.session.workedMonth} <span className="text-[12px] font-normal">h</span></div>
+                    <div className={`text-[10.5px] mt-1 ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('odpracováno', 'worked')}</div>
                   </div>
                   <div>
                     <div className={`tf-mono text-[19px] font-semibold leading-none ${sideTextCls}`}>{shiftsCtx.session.hoursMonth} <span className="text-[12px] font-normal">h</span></div>
-                    <div className={`text-[10.5px] mt-1 ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('tento měsíc', 'this month')}</div>
+                    <div className={`text-[10.5px] mt-1 ${darkSide ? 'text-[#8e9aa6]' : 'text-[#5c6672]'}`}>{t('naplánováno', 'planned')}</div>
                   </div>
                 </div>
               </div>
