@@ -1049,8 +1049,8 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 text-[11px]" style={{ color: '#5c6672' }}>
+      {/* Legend — hidden on desktop (md+), where the dark sidebar shows it */}
+      <div className="md:hidden flex flex-wrap items-center gap-3 sm:gap-4 mt-3 text-[11px]" style={{ color: '#5c6672' }}>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: '#e7efe8', border: '1px solid #c4d6c8' }} />{t('Schválena', 'Approved')}</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: '#f7f0dd', border: '1px solid #e3d5ae' }} />{t('Čeká na schválení', 'Pending approval')}</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: '#f7e9e7', border: '1px solid #e5c8c3' }} />{t('Zamítnuta', 'Rejected')}</div>

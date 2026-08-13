@@ -466,40 +466,59 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Vacation dashboard — used / planned / remaining (Dovolená tab, expanded) */}
-        {!sidebarCollapsed && activeTab === 'vacation' && vacationCtx && (
+        {/* Vacation dashboard + status legend (Dovolená tab, expanded) */}
+        {!sidebarCollapsed && activeTab === 'vacation' && (
           <div className={`px-3 pb-1 pt-1 border-t ${sideFootBorder}`}>
-            <div className={`text-[10px] font-normal uppercase tracking-[.12em] mt-2.5 mb-2 ${darkSide ? 'text-[#7e8b98]' : 'text-[#8a929c]'}`}>
-              {vacationCtx.scope === 'me' ? t('Moje dovolená', 'My vacation') : t('Dovolená týmu', 'Team vacation')}
-            </div>
-            {(() => {
-              const showRemaining = vacationCtx.scope === 'org' || vacationCtx.hasPaidVacation !== false
-              const total = Math.max(1, vacationCtx.usedHours + vacationCtx.plannedHours + (showRemaining ? vacationCtx.remainingHours : 0))
-              const seg = (h: number) => `${(h / total) * 100}%`
-              const rows: { label: string; hours: number; dot: string }[] = [
-                { label: t('Vyčerpáno', 'Used'), hours: vacationCtx.usedHours, dot: '#c25b52' },
-                { label: t('Naplánováno', 'Planned'), hours: vacationCtx.plannedHours, dot: '#c99a3a' },
-                ...(showRemaining ? [{ label: t('Zbývá', 'Remaining'), hours: vacationCtx.remainingHours, dot: '#3f9e6a' }] : []),
-              ]
-              return (
-                <>
-                  <div className="flex h-2 rounded-full overflow-hidden mb-3" style={{ background: darkSide ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
-                    <div style={{ width: seg(vacationCtx.usedHours), background: '#c25b52' }} />
-                    <div style={{ width: seg(vacationCtx.plannedHours), background: '#c99a3a' }} />
-                    {showRemaining && <div style={{ width: seg(vacationCtx.remainingHours), background: '#3f9e6a' }} />}
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {rows.map((r) => (
-                      <div key={r.label} className="flex items-center gap-2.5">
-                        <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: r.dot }} />
-                        <span className={`text-[12.5px] ${sideTextCls}`}>{r.label}</span>
-                        <span className={`ml-auto tf-mono text-[12.5px] font-medium ${sideTextCls}`}>{r.hours} h</span>
+            {vacationCtx && (
+              <>
+                <div className={`text-[10px] font-normal uppercase tracking-[.12em] mt-2.5 mb-2 ${darkSide ? 'text-[#7e8b98]' : 'text-[#8a929c]'}`}>
+                  {vacationCtx.scope === 'me' ? t('Moje dovolená', 'My vacation') : t('Dovolená týmu', 'Team vacation')}
+                </div>
+                {(() => {
+                  const showRemaining = vacationCtx.scope === 'org' || vacationCtx.hasPaidVacation !== false
+                  const total = Math.max(1, vacationCtx.usedHours + vacationCtx.plannedHours + (showRemaining ? vacationCtx.remainingHours : 0))
+                  const seg = (h: number) => `${(h / total) * 100}%`
+                  const rows: { label: string; hours: number; dot: string }[] = [
+                    { label: t('Vyčerpáno', 'Used'), hours: vacationCtx.usedHours, dot: '#c25b52' },
+                    { label: t('Naplánováno', 'Planned'), hours: vacationCtx.plannedHours, dot: '#c99a3a' },
+                    ...(showRemaining ? [{ label: t('Zbývá', 'Remaining'), hours: vacationCtx.remainingHours, dot: '#3f9e6a' }] : []),
+                  ]
+                  return (
+                    <>
+                      <div className="flex h-2 rounded-full overflow-hidden mb-3" style={{ background: darkSide ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+                        <div style={{ width: seg(vacationCtx.usedHours), background: '#c25b52' }} />
+                        <div style={{ width: seg(vacationCtx.plannedHours), background: '#c99a3a' }} />
+                        {showRemaining && <div style={{ width: seg(vacationCtx.remainingHours), background: '#3f9e6a' }} />}
                       </div>
-                    ))}
-                  </div>
-                </>
-              )
-            })()}
+                      <div className="flex flex-col gap-1.5">
+                        {rows.map((r) => (
+                          <div key={r.label} className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: r.dot }} />
+                            <span className={`text-[12.5px] ${sideTextCls}`}>{r.label}</span>
+                            <span className={`ml-auto tf-mono text-[12.5px] font-medium ${sideTextCls}`}>{r.hours} h</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )
+                })()}
+              </>
+            )}
+
+            {/* Status legend — moved here from the calendar bottom */}
+            <div className={`text-[10px] font-normal uppercase tracking-[.12em] ${vacationCtx ? 'mt-4' : 'mt-2.5'} mb-2 ${darkSide ? 'text-[#7e8b98]' : 'text-[#8a929c]'}`}>{t('Stavy', 'Statuses')}</div>
+            <div className="flex flex-col gap-1.5 mb-1">
+              {[
+                { label: t('Schválena', 'Approved'), dot: '#4a9d6a' },
+                { label: t('Čeká na schválení', 'Pending'), dot: '#c99a3a' },
+                { label: t('Zamítnuta', 'Rejected'), dot: '#c25b52' },
+              ].map((s) => (
+                <div key={s.label} className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: s.dot }} />
+                  <span className={`text-[12.5px] ${sideTextCls}`}>{s.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
