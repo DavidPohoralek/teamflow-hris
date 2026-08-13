@@ -311,7 +311,7 @@ interface ManagerPanelProps {
 // TYPE_LABELS and CATEGORY_LABELS are built inside components via useT() for i18n
 
 const CATEGORY_COLORS: Record<string, string> = {
-  shift: 'bg-blue-100 text-blue-800',
+  shift: 'bg-[#eceae4] text-[#111820]',
   presence: 'bg-green-100 text-green-800',
   absence: 'bg-red-100 text-red-800',
   activity: 'bg-purple-100 text-purple-800',
@@ -349,6 +349,26 @@ function formatRequestNote(raw: string | null | undefined): { short: string; ful
   } catch {
     return { short: raw.length > 60 ? raw.slice(0, 60) + '…' : raw, full: raw };
   }
+}
+
+// Line icons for the management sidebar — replaces emoji so the panel matches
+// the redesigned nav. Stroke follows currentColor.
+function MgrTabIcon({ id, className = 'w-[17px] h-[17px]' }: { id: string; className?: string }) {
+  const p: Record<string, React.ReactNode> = {
+    employees: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c0-3.1 2.5-4.8 5.5-4.8s5.5 1.7 5.5 4.8" /><path d="M16 5.4a3.2 3.2 0 010 5.9M20.6 19c0-2.4-1.5-4-3.6-4.6" /></>,
+    'work-types': <><path d="M4 7.5h16v11H4zM4 7.5l2.4-3h6.2l2 3" /></>,
+    requests: <><path d="M5 4.5h14v15H5zM8.5 9h7M8.5 13h7M8.5 17h4" /></>,
+    homeoffice: <><path d="M4 11l8-6.5 8 6.5M6.5 9.6V19h11V9.6" /></>,
+    bonuses: <><circle cx="12" cy="12" r="7.6" /><path d="M12 7.8v8.4M9.6 9.5c0-1 1-1.7 2.4-1.7s2.4.7 2.4 1.7-1 1.5-2.4 1.5-2.4.7-2.4 1.7 1 1.7 2.4 1.7 2.4-.7 2.4-1.6" /></>,
+    'open-sessions': <><circle cx="12" cy="12" r="8" /><path d="M12 7.6V12l3 1.8" /></>,
+    notifications: <><path d="M6.5 10a5.5 5.5 0 0111 0c0 4 1.5 5.2 1.5 5.2H5s1.5-1.2 1.5-5.2M10.2 18.5a2 2 0 003.6 0" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18 6l-1.4 1.4M7.4 16.6L6 18M18 18l-1.4-1.4M7.4 7.4L6 6" /></>,
+  };
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      {p[id] ?? <circle cx="12" cy="12" r="8" />}
+    </svg>
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -393,10 +413,10 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
   return (
     <div className="fixed inset-0 z-50 flex bg-white">
       {/* Sidebar */}
-      <div className="w-56 flex-shrink-0 bg-gray-900 flex flex-col">
-        <div className="px-4 py-5 border-b border-gray-700">
-          <h1 className="text-white font-semibold text-base leading-tight">{t('Správa systému', 'System Management')}</h1>
-          <p className="text-gray-400 text-xs mt-0.5">Manager Panel</p>
+      <div className="w-56 flex-shrink-0 bg-[#262b31] flex flex-col tf-sans">
+        <div className="px-4 py-5 border-b border-white/10">
+          <h1 className="text-white font-semibold text-[15px] leading-tight">{t('Správa systému', 'System Management')}</h1>
+          <p className="text-[#8e9aa6] text-xs mt-0.5">Manager Panel</p>
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1">
           {tabs.map((tab) => (
@@ -404,13 +424,14 @@ export default function ManagerPanel({ orgId, onClose, initialTab, lang, scope }
               key={tab.id}
               data-mgr-tour={`mgr-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              style={activeTab === tab.id ? { boxShadow: 'inset 2px 0 0 #ffffff' } : undefined}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[7px] text-[13px] transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-[#2c3b4a] text-white font-medium'
+                  : 'text-[#bcc5cf] hover:bg-white/[0.06] hover:text-white font-normal'
               }`}
             >
-              <span className="text-base">{tab.icon}</span>
+              <MgrTabIcon id={tab.id} />
               <span className="flex-1 text-left">{tab.label}</span>
               {tab.id === 'requests' && pendingCount > 0 && (
                 <span className="flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold">
@@ -663,7 +684,7 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setShowAddForm(v => !v); setAddError(null); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showAddForm ? 'bg-slate-200 text-slate-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showAddForm ? 'bg-slate-200 text-slate-700' : 'bg-[#111820] text-white hover:bg-[#2a333e]'}`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
               Přidat záznam
@@ -691,15 +712,15 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Datum</label>
               <input type="date" value={addDate} onChange={e => setAddDate(e.target.value)} required
-                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Příchod <span className="text-red-500">*</span></label>
-              <TimeSelect value={addCheckIn} onChange={setAddCheckIn} selectClassName="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+              <TimeSelect value={addCheckIn} onChange={setAddCheckIn} selectClassName="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Odchod</label>
-              <TimeSelect value={addCheckOut} onChange={setAddCheckOut} selectClassName="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+              <TimeSelect value={addCheckOut} onChange={setAddCheckOut} selectClassName="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white" />
             </div>
             <div className="flex flex-col gap-1 min-w-[140px]">
               <label className="text-xs font-medium text-slate-600">Oddělení</label>
@@ -711,7 +732,7 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
                   setAddWorkTypeName(wt?.name ?? '');
                 }}
                 disabled={workTypes.length === 0}
-                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white disabled:bg-slate-50 disabled:text-slate-400"
               >
                 <option value="">{workTypes.length === 0 ? 'Nejprve přidejte typy práce' : '— bez oddělení —'}</option>
                 {workTypes.map(wt => (
@@ -722,11 +743,11 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
               <label className="text-xs font-medium text-slate-600">Poznámka</label>
               <input type="text" value={addNote} onChange={e => setAddNote(e.target.value)} placeholder="volitelná"
-                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20" />
             </div>
             <div className="flex gap-2 items-end">
               <button type="submit" disabled={adding}
-                className="px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                className="px-4 py-1.5 bg-[#111820] text-white text-sm font-semibold rounded-lg hover:bg-[#2a333e] disabled:opacity-50 transition-colors">
                 {adding ? '…' : 'Uložit'}
               </button>
               <button type="button" onClick={() => { setShowAddForm(false); setAddError(null); }}
@@ -740,7 +761,7 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
 
         {/* Summary bar */}
         {!loadingLogs && logs.length > 0 && (
-          <div className="px-6 py-2 bg-blue-50 border-b border-blue-100 shrink-0 flex gap-4 text-xs text-blue-700 font-medium">
+          <div className="px-6 py-2 bg-[#f4f2ef] border-b border-[#e9e7e3] shrink-0 flex gap-4 text-xs text-[#111820] font-medium">
             <span>{logs.length} záznamů</span>
             <span>{totalH.toFixed(2)} h celkem</span>
           </div>
@@ -750,7 +771,7 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
         <div className="flex-1 overflow-y-auto">
           {loadingLogs ? (
             <div className="flex items-center justify-center py-12">
-              <span className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <span className="w-6 h-6 border-2 border-[#d5d2cc] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : logs.length === 0 ? (
             <p className="text-center text-slate-400 text-sm py-12">Žádné záznamy pro {monthLabel}</p>
@@ -774,7 +795,7 @@ function EmpLogsModal({ empId, empName, orgId, onClose }: { empId: string; empNa
                     <td className="px-4 py-3 text-slate-600">{fmtTime(log.check_out)}</td>
                     <td className="px-4 py-3 text-slate-700 font-medium">{fmtDuration(log.check_in, log.check_out)}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-[#eceae4] text-[#111820]">
                         {log.work_type_name ?? log.note ?? '—'}
                       </span>
                     </td>
@@ -874,7 +895,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
         {isAdmin && (
           <button
             onClick={() => { setEditingEmployee(null); setShowForm(true); }}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="px-4 py-2 bg-[#111820] text-white text-sm rounded-lg hover:bg-[#2a333e] transition-colors font-medium"
           >
             {t('+ Přidat zaměstnance', '+ Add employee')}
           </button>
@@ -917,7 +938,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                     <td className="px-4 py-3 text-sm text-gray-500">{emp.position ?? '—'}</td>
                     <td className="px-4 py-3 text-sm">
                       {emp.tier ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#eceae4] text-[#111820]">
                           T{emp.tier}{emp.max_saturdays ? ` · ${emp.max_saturdays}So` : ''}
                         </span>
                       ) : <span className="text-gray-300">—</span>}
@@ -962,7 +983,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() => { setEditingEmployee(emp); setShowForm(true); }}
-                        className="text-blue-600 hover:text-blue-800 text-sm mr-3"
+                        className="text-[#111820] hover:text-[#111820] text-sm mr-3"
                       >
                         {t('Upravit', 'Edit')}
                       </button>
@@ -1065,13 +1086,13 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-text focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500"
+        className="flex flex-wrap gap-1.5 min-h-[38px] px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-text focus-within:ring-2 focus-within:ring-[#111820]/25 focus-within:border-[#111820]"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag) => (
-          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-xs font-medium">
+          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#eceae4] text-[#111820] text-xs font-medium">
             {tag}
-            <button type="button" onClick={(e) => { e.stopPropagation(); removeTag(tag); }} className="hover:text-blue-900 leading-none">✕</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); removeTag(tag); }} className="hover:text-[#111820] leading-none">✕</button>
           </span>
         ))}
         <input
@@ -1091,7 +1112,7 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
             <li
               key={s}
               onMouseDown={(e) => { e.preventDefault(); addTag(s); }}
-              className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700"
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-[#f4f2ef] hover:text-[#111820]"
             >
               {s}
             </li>
@@ -1286,7 +1307,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
                   min={0}
                   value={form.vacation_hours_offset}
                   onChange={(e) => set('vacation_hours_offset', Number(e.target.value))}
-                  className="w-14 text-xs border border-slate-200 rounded px-1.5 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  className="w-14 text-xs border border-slate-200 rounded px-1.5 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#111820]/15"
                   title={t('Kolik hodin dovolené zaměstnanci zbývá ke dni, kdy začal být sledován v systému. 0 = nenastaveno.', 'How many vacation hours the employee had remaining when system tracking began. 0 = not set.')}
                 />
                 <span className="text-[11px] text-slate-400">h</span>
@@ -1313,7 +1334,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
                       type="button"
                       onClick={() => set('tier', t_)}
                       title={descs[t_]}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${active ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-600 hover:border-blue-300'}`}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${active ? 'bg-[#111820] border-[#111820] text-white' : 'border-slate-200 text-slate-600 hover:border-[#d5d2cc]'}`}
                     >
                       {labels[t_]}
                     </button>
@@ -1486,7 +1507,7 @@ function EmployeeForm({ employee, existingPins, allLabels, onClose, onSaved, isA
 
           <div className="flex gap-3 pt-2 justify-end">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">{t('Zrušit', 'Cancel')}</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-[#111820] text-white rounded-lg hover:bg-[#2a333e] disabled:opacity-50">
               {saving ? t('Ukládám…', 'Saving…') : employee ? t('Uložit', 'Save') : t('Přidat', 'Add')}
             </button>
           </div>
@@ -1557,7 +1578,7 @@ function WorkTypesTab() {
         <p className="text-sm text-gray-500">{workTypes.length} typů</p>
         <button
           onClick={() => { setEditingWT(null); setShowForm(true); }}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium"
+          className="px-4 py-2 bg-[#111820] text-white text-sm rounded-lg hover:bg-[#2a333e] font-medium"
         >
           {t('+ Přidat oddělení', '+ Add department')}
         </button>
@@ -1596,7 +1617,7 @@ function WorkTypesTab() {
                     title={t('Posunout níž', 'Move down')}
                   >▼</button>
                   <div className="w-px h-4 bg-gray-200 mx-1" />
-                  <button onClick={() => { setEditingWT(wt); setShowForm(true); }} className="text-blue-600 hover:text-blue-800 text-sm">{t('Upravit', 'Edit')}</button>
+                  <button onClick={() => { setEditingWT(wt); setShowForm(true); }} className="text-[#111820] hover:text-[#111820] text-sm">{t('Upravit', 'Edit')}</button>
                   {deleteConfirm === wt.id ? (
                     <>
                       <button onClick={() => handleDelete(wt.id)} className="text-red-600 hover:text-red-800 text-sm">{t('Smazat?', 'Delete?')}</button>
@@ -1748,7 +1769,7 @@ function WorkTypeForm({ workType, onClose, onSaved }: WorkTypeFormProps) {
           </FormField>
           <div className="flex gap-3 pt-2 justify-end">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50">{t('Zrušit', 'Cancel')}</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-[#111820] text-white rounded-lg hover:bg-[#2a333e] disabled:opacity-50">
               {saving ? t('Ukládám…', 'Saving…') : workType ? t('Uložit', 'Save') : t('Přidat', 'Add')}
             </button>
           </div>
@@ -1845,7 +1866,7 @@ function VacationOverviewPanel() {
                   const wd = mondayWD(d);
                   const dayN = new Date(d + 'T00:00:00').getDate();
                   return (
-                    <th key={d} className={`px-0.5 py-2 text-center font-medium min-w-[28px] ${wd >= 5 ? 'text-blue-300' : ''}`}>
+                    <th key={d} className={`px-0.5 py-2 text-center font-medium min-w-[28px] ${wd >= 5 ? 'text-[#8a929c]' : ''}`}>
                       <div>{dayN}</div>
                       <div className="text-slate-500 text-[9px]">{DAY_NAMES[wd]}</div>
                     </th>
@@ -1864,7 +1885,7 @@ function VacationOverviewPanel() {
                       const wd = mondayWD(d);
                       const st = dayMap?.get(d);
                       return (
-                        <td key={d} className={`px-0.5 py-1 text-center ${wd >= 5 ? 'bg-blue-50/40' : ''}`}>
+                        <td key={d} className={`px-0.5 py-1 text-center ${wd >= 5 ? 'bg-[#f4f2ef]/60' : ''}`}>
                           {st === 'approved' && <span className="block w-5 h-5 rounded bg-emerald-400 mx-auto" title={t('Schválena', 'Approved')} />}
                           {st === 'pending' && <span className="block w-5 h-5 rounded bg-amber-300 mx-auto" title={t('Čeká', 'Pending')} />}
                         </td>
@@ -2088,7 +2109,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
                 </tr>
               ) : (
                 requests.map((req) => (
-                  <tr key={req.id} className={`hover:bg-gray-50 ${selectedIds.has(req.id) ? 'bg-blue-50' : ''}`}>
+                  <tr key={req.id} className={`hover:bg-gray-50 ${selectedIds.has(req.id) ? 'bg-[#f4f2ef]' : ''}`}>
                     {subTab === 'pending' && (
                       <td className="px-4 py-3 w-10">
                         <input
@@ -2237,7 +2258,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
                     <input
                       type="text" inputMode="decimal" value={otherApproval.hours}
                       onChange={(e) => setOtherApproval(prev => prev && ({ ...prev, hours: e.target.value.replace(/[^0-9.,]/g, '') }))}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#d5d2cc] focus:ring-2 focus:ring-[#e2e0dc] outline-none text-sm"
                     />
                   </div>
                   <div>
@@ -2245,7 +2266,7 @@ function RequestsTab({ onCountChange, isAdmin = false }: { onCountChange?: (n: n
                     <input
                       type="text" inputMode="decimal" value={otherApproval.bonus}
                       onChange={(e) => setOtherApproval(prev => prev && ({ ...prev, bonus: e.target.value.replace(/[^0-9.,]/g, '') }))}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#d5d2cc] focus:ring-2 focus:ring-[#e2e0dc] outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -2394,7 +2415,7 @@ function BenefitEntriesTab({ orgId }: { orgId: string }) {
         <div className="flex gap-1.5 flex-wrap">
           {['all', ...benefitKeys].map((k) => (
             <button key={k} onClick={() => setFilterKey(k)}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#d5d2cc]'}`}>
               {k === 'all' ? t('Vše', 'All') : `${BENEFIT_ICONS[k] ?? ''} ${t(BENEFIT_LABELS[k] ?? k, BENEFIT_LABELS[k] ?? k)}`}
             </button>
           ))}
@@ -2423,7 +2444,7 @@ function BenefitEntriesTab({ orgId }: { orgId: string }) {
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">{t('Záznamy', 'Entries')}</span>
-          {loading && <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />}
+          {loading && <span className="w-4 h-4 border-2 border-[#d5d2cc] border-t-transparent rounded-full animate-spin inline-block" />}
           <span className="text-xs text-slate-400">{filtered.length} {t('záznamů', 'records')}</span>
         </div>
         {filtered.length === 0 && !loading ? (
@@ -2530,7 +2551,7 @@ function HomeOfficeTab() {
 
   const pillCls = (active: boolean) =>
     `px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer whitespace-nowrap ${
-      active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+      active ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-gray-600 border-gray-300 hover:border-[#d5d2cc] hover:text-[#111820]'
     }`;
 
   return (
@@ -2562,7 +2583,7 @@ function HomeOfficeTab() {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#111820]/25"
         />
       </div>
 
@@ -2640,7 +2661,7 @@ function HomeOfficeTab() {
                 min={`${month}-01`}
                 max={(() => { const [y, m] = month.split('-').map(Number); return toISODateLocal(new Date(y, m, 0)); })()}
                 onChange={(e) => setDayFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#111820]/25"
               />
               {dayFilter && (
                 <button onClick={() => setDayFilter('')} className="text-xs text-gray-400 hover:text-gray-600 underline">
@@ -2689,7 +2710,7 @@ function HomeOfficeTab() {
                               {hasMore && (
                                 <button
                                   onClick={(e) => setNotePopup({ text: log.note!, x: e.clientX, y: e.clientY })}
-                                  className="shrink-0 mt-0.5 text-xs text-blue-500 hover:text-blue-700 font-medium underline underline-offset-2 whitespace-nowrap"
+                                  className="shrink-0 mt-0.5 text-xs text-[#5c6672] hover:text-[#111820] font-medium underline underline-offset-2 whitespace-nowrap"
                                 >
                                   {t('více', 'more')}
                                 </button>
@@ -2826,7 +2847,7 @@ function SettingsTab() {
             </p>
           )}
           <div className="pt-1">
-            <button type="submit" disabled={savingPwd} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
+            <button type="submit" disabled={savingPwd} className="px-4 py-2 bg-[#111820] text-white text-sm rounded-lg hover:bg-[#2a333e] disabled:opacity-50 font-medium">
               {savingPwd ? t('Ukládám…', 'Saving…') : t('Uložit heslo', 'Save password')}
             </button>
           </div>
@@ -2850,8 +2871,8 @@ function SettingsTab() {
           {empTypes.map((et) => {
             const paid = empConfigs[et]?.paidVacation ?? true;
             return (
-              <div key={et} className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl">
-                <span className="font-medium text-blue-900 text-sm">{et}</span>
+              <div key={et} className="flex items-center justify-between px-4 py-2.5 bg-[#f4f2ef] border border-[#e9e7e3] rounded-xl">
+                <span className="font-medium text-[#111820] text-sm">{et}</span>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                     <button
@@ -2880,7 +2901,7 @@ function SettingsTab() {
         </div>
         <div className="flex gap-2">
           <input
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25"
             placeholder={t('Přidat typ (např. DPP)', 'Add type (e.g. DPP)')}
             value={newEmpType}
             onChange={(e) => setNewEmpType(e.target.value)}
@@ -2899,7 +2920,7 @@ function SettingsTab() {
               const v = newEmpType.trim();
               if (v && !empTypes.includes(v)) { saveEmpTypes([...empTypes, v]); setNewEmpType(''); }
             }}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+            className="px-4 py-2 bg-[#111820] text-white text-sm rounded-lg hover:bg-[#2a333e] disabled:opacity-50 font-medium"
           >
             {savingEmpTypes ? '…' : t('Přidat', 'Add')}
           </button>
@@ -2916,7 +2937,7 @@ function SettingsTab() {
               role="switch"
               aria-checked={kioskEnabled}
               onClick={() => setKioskEnabled((v) => !v)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${kioskEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${kioskEnabled ? 'bg-[#111820]' : 'bg-gray-300'}`}
             >
               <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${kioskEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -3156,7 +3177,7 @@ function ToggleSetting({ label, description, settingKey }: ToggleSettingProps) {
   return (
     <label className="flex items-start gap-3 cursor-pointer select-none">
       <button type="button" role="switch" aria-checked={enabled} onClick={toggle} disabled={saving}
-        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-300'} disabled:opacity-60`}>
+        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${enabled ? 'bg-[#111820]' : 'bg-gray-300'} disabled:opacity-60`}>
         <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
       </button>
       <div>
@@ -3204,7 +3225,7 @@ function NumberSetting({ label, description, settingKey, defaultValue }: { label
           type="number"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
           min={0}
           step={1}
         />
@@ -3272,7 +3293,7 @@ function BonusSundayDepartmentSetting() {
               type="checkbox"
               checked={selected.includes(dept)}
               onChange={() => toggle(dept)}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+              className="w-4 h-4 rounded border-gray-300 text-[#111820] focus:ring-[#111820]/20"
             />
             <span className="text-sm text-gray-700">{dept}</span>
           </label>
@@ -3341,7 +3362,7 @@ function BonusDepartmentSetting() {
               type="checkbox"
               checked={selected.includes(dept)}
               onChange={() => toggle(dept)}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+              className="w-4 h-4 rounded border-gray-300 text-[#111820] focus:ring-[#111820]/20"
             />
             <span className="text-sm text-gray-700">{dept}</span>
           </label>
@@ -3447,7 +3468,7 @@ function SpecialDaysSetting() {
                 <span className="font-medium text-gray-800">
                   {formatDate(day.dateFrom)}{day.dateTo && day.dateTo !== day.dateFrom ? ` – ${formatDate(day.dateTo)}` : ''}
                 </span>
-                <span className="ml-2 text-blue-700 font-semibold">{day.pct} %</span>
+                <span className="ml-2 text-[#111820] font-semibold">{day.pct} %</span>
                 {day.label && <span className="ml-2 text-gray-500">· {day.label}</span>}
                 <span className="ml-2 text-gray-400">
                   · {day.departments.length > 0 ? day.departments.join(', ') : t('všechna oddělení', 'all departments')}
@@ -3478,7 +3499,7 @@ function SpecialDaysSetting() {
               type="date"
               value={addFrom}
               onChange={(e) => { setAddFrom(e.target.value); if (!addTo) setAddTo(e.target.value); }}
-              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
             />
           </div>
           <div>
@@ -3488,7 +3509,7 @@ function SpecialDaysSetting() {
               value={addTo}
               onChange={(e) => setAddTo(e.target.value)}
               min={addFrom}
-              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
             />
           </div>
         </div>
@@ -3503,7 +3524,7 @@ function SpecialDaysSetting() {
               min={0}
               max={500}
               step={1}
-              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
             />
           </div>
           <div>
@@ -3513,7 +3534,7 @@ function SpecialDaysSetting() {
               value={addLabel}
               onChange={(e) => setAddLabel(e.target.value)}
               placeholder={t('Vánoce 2025', 'Christmas 2025')}
-              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
             />
           </div>
         </div>
@@ -3528,7 +3549,7 @@ function SpecialDaysSetting() {
                     type="checkbox"
                     checked={addDepts.includes(dept)}
                     onChange={() => toggleDept(dept)}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                    className="w-4 h-4 rounded border-gray-300 text-[#111820] focus:ring-[#111820]/20"
                   />
                   <span className="text-sm text-gray-700">{dept}</span>
                 </label>
@@ -3540,7 +3561,7 @@ function SpecialDaysSetting() {
         <button
           onClick={handleAdd}
           disabled={saving || !addFrom}
-          className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-40"
+          className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#111820] hover:bg-[#2a333e] text-white transition-colors disabled:opacity-40"
         >
           {saving ? '…' : t('+ Přidat', '+ Add')}
         </button>
@@ -3624,10 +3645,10 @@ function OperatingHoursSetting() {
               <div className="flex items-center gap-2 ml-2">
                 <span className="text-xs text-gray-400">{t('Od', 'From')}</span>
                 <TimeSelect value={fromTime ?? '09:00'} onChange={(v) => setTime(key, 'from', v)}
-                  selectClassName="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+                  selectClassName="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white" />
                 <span className="text-xs text-gray-400">{t('Do', 'To')}</span>
                 <TimeSelect value={toTime ?? '18:00'} onChange={(v) => setTime(key, 'to', v)}
-                  selectClassName="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+                  selectClassName="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white" />
               </div>
             )}
           </div>
@@ -3704,9 +3725,9 @@ function ClosedDatesSetting() {
       )}
       <div className="flex items-center gap-2">
         <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20" />
         <button onClick={addDate} disabled={!newDate || saving}
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+          className="px-3 py-1.5 bg-[#111820] text-white text-sm font-semibold rounded-lg hover:bg-[#2a333e] disabled:opacity-50 transition-colors">
           {t('+ Přidat datum', '+ Add date')}
         </button>
         {saved && <span className="text-emerald-600 text-sm">✓ {t('Uloženo', 'Saved')}</span>}
@@ -3769,7 +3790,7 @@ function StaffingPerDaySetting() {
               max={99}
               value={values[key] ?? String(DOW_DEFAULT[i])}
               onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-              className={`w-full text-center border rounded-lg px-1 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+              className={`w-full text-center border rounded-lg px-1 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#111820]/20 ${
                 parseInt(values[key] ?? '0') === 0 ? 'border-gray-100 bg-gray-50 text-gray-300' : 'border-gray-200 text-gray-800'
               }`}
             />
@@ -3780,7 +3801,7 @@ function StaffingPerDaySetting() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="px-4 py-1.5 bg-[#111820] text-white text-sm font-semibold rounded-lg hover:bg-[#2a333e] disabled:opacity-50 transition-colors"
         >
           {saving ? t('Ukládám…', 'Saving…') : t('Uložit', 'Save')}
         </button>
@@ -3861,7 +3882,7 @@ function BenefitsSetting() {
             step={0.5}
             value={values[row.hoursKey] ?? String(row.defaultHours)}
             onChange={(e) => setValues((v) => ({ ...v, [row.hoursKey]: e.target.value }))}
-            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
           />
           <input
             type="number"
@@ -3869,7 +3890,7 @@ function BenefitsSetting() {
             min={0}
             value={values[row.maxKey] ?? String(row.defaultMax)}
             onChange={(e) => setValues((v) => ({ ...v, [row.maxKey]: e.target.value }))}
-            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
           />
         </div>
       ))}
@@ -3937,7 +3958,7 @@ function EveningShiftSetting() {
           role="switch"
           aria-checked={enabled}
           onClick={() => setEnabled((v) => !v)}
-          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${enabled ? 'bg-[#111820]' : 'bg-gray-300'}`}
         >
           <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
@@ -3945,22 +3966,22 @@ function EveningShiftSetting() {
       </label>
 
       {enabled && (
-        <div className="space-y-3 pl-2 border-l-2 border-blue-100">
+        <div className="space-y-3 pl-2 border-l-2 border-[#e9e7e3]">
           <div className="flex items-center gap-3 flex-wrap">
             <div>
               <p className="text-xs text-gray-500 mb-1">{t('Od', 'From')}</p>
               <TimeSelect value={startTime} onChange={setStartTime}
-                selectClassName="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+                selectClassName="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white" />
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">{t('Do', 'To')}</p>
               <TimeSelect value={endTime} onChange={setEndTime}
-                selectClassName="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+                selectClassName="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20 bg-white" />
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">{t('Min. lidí', 'Min. staff')}</p>
               <input type="number" min={1} max={20} value={minStaff} onChange={(e) => setMinStaff(e.target.value)}
-                className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#111820]/20" />
             </div>
           </div>
           <div>
@@ -3970,7 +3991,7 @@ function EveningShiftSetting() {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Prodejna"
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
             />
             <p className="text-xs text-gray-400 mt-1">{t('Zaměstnanci s tímto štítkem budou navrhováni pro večerní směnu.', 'Employees with this label will be suggested for the evening shift.')}</p>
           </div>
@@ -4138,7 +4159,7 @@ function DefaultVacationDaysSetting() {
         <input
           type="number" min={0} max={365} value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
         />
       </div>
       <button onClick={handleSave} disabled={saving}
@@ -4164,7 +4185,7 @@ function FormField({ label, error, children, className }: { label: string; error
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center py-12">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="w-6 h-6 border-2 border-[#111820] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }
@@ -4173,13 +4194,13 @@ function ErrorMessage({ message, onRetry }: { message: string; onRetry: () => vo
   return (
     <div className="text-center py-8">
       <p className="text-sm text-red-600 mb-3">{message}</p>
-      <button onClick={onRetry} className="text-sm text-blue-600 hover:text-blue-800 underline">Zkusit znovu</button>
+      <button onClick={onRetry} className="text-sm text-[#111820] hover:text-[#111820] underline">Zkusit znovu</button>
     </div>
   );
 }
 
 function inputCls(error?: string) {
-  return `block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+  return `block w-full rounded-lg border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 transition-colors ${
     error ? 'border-red-400 focus:ring-red-400' : 'border-gray-300'
   }`;
 }

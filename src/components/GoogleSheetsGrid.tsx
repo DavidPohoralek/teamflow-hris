@@ -205,13 +205,13 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Datum', 'Date')}</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer" />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 cursor-pointer" />
           </div>
           {isManagerMode && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
               <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 bg-white">
                 {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
                 {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
               </select>
@@ -220,7 +220,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
             <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 bg-white">
               {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
             </select>
           </div>
@@ -237,7 +237,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Poznámka', 'Note')}</label>
             <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Volitelná…', 'Optional…')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25" />
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" checked={isEvening} onChange={(e) => setIsEvening(e.target.checked)}
@@ -251,7 +251,7 @@ function AddShiftModal({ orgId, defaultDate, workTypes, isManagerMode, sessionPi
               {t('Zrušit', 'Cancel')}
             </button>
             <button type="submit" disabled={submitting}
-              className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              className="flex-1 py-2 rounded-xl bg-[#111820] text-white text-sm font-semibold hover:bg-[#2a333e] disabled:opacity-50 transition-colors">
               {submitting ? '…' : t('Přidat', 'Add')}
             </button>
           </div>
@@ -322,7 +322,7 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
             <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 bg-white">
               {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
             </select>
           </div>
@@ -347,7 +347,7 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder={t('Volitelná poznámka ke směně…', 'Optional shift note…')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 resize-none"
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -355,7 +355,7 @@ function EditShiftModal({ orgId, entry, workTypes, isManagerMode, sessionPin, on
             <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
               {t('Zrušit', 'Cancel')}
             </button>
-            <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-xl bg-[#111820] text-white text-sm font-semibold hover:bg-[#2a333e] disabled:opacity-50">
               {submitting ? '…' : t('Uložit', 'Save')}
             </button>
           </div>
@@ -470,7 +470,7 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('Zaměstnanec', 'Employee')}</label>
               <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 bg-white">
                 {employees.length === 0 && <option value="">{t('Načítám…', 'Loading…')}</option>}
                 {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
               </select>
@@ -479,7 +479,7 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('Typ práce', 'Work type')}</label>
             <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 bg-white">
               {workTypes.map((wt) => <option key={wt.id} value={wt.id}>{wt.name}</option>)}
             </select>
           </div>
@@ -502,14 +502,14 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
             <div className="flex gap-1.5 flex-wrap">
               {WEEKDAY_LABELS_CS.map((label, wd) => (
                 <button key={wd} type="button" onClick={() => toggleDay(wd)}
-                  className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${selectedDays.has(wd) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${selectedDays.has(wd) ? 'bg-[#111820] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
           {targetDays.length > 0 && (
-            <div className="text-sm text-blue-700 bg-blue-50 rounded-lg px-3 py-2 font-medium">
+            <div className="text-sm text-[#111820] bg-[#f4f2ef] rounded-lg px-3 py-2 font-medium">
               {t(`Zadá ${targetDays.length} směn v ${month}`, `Creates ${targetDays.length} shifts in ${month}`)}
             </div>
           )}
@@ -525,7 +525,7 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
               {t('Zrušit', 'Cancel')}
             </button>
             <button type="submit" disabled={!!progress || targetDays.length === 0}
-              className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              className="flex-1 py-2 rounded-xl bg-[#111820] text-white text-sm font-semibold hover:bg-[#2a333e] disabled:opacity-50 transition-colors">
               {progress ?? t('Zadat směny', 'Assign shifts')}
             </button>
           </div>
@@ -1385,7 +1385,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isQuietDay = isClosed || isDimmed;
             return (
               <td key={date}
-                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#f5f3ef] transition-colors duration-75 ${isStaged ? 'bg-blue-100/70 border-blue-300' : isToday ? 'bg-blue-50/60 border-blue-200' : 'border-[#f4f2ef]'}`}
+                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#f5f3ef] transition-colors duration-75 ${isStaged ? 'bg-[#111820]/[0.07] border-[#111820]/25' : isToday ? 'bg-[#111820]/[0.04] border-[#111820]/15' : 'border-[#f4f2ef]'}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
@@ -1540,7 +1540,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     <label key={dept} className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors">
                       <input type="checkbox" checked={deptFilters.includes(dept)}
                         onChange={() => setDeptFilters((prev) => prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept])}
-                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-400" />
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-[#111820] focus:ring-[#111820]/20" />
                       <span className="text-xs font-medium text-slate-700">{dept}</span>
                     </label>
                   ))}
@@ -1748,7 +1748,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               <tr>
                 <td colSpan={8} className="py-12 text-center text-gray-400 text-sm">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[#8a929c] border-t-transparent rounded-full animate-spin" />
                     {t('Načítám…', 'Loading…')}
                   </div>
                 </td>

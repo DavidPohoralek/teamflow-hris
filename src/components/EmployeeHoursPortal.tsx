@@ -377,13 +377,13 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4">
         <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
           {/* Header — fixed, never scrolls */}
-          <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+          <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-5 border-b border-[#e9e7e3] bg-[#fbfaf8] tf-sans">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-slate-700 bg-clip-text text-transparent">
+                <h2 className="text-xl font-semibold text-[#111820]">
                   {data.name}
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">Přehled odpracovaných hodin</p>
+                <p className="text-xs text-[#8a929c] mt-0.5">Přehled odpracovaných hodin</p>
               </div>
               <button
                 onClick={onClose}
@@ -406,25 +406,25 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             const adjustedHours = data.thisMonth.hours + benefitImpact;
             return (
           <div className="grid grid-cols-2 gap-3 px-4 sm:px-6 py-4 sm:py-5">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-blue-100">
-              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1 sm:mb-3">Tento měsíc</p>
-              <p className="text-2xl sm:text-4xl font-bold text-blue-700 leading-none">{adjustedHours.toFixed(2)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
+            <div className="bg-[#f1efe9] rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-[#e9e7e3]">
+              <p className="text-[10px] font-medium text-[#8a929c] uppercase tracking-[.1em] mb-1 sm:mb-3">Tento měsíc</p>
+              <p className="tf-mono text-2xl sm:text-4xl font-semibold text-[#111820] leading-none">{adjustedHours.toFixed(2)}<span className="text-base sm:text-xl ml-1 font-normal">h</span></p>
               {benefitImpact !== 0 && (
                 <p className={`text-xs font-semibold mt-0.5 ${benefitImpact < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                   {data.thisMonth.hours.toFixed(2)} h {benefitImpact > 0 ? '+' : ''}{benefitImpact.toFixed(2)} h aktivity
                 </p>
               )}
-              <p className="text-xs sm:text-sm text-blue-600 mt-1 font-medium">{data.thisMonth.days} dní</p>
-              <p className="text-xs text-blue-400 mt-0.5 capitalize hidden sm:block">{thisMonthName}</p>
+              <p className="text-xs sm:text-sm text-[#5c6672] mt-1">{data.thisMonth.days} dní</p>
+              <p className="text-xs text-[#8a929c] mt-0.5 capitalize hidden sm:block">{thisMonthName}</p>
             </div>
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-slate-200">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 sm:mb-3">Minulý měsíc</p>
-              <p className="text-2xl sm:text-4xl font-bold text-slate-700 leading-none">{(data.lastMonth.hours + (data.lastMonth.saturdayBonusHours ?? 0)).toFixed(2)}<span className="text-base sm:text-xl ml-1 font-medium">h</span></p>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1 sm:mt-1.5 font-medium">{data.lastMonth.days} dní</p>
+            <div className="bg-[#fbfaf8] rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-[#e9e7e3]">
+              <p className="text-[10px] font-medium text-[#8a929c] uppercase tracking-[.1em] mb-1 sm:mb-3">Minulý měsíc</p>
+              <p className="tf-mono text-2xl sm:text-4xl font-semibold text-[#111820] leading-none">{(data.lastMonth.hours + (data.lastMonth.saturdayBonusHours ?? 0)).toFixed(2)}<span className="text-base sm:text-xl ml-1 font-normal">h</span></p>
+              <p className="text-xs sm:text-sm text-[#5c6672] mt-1 sm:mt-1.5">{data.lastMonth.days} dní</p>
               {(data.lastMonth.saturdayBonusHours ?? 0) > 0 && (
                 <p className="text-xs text-amber-500 mt-0.5">vč. bonusů za soboty +{data.lastMonth.saturdayBonusHours!.toFixed(2)}h</p>
               )}
-              <p className="text-xs text-slate-400 mt-0.5 capitalize hidden sm:block">{lastMonthName}</p>
+              <p className="text-xs text-[#8a929c] mt-0.5 capitalize hidden sm:block">{lastMonthName}</p>
             </div>
           </div>
             );
@@ -538,7 +538,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                     loggedToday
                                       ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default'
                                       : canLog
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                        ? 'bg-[#111820] text-white hover:bg-[#2a333e]'
                                         : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                   }`}
                                 >
@@ -568,12 +568,12 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                   value={retroDate}
                                   max={today}
                                   onChange={(e) => setRetroDatePicker((prev) => ({ ...prev, [b.key]: e.target.value }))}
-                                  className="border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  className="border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
                                 />
                                 <button
                                   onClick={() => !retroAlreadyLogged && logBenefit(b.key, retroDate)}
                                   disabled={isSaving || retroAlreadyLogged || !retroDate}
-                                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${retroAlreadyLogged ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'}`}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${retroAlreadyLogged ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default' : 'bg-[#111820] text-white hover:bg-[#2a333e] disabled:opacity-50'}`}
                                 >
                                   {isSaving ? '…' : retroAlreadyLogged ? '✓ Zadáno' : 'Zadat'}
                                 </button>
@@ -585,7 +585,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                   const isToday = e.date === today;
                                   const isDeleting = deletingBenefitId === e.id;
                                   return (
-                                    <span key={e.id} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${isToday ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                                    <span key={e.id} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${isToday ? 'bg-[#eceae4] text-[#111820]' : 'bg-slate-100 text-slate-600'}`}>
                                       {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit' })}
                                       <button
                                         onClick={() => !isDeleting && deleteBenefitEntry(e.id, e.benefit_key)}
@@ -657,7 +657,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                       <button
                         key={f}
                         onClick={() => setLogFilter(f)}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${logFilter === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${logFilter === f ? 'bg-[#111820] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                       >
                         {f === 'today' ? 'Dnes' : f === '7d' ? '7 dní' : f === '30d' ? '30 dní' : 'Vše'}
                       </button>
@@ -685,7 +685,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                           filtered.map((rec, i) => {
                             const isComplete = rec.departure !== null;
                             return (
-                              <tr key={i} className={`border-b border-slate-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-blue-50/40`}>
+                              <tr key={i} className={`border-b border-slate-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} hover:bg-[#f4f2ef]/60`}>
                                 <td className="px-4 py-3 text-slate-900 font-semibold">{formatDate(rec.date)}</td>
                                 <td className="px-4 py-3 text-slate-600">{formatTime(rec.arrival)}</td>
                                 <td className="px-4 py-3 text-slate-600">{formatTime(rec.departure)}</td>
@@ -696,7 +696,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                                       rec.category === 'Dovolená'
                                         ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                                        : 'bg-blue-100 text-blue-700'
+                                        : 'bg-[#eceae4] text-[#111820]'
                                     }`}>{rec.category === 'Dovolená' ? '🏖️ Dovolená' : rec.category}</span>
                                     {(rec.satBonusHours ?? 0) > 0 && (
                                       <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
@@ -731,7 +731,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                   <span className="text-xs text-slate-500">{requests.length} žádostí celkem</span>
                   <button
                     onClick={() => setShowRequestModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#111820] hover:bg-[#2a333e] rounded-lg transition shadow-sm"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M12 5v14M5 12h14" strokeLinecap="round" />
@@ -741,7 +741,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                 </div>
                 {requestsLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="inline-block w-5 h-5 border-2 border-[#8a929c] border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : requests.length === 0 ? (
                   <p className="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-xl border border-slate-100">Žádné žádosti</p>
@@ -807,7 +807,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             {activeTab === 'ho' && (
               hoLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="inline-block w-5 h-5 border-2 border-[#8a929c] border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : hoLogs.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-xl border border-slate-100">Žádné HomeOffice záznamy</p>
@@ -826,7 +826,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm font-semibold text-slate-800">{dayName} {dateStr}</span>
                           {hours && (
-                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{hours} h</span>
+                            <span className="text-xs font-medium text-[#111820] bg-[#f4f2ef] px-2 py-0.5 rounded-full">{hours} h</span>
                           )}
                         </div>
                         {log.note ? (
