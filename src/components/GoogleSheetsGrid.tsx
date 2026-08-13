@@ -1607,26 +1607,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {/* PIN session — kept green */}
           {!isManagerMode && (
             sessionEmployee ? (
-              <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: '#eef6ef', border: '1px solid #cfdfd2' }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <div className="flex flex-col leading-tight">
-                  <span className="text-[12px] font-medium" style={{ color: '#41654a' }}>{sessionEmployee.name}</span>
-                  {(() => {
-                    const hw = computePlannedHours(sessionEmployee.id, stickyDays);
-                    const hm = computeMonthlyHours(sessionEmployee.id);
-                    const fmt = (h: number) => Number.isInteger(h) ? String(h) : h.toFixed(1);
-                    return (
-                      <>
-                        {hw > 0 && <span className="tf-mono text-[10px]" style={{ color: '#5f7f66' }}>{fmt(hw)} h {t('tento týden', 'this week')}</span>}
-                        {hm > 0 && <span className="tf-mono text-[10px]" style={{ color: '#7f9884' }}>{fmt(hm)} h {t('tento měsíc', 'this month')}</span>}
-                      </>
-                    );
-                  })()}
-                </div>
+              // Green login pill — unified with the Dovolená chip
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-[7px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
                 <button
                   onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
-                  className="text-xs ml-1 transition-colors"
-                  style={{ color: '#7f9884' }}
+                  className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1 shrink-0"
+                  title={t('Odhlásit', 'Log out')}
                 >✕</button>
               </div>
             ) : (
