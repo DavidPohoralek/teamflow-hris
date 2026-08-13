@@ -1352,7 +1352,13 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       return (
         <tr key={`${emp.id}-${wDays[0]}`}
           className="group border-b border-[#f4f2ef] last:border-b-0 bg-white transition-colors duration-75">
-          <td className="sticky left-0 z-10 px-3.5 py-[3px] border-r border-[#ececea] bg-inherit group-hover:bg-[#fbfaf8] transition-colors duration-75 h-[31px]">
+          <td
+            className="sticky left-0 z-10 pl-3 pr-3.5 py-[3px] border-r border-[#ececea] transition-colors duration-75 h-[31px]"
+            style={{
+              backgroundColor: deptColor ? catColors(deptColor).tint : '#ffffff',
+              borderLeft: `3px solid ${deptColor ? catColors(deptColor).solid : 'transparent'}`,
+            }}
+          >
             <div className="flex items-center gap-1.5 min-w-0">
               {/* Narrow screens: department shown as a color dot before the name */}
               {emp.department && deptColor && (

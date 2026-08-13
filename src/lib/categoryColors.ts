@@ -14,6 +14,7 @@ export interface CategoryColors {
   fill: string;
   text: string;
   solid: string;
+  tint: string; // very light opaque wash — row banding in the shifts grid
 }
 
 // ── sRGB ↔ OKLab (standard Björn Ottosson matrices) ─────────────────────────
@@ -67,7 +68,7 @@ function oklchToHex(L: number, C: number, H: number): string {
   return `#${toByte(r)}${toByte(g)}${toByte(bl)}`;
 }
 
-const NEUTRAL: CategoryColors = { fill: '#eef1f4', text: '#7d8792', solid: '#8a929c' };
+const NEUTRAL: CategoryColors = { fill: '#eef1f4', text: '#7d8792', solid: '#8a929c', tint: '#faf9f7' };
 
 const cache = new Map<string, CategoryColors>();
 
@@ -81,6 +82,7 @@ export function catColors(hex: string | null | undefined): CategoryColors {
     fill: oklchToHex(0.95, 0.035, hue),
     text: oklchToHex(0.45, 0.09, hue),
     solid: oklchToHex(0.62, 0.10, hue),
+    tint: oklchToHex(0.975, 0.018, hue),
   };
   cache.set(hex, result);
   return result;
