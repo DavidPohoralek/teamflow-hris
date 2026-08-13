@@ -347,12 +347,15 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
               <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: '#111820' }}>{totalCount}</div>
               <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{t('Celkem přítomno', 'Total present')}</div>
             </div>
-            {activeTypes.map((type) => (
-              <div key={type} className="rounded-[9px] border border-[#e2e0dc] bg-white px-4 py-3">
-                <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: '#111820' }}>{countByType[type]}</div>
-                <div className="text-[12px] mt-1.5" style={{ color: '#5c6672' }}>{type}</div>
-              </div>
-            ))}
+            {activeTypes.map((type) => {
+              const cat = catColors(workTypeColorMap.get(type));
+              return (
+                <div key={type} className="rounded-[9px] border px-4 py-3" style={{ backgroundColor: cat.fill, borderColor: `${cat.solid}55` }}>
+                  <div className="tf-mono text-[22px] font-medium leading-none" style={{ color: cat.text }}>{countByType[type]}</div>
+                  <div className="text-[12px] mt-1.5 font-medium" style={{ color: cat.text }}>{type}</div>
+                </div>
+              );
+            })}
           </div>
         );
       })()}
