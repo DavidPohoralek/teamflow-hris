@@ -49,28 +49,17 @@ export async function GET(req: NextRequest) {
   const empType = employee.employment_type ?? '';
   const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
 
-  if (!hasPaidVacation) {
-    return NextResponse.json({
-      hasPaidVacation: false,
-      totalDays: 0,
-      totalHours: 0,
-      usedDays: 0,
-      usedHours: 0,
-      pendingDays: 0,
-      pendingHours: 0,
-      remainingDays: 0,
-      remainingHours: 0,
-    });
-  }
-
-  const totalDays = employee.vacation_days_per_year ?? defaultVacationDays;
+  // Employees without a paid-vacation entitlement still book unpaid vacation days,
+  // so we compute their consumed/planned days below — only the entitlement-based
+  // totals (total, remaining) are zeroed for them.
   const hoursPerDay = 8;
+  const totalDays = hasPaidVacation ? (employee.vacation_days_per_year ?? defaultVacationDays) : 0;
   const totalHours = totalDays * hoursPerDay;
   // vacation_hours_offset = employee's REMAINING vacation hours as a starting balance
   // (hours they still had left when we started tracking in the system).
   // 0 = not set → use full totalDays as starting balance.
   const offsetHours = Number((employee as { vacation_hours_offset?: number }).vacation_hours_offset ?? 0);
-  const effectiveStartDays = offsetHours > 0 ? offsetHours / hoursPerDay : totalDays;
+  const effectiveStartDays = !hasPaidVacation ? 0 : (offsetHours > 0 ? offsetHours / hoursPerDay : totalDays);
   const currentYear = new Date().getFullYear();
 
   // Load vacation requests overlapping the current year — a range straddling
@@ -117,7 +106,7 @@ export async function GET(req: NextRequest) {
   const usedDays = displayConsumedDays + futurePlannedDays;
 
   return NextResponse.json({
-    hasPaidVacation: true,
+    hasPaidVacation,
     totalDays,
     totalHours,
     consumedDays: displayConsumedDays,

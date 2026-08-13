@@ -648,16 +648,19 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
       .catch(() => {});
   }, [isManagerMode, balancesYear, requests]);
 
-  // Employee (non-manager) view: publish the person's own balance to the sidebar
+  // Employee (non-manager) view: publish the person's own balance to the sidebar.
+  // Shown for anyone logged in via PIN — no-entitlement contracts still see their
+  // used/planned days (remaining is only meaningful with a paid entitlement).
   useEffect(() => {
-    if (isManagerMode || !vacBalance || !vacBalance.hasPaidVacation) return;
+    if (isManagerMode || !sessionEmployee || !vacBalance) return;
     window.dispatchEvent(new CustomEvent('tf:vacation-context', { detail: {
       scope: 'me',
+      hasPaidVacation: vacBalance.hasPaidVacation,
       usedHours: Math.round(vacBalance.consumedHours),
       plannedHours: Math.round(vacBalance.futurePlannedHours),
       remainingHours: Math.round(vacBalance.remainingHours),
     } }));
-  }, [isManagerMode, vacBalance]);
+  }, [isManagerMode, sessionEmployee, vacBalance]);
 
   // Clear the sidebar dashboard when leaving the Dovolená tab
   useEffect(() => {

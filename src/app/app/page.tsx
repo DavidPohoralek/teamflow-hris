@@ -105,7 +105,7 @@ export default function HomePage() {
     categories: { name: string; count: number; color: string }[]
   }>({ session: null, categories: [] })
   // Vacation dashboard published by VacationPlanner — used/planned/remaining hours
-  const [vacationCtx, setVacationCtx] = useState<{ scope: 'org' | 'me'; usedHours: number; plannedHours: number; remainingHours: number } | null>(null)
+  const [vacationCtx, setVacationCtx] = useState<{ scope: 'org' | 'me'; hasPaidVacation?: boolean; usedHours: number; plannedHours: number; remainingHours: number } | null>(null)
 
   const [currentMonth, setCurrentMonth] = useState<string>(() => {
     const now = new Date()
@@ -473,19 +473,20 @@ export default function HomePage() {
               {vacationCtx.scope === 'me' ? t('Moje dovolená', 'My vacation') : t('Dovolená týmu', 'Team vacation')}
             </div>
             {(() => {
-              const total = Math.max(1, vacationCtx.usedHours + vacationCtx.plannedHours + vacationCtx.remainingHours)
+              const showRemaining = vacationCtx.scope === 'org' || vacationCtx.hasPaidVacation !== false
+              const total = Math.max(1, vacationCtx.usedHours + vacationCtx.plannedHours + (showRemaining ? vacationCtx.remainingHours : 0))
               const seg = (h: number) => `${(h / total) * 100}%`
               const rows: { label: string; hours: number; dot: string }[] = [
                 { label: t('Vyčerpáno', 'Used'), hours: vacationCtx.usedHours, dot: '#c25b52' },
                 { label: t('Naplánováno', 'Planned'), hours: vacationCtx.plannedHours, dot: '#c99a3a' },
-                { label: t('Zbývá', 'Remaining'), hours: vacationCtx.remainingHours, dot: '#3f9e6a' },
+                ...(showRemaining ? [{ label: t('Zbývá', 'Remaining'), hours: vacationCtx.remainingHours, dot: '#3f9e6a' }] : []),
               ]
               return (
                 <>
                   <div className="flex h-2 rounded-full overflow-hidden mb-3" style={{ background: darkSide ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
                     <div style={{ width: seg(vacationCtx.usedHours), background: '#c25b52' }} />
                     <div style={{ width: seg(vacationCtx.plannedHours), background: '#c99a3a' }} />
-                    <div style={{ width: seg(vacationCtx.remainingHours), background: '#3f9e6a' }} />
+                    {showRemaining && <div style={{ width: seg(vacationCtx.remainingHours), background: '#3f9e6a' }} />}
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {rows.map((r) => (
