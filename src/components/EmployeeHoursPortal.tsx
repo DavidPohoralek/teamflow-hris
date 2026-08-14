@@ -129,12 +129,24 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [hoEnabled, setHoEnabled] = useState(false);
   const [hoLogs, setHoLogs] = useState<{ id: string; date: string; checkIn: string | null; checkOut: string | null; note: string | null }[]>([]);
   const [hoLoading, setHoLoading] = useState(false);
+  // Live "X lidí ve směně" count — same silent status as the attendance kiosk
+  const [presentCount, setPresentCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/public/company-settings?orgId=${encodeURIComponent(orgId)}`)
       .then((r) => r.json())
       .then((d) => { if (d.require_ho_activity_report) setHoEnabled(true); })
       .catch(() => {});
+  }, [orgId]);
+
+  useEffect(() => {
+    const load = () => fetch(`/api/public/presence?orgId=${encodeURIComponent(orgId)}`)
+      .then((r) => r.json())
+      .then((d: { summary?: { total?: number } }) => setPresentCount(d?.summary?.total ?? null))
+      .catch(() => {});
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
   }, [orgId]);
 
   const fetchVacationBalance = async (enteredPin: string) => {
@@ -882,6 +894,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       onConfirm={handlePinSubmit}
       loading={loading}
       error={error || null}
+      status={presentCount != null && presentCount > 0
+        ? { dot: '#3f9e6a', text: presentCount === 1 ? '1 člověk ve směně' : `${presentCount} lidí ve směně` }
+        : null}
     />
   );
 }
