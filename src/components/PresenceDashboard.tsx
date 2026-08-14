@@ -408,28 +408,27 @@ export default function PresenceDashboard({ orgId, isManagerMode }: PresenceDash
                 </div>
 
                 {isManagerMode && (
-                  <div className="mt-3 border-t border-gray-100 pt-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-500"><span className="font-medium text-gray-600">ID:</span> {record.employeeId}</div>
-                      <button onClick={() => isEditing ? setEditingId(null) : openEdit(record)} className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                  <div className="mt-3 border-t border-[#f4f2ef] pt-3">
+                    <div className="flex items-center justify-end">
+                      <button onClick={() => isEditing ? setEditingId(null) : openEdit(record)} className="rounded-md border border-[#e2e0dc] px-2.5 py-1 text-xs font-medium text-[#5c6672] hover:border-[#d5d2cc] hover:bg-[#f4f2ef] hover:text-[#111820] transition-colors">
                         {isEditing ? t('Zavřít', 'Close') : t('Upravit', 'Edit')}
                       </button>
                     </div>
                     {isEditing && (
-                      <div className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-600 space-y-2">
-                        <p className="font-medium text-gray-700">{t('Ruční úprava příchodu/odchodu', 'Manual clock-in/out adjustment')}</p>
+                      <div className="mt-3 rounded-md bg-[#fbfaf8] border border-[#e9e7e3] p-3 text-xs text-[#5c6672] space-y-2">
+                        <p className="font-medium text-[#111820]">{t('Ruční úprava příchodu/odchodu', 'Manual clock-in/out adjustment')}</p>
                         <div className="flex gap-2">
                           <div className="flex-1">
-                            <label className="block mb-1 text-gray-500">{t('Příchod', 'Clock in')}</label>
-                            <TimeSelect value={editCheckIn} onChange={setEditCheckIn} selectClassName="rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none bg-white" />
+                            <label className="block mb-1 text-[#8a929c]">{t('Příchod', 'Clock in')}</label>
+                            <TimeSelect value={editCheckIn} onChange={setEditCheckIn} selectClassName="rounded border border-[#e2e0dc] px-2 py-1 text-xs focus:border-[#8a929c] focus:outline-none bg-white" />
                           </div>
                           <div className="flex-1">
-                            <label className="block mb-1 text-gray-500">{t('Odchod', 'Clock out')}</label>
-                            <TimeSelect value={editCheckOut} onChange={setEditCheckOut} selectClassName="rounded border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none bg-white" />
+                            <label className="block mb-1 text-[#8a929c]">{t('Odchod', 'Clock out')}</label>
+                            <TimeSelect value={editCheckOut} onChange={setEditCheckOut} selectClassName="rounded border border-[#e2e0dc] px-2 py-1 text-xs focus:border-[#8a929c] focus:outline-none bg-white" />
                           </div>
                         </div>
                         {editError && <p className="text-red-500">{editError}</p>}
-                        <button onClick={() => handleSaveEdit(record)} disabled={editSaving} className="mt-1 w-full rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                        <button onClick={() => handleSaveEdit(record)} disabled={editSaving} className="mt-1 w-full rounded-md bg-[#111820] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#2a333e] transition-colors disabled:opacity-50">
                           {editSaving ? '…' : t('Uložit změny', 'Save changes')}
                         </button>
                       </div>
