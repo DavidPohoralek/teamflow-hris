@@ -29,27 +29,21 @@ function fmtTime(iso: string | null): string {
   }
 }
 
-const REQUEST_TYPES: { type: RequestType; emoji: string; label: string; color: string; selected: string }[] = [
+const REQUEST_TYPES: { type: RequestType; label: string; icon: React.ReactNode }[] = [
   {
     type: 'sick',
-    emoji: '🤒',
     label: 'Nemoc',
-    color: 'border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700',
-    selected: 'border-orange-500 bg-orange-100 text-orange-800 ring-2 ring-orange-400',
+    icon: <><path d="M12 8v8M8 12h8" /><rect x="4" y="4" width="16" height="16" rx="4" /></>,
   },
   {
     type: 'correction',
-    emoji: '✏️',
     label: 'Oprava docházky',
-    color: 'border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700',
-    selected: 'border-purple-500 bg-purple-100 text-purple-800 ring-2 ring-purple-400',
+    icon: <><path d="M4 20h4L18.4 9.6a2 2 0 00-2.8-2.8L4 18.2V20z" /><path d="M14.5 7.5l2.8 2.8" /></>,
   },
   {
     type: 'other',
-    emoji: '📝',
     label: 'Ostatní',
-    color: 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700',
-    selected: 'border-slate-500 bg-slate-100 text-slate-800 ring-2 ring-slate-400',
+    icon: <><path d="M6 3.5h8l4 4V20.5H6zM14 3.5v4h4" /><path d="M9 12h6M9 15.5h4" /></>,
   },
 ];
 
@@ -223,9 +217,11 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
         <form onSubmit={handleSubmit} className="flex-1 overflow-auto px-6 py-5 flex flex-col gap-5">
           {/* Request type */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">Typ žádosti</label>
+            <label className="block text-sm font-semibold text-[#111820] mb-3">Typ žádosti</label>
             <div className="grid grid-cols-2 gap-3">
-              {REQUEST_TYPES.map(({ type, emoji, label, color, selected }) => (
+              {REQUEST_TYPES.map(({ type, label, icon }) => {
+                const isSel = selectedType === type;
+                return (
                 <button
                   key={type}
                   type="button"
@@ -241,14 +237,15 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                     setOtherBonusPct('');
                     setError('');
                   }}
-                  className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                    selectedType === type ? selected : color
+                  className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-[10px] border font-semibold text-sm transition-colors ${
+                    isSel ? 'border-[#111820] bg-[#f1efe9] text-[#111820]' : 'border-[#e2e0dc] bg-white text-[#5c6672] hover:bg-[#f4f2ef] hover:text-[#111820]'
                   }`}
                 >
-                  <span className="text-2xl leading-none">{emoji}</span>
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
                   <span>{label}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -281,7 +278,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
 
                   {dateLogsLoading ? (
                     <div className="flex items-center gap-2 text-slate-400 text-sm py-3">
-                      <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-purple-500 rounded-full animate-spin" />
+                      <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-[#111820] rounded-full animate-spin" />
                       Načítám záznamy…
                     </div>
                   ) : dateLogs.length === 0 ? (
@@ -300,14 +297,14 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                             onClick={() => handleSelectLog(log)}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                               isSelected
-                                ? 'border-purple-500 bg-purple-50'
-                                : 'border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-purple-50/40'
+                                ? 'border-[#111820] bg-[#f1efe9]'
+                                : 'border-slate-200 bg-slate-50 hover:border-[#d5d2cc] hover:bg-[#f4f2ef]'
                             }`}
                           >
                             <span className="text-base shrink-0">{missingOut ? '⚠️' : '✅'}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`font-semibold text-sm ${isSelected ? 'text-purple-800' : 'text-slate-700'}`}>
+                                <span className={`font-semibold text-sm ${isSelected ? 'text-[#111820]' : 'text-slate-700'}`}>
                                   {fmtTime(log.check_in)} → {fmtTime(log.check_out)}
                                 </span>
                                 {missingOut && (
@@ -321,7 +318,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                               )}
                             </div>
                             <div className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                              isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300'
+                              isSelected ? 'border-[#111820] bg-[#111820]' : 'border-slate-300'
                             }`}>
                               {isSelected && (
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -353,8 +350,8 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                         onClick={() => { setCorrectionField(value); setTimeIn(''); setTimeOut(''); }}
                         className={`flex-1 py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                           correctionField === value
-                            ? 'border-purple-500 bg-purple-50 text-purple-700'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300'
+                            ? 'border-[#111820] bg-[#f1efe9] text-[#111820]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-[#d5d2cc]'
                         }`}
                       >
                         {label}
@@ -379,7 +376,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                           </span>
                         )}
                       </label>
-                      <TimeSelect value={timeIn} onChange={setTimeIn} selectClassName="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm bg-white" />
+                      <TimeSelect value={timeIn} onChange={setTimeIn} selectClassName="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm bg-white" />
                     </div>
                   )}
                   {(correctionField === 'check_out' || correctionField === 'both') && (
@@ -392,7 +389,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                           </span>
                         )}
                       </label>
-                      <TimeSelect value={timeOut} onChange={setTimeOut} selectClassName="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-slate-800 transition text-sm bg-white" />
+                      <TimeSelect value={timeOut} onChange={setTimeOut} selectClassName="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm bg-white" />
                     </div>
                   )}
                 </div>
