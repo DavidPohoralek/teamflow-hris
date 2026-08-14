@@ -496,7 +496,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                     <Tooltip content={<CustomTooltip unit="h" />} />
                     <Bar dataKey="workedHours" name="Odpracováno" radius={[3, 3, 0, 0]} maxBarSize={18}>
                       {dailyData.map((d, i) => (
-                        <Cell key={i} fill={d.isWeekend ? '#e6d4ad' : '#111820'} />
+                        <Cell key={i} fill={d.isWeekend ? '#bfdbfe' : '#3b82f6'} />
                       ))}
                     </Bar>
                     <Line
@@ -512,8 +512,8 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                   </ComposedChart>
                 </ResponsiveContainer>
                 <div className="flex gap-5 mt-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-[#111820]" />Odpracováno</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-[#e6d4ad]" />Sobota</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-blue-500" />Odpracováno</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-blue-200" />Sobota</span>
                   <span className="flex items-center gap-1.5 ml-1">
                     <svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3"/></svg>
                     Plán
@@ -745,7 +745,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
               <div className="space-y-3">
                 {workTypeBreakdown.map((wt, i) => {
                   const maxH = workTypeBreakdown[0].hours;
-                  const COLORS = ['#111820','#8b5cf6','#f59e0b','#10b981','#f97316','#ef4444','#06b6d4'];
+                  const COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#f97316','#ef4444','#06b6d4'];
                   const color = COLORS[i % COLORS.length];
                   return (
                     <div key={wt.name} className="flex items-center gap-3">
