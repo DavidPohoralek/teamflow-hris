@@ -373,7 +373,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
           <select
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
-            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 appearance-none cursor-pointer font-medium text-slate-700"
+            className="pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#111820]/20 appearance-none cursor-pointer font-medium text-slate-700"
           >
             <option value="__all__">Všechna oddělení</option>
             {allDepts.map((d) => (
@@ -399,7 +399,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
             value={nameSearch}
             onChange={(e) => setNameSearch(e.target.value)}
             placeholder="Hledat zaměstnance…"
-            className="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 w-48"
+            className="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#111820]/20 w-48"
           />
         </div>
 
@@ -437,7 +437,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                   if (active) next.delete(emp.id); else next.add(emp.id);
                   return next;
                 })}
-                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}
+                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${active ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#8a929c]'}`}
               >
                 {emp.name}
               </button>
@@ -454,7 +454,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
         <>
           {/* ── KPI cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <SummaryCard label="Zaměstnanců" value={String(filteredStats.length)} icon="👥" color="bg-blue-50 border-blue-100"
+            <SummaryCard label="Zaměstnanců" value={String(filteredStats.length)} icon="👥" color="bg-[#f4f2ef] border-[#e9e7e3]"
               sub={selectedDept !== '__all__' ? selectedDept : undefined} />
             <SummaryCard label="Odpracováno / Fond" icon="⏱️" color="bg-violet-50 border-violet-100"
               value={`${totalWorked.toFixed(0)}h`}
@@ -496,7 +496,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                     <Tooltip content={<CustomTooltip unit="h" />} />
                     <Bar dataKey="workedHours" name="Odpracováno" radius={[3, 3, 0, 0]} maxBarSize={18}>
                       {dailyData.map((d, i) => (
-                        <Cell key={i} fill={d.isWeekend ? '#bfdbfe' : '#3b82f6'} />
+                        <Cell key={i} fill={d.isWeekend ? '#e6d4ad' : '#111820'} />
                       ))}
                     </Bar>
                     <Line
@@ -512,8 +512,8 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                   </ComposedChart>
                 </ResponsiveContainer>
                 <div className="flex gap-5 mt-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-blue-500" />Odpracováno</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-blue-200" />Sobota</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-[#111820]" />Odpracováno</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded bg-[#e6d4ad]" />Sobota</span>
                   <span className="flex items-center gap-1.5 ml-1">
                     <svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3"/></svg>
                     Plán
@@ -677,7 +677,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                       <tr key={emp.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-[#eceae4] flex items-center justify-center text-[#111820] text-xs font-bold shrink-0">
                               {emp.name.slice(0, 2).toUpperCase()}
                             </div>
                             <span className="font-medium text-slate-900">{emp.name}</span>
@@ -745,7 +745,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
               <div className="space-y-3">
                 {workTypeBreakdown.map((wt, i) => {
                   const maxH = workTypeBreakdown[0].hours;
-                  const COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#f97316','#ef4444','#06b6d4'];
+                  const COLORS = ['#111820','#8b5cf6','#f59e0b','#10b981','#f97316','#ef4444','#06b6d4'];
                   const color = COLORS[i % COLORS.length];
                   return (
                     <div key={wt.name} className="flex items-center gap-3">
@@ -794,7 +794,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                       onClick={() => setExportEmpIds(new Set(
                         exportAllStats.filter((s) => !exportDeptFilter || s.department === exportDeptFilter).map((s) => s.id)
                       ))}
-                      className="text-blue-600 hover:underline"
+                      className="text-[#111820] hover:underline"
                     >Vše</button>
                     <span className="text-slate-300">|</span>
                     <button onClick={() => setExportEmpIds(new Set())} className="text-slate-400 hover:underline">Žádný</button>
@@ -813,7 +813,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                           exportAllStats.filter((s) => !dept || s.department === dept).map((s) => s.id)
                         ));
                       }}
-                      className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#111820]/20"
                     >
                       <option value="">Všechna oddělení</option>
                       {depts.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -851,7 +851,7 @@ export default function AnalyticsDashboard({ orgId, isAdmin = false }: { orgId: 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-700">Sloupce</span>
                   <div className="flex items-center gap-2 text-xs">
-                    <button onClick={() => setExportColKeys(new Set<string>(EXPORT_COLS.map((c) => c.key)))} className="text-blue-600 hover:underline">Vše</button>
+                    <button onClick={() => setExportColKeys(new Set<string>(EXPORT_COLS.map((c) => c.key)))} className="text-[#111820] hover:underline">Vše</button>
                     <span className="text-slate-300">|</span>
                     <button onClick={() => setExportColKeys(new Set())} className="text-slate-400 hover:underline">Žádný</button>
                   </div>
@@ -1003,7 +1003,7 @@ function BenefitComparisonView({ month, activityTypes, employees }: {
                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
                             : 'bg-green-50 text-green-700 border border-green-200'
                       }`}>
-                        <span title="Naplánováno ve Směnách" className={empty ? '' : 'text-sky-600'}>{planned}×</span>
+                        <span title="Naplánováno ve Směnách" className={empty ? '' : 'text-[#5c6672]'}>{planned}×</span>
                         <span className="text-slate-300">/</span>
                         <span title="Docházka">{a.attended}×</span>
                         {a.deducted != null && (
@@ -1027,7 +1027,7 @@ function BenefitComparisonView({ month, activityTypes, employees }: {
         </tbody>
       </table>
       <div className="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span><span className="text-sky-600 font-semibold">Plán</span> = aktivita naplánovaná ve Směnách</span>
+        <span><span className="text-[#5c6672] font-semibold">Plán</span> = aktivita naplánovaná ve Směnách</span>
         <span>Docházka = počet příchodů s daným typem aktivity</span>
         <span>Odečteno = benefit záznamy v systému</span>
         <span className="text-amber-500">⚠️ = neshoda docházky a odečtů</span>
@@ -1134,14 +1134,14 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
           <div className="flex gap-1.5 flex-wrap">
             {['all', ...benefitKeys].map((k) => (
               <button key={k} onClick={() => setFilterKey(k)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterKey === k ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#8a929c]'}`}>
                 {k === 'all' ? 'Vše' : `${BE_ICONS[k] ?? ''} ${BE_LABELS[k] ?? k}`}
               </button>
             ))}
           </div>
         )}
         {subTab === 'comparison' && compLoading && (
-          <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />
+          <span className="w-4 h-4 border-2 border-[#8a929c] border-t-transparent rounded-full animate-spin inline-block" />
         )}
       </div>
 
@@ -1174,7 +1174,7 @@ function BenefitEntriesView({ month, setMonth, prevMonth, nextMonth, monthLabel 
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">Záznamy návštěv</span>
           <div className="flex items-center gap-3">
-            {loading && <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin inline-block" />}
+            {loading && <span className="w-4 h-4 border-2 border-[#8a929c] border-t-transparent rounded-full animate-spin inline-block" />}
             <span className="text-xs text-slate-400">{filtered.length} záznamů</span>
           </div>
         </div>
