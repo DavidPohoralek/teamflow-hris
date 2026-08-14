@@ -5,6 +5,7 @@ import PinPad from './PinPad';
 import TimeSelect from '@/components/TimeSelect';
 import { toISODateLocal } from '@/lib/vacationDays';
 import { useT } from '@/lib/i18n';
+import { catColors } from '@/lib/categoryColors';
 
 interface WorkType {
   id: string;
@@ -64,34 +65,8 @@ interface AttendanceKioskProps {
   orgId: string;
 }
 
-const WORK_TYPE_ICONS: Record<string, string> = {
-  Prodejna: '🏪',
-  Kancelář: '🏢',
-  HO: '🏠',
-  Expedice: '📦',
-  Sklad: '🏭',
-  Výroba: '⚙️',
-  Servis: '🔧',
-};
-
-const WORK_TYPE_COLORS: Record<string, string> = {
-  Prodejna: 'bg-blue-600 hover:bg-blue-500',
-  Kancelář: 'bg-purple-600 hover:bg-purple-500',
-  HO: 'bg-green-600 hover:bg-green-500',
-  Expedice: 'bg-orange-600 hover:bg-orange-500',
-  Sklad: 'bg-yellow-600 hover:bg-yellow-500',
-  Výroba: 'bg-red-600 hover:bg-red-500',
-  Servis: 'bg-teal-600 hover:bg-teal-500',
-};
-
-const DEFAULT_COLORS = [
-  'bg-blue-600 hover:bg-blue-500',
-  'bg-purple-600 hover:bg-purple-500',
-  'bg-green-600 hover:bg-green-500',
-  'bg-orange-600 hover:bg-orange-500',
-  'bg-pink-600 hover:bg-pink-500',
-  'bg-teal-600 hover:bg-teal-500',
-];
+// Work-type button colours now come from catColors(wt.color) — one shared OKLCH
+// scale with the shift chips, so no per-name Tailwind palette is needed here.
 
 function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString('cs-CZ', {
@@ -653,7 +628,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 {/* HomeOffice banner — distinct section for retrospective entry */}
                 {hoWorkTypes.length > 0 && (
                   <div className="w-full">
-                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 text-center">{t('HomeOffice', 'HomeOffice')}</p>
+                    <p className="text-[10px] text-[#8a929c] uppercase tracking-[.14em] mb-2 text-center">{t('HomeOffice', 'HomeOffice')}</p>
                     {hoWorkTypes.map((wt) => (
                       <button
                         key={wt.id}
@@ -667,14 +642,15 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                           setHoFormWorkTypeName(wt.name);
                           setScreen('ho-form');
                         }}
-                        className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-emerald-700/40 hover:bg-emerald-700/60 border border-emerald-500/40 hover:border-emerald-400/70 text-white font-semibold text-base sm:text-lg transition-all duration-150 active:scale-[0.98]"
+                        style={{ boxShadow: 'inset 3px 0 0 #4a9d6a' }}
+                        className="w-full flex items-center gap-4 px-5 py-4 rounded-[12px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] font-semibold text-base sm:text-lg transition-all duration-150 active:scale-[0.98]"
                       >
-                        <span className="text-3xl shrink-0">🏠</span>
+                        <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0" fill="none" stroke="#2f6b45" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6.5 8 6.5M6.5 9.6V19h11V9.6" /></svg>
                         <div className="flex-1 text-left">
-                          <div className="font-bold">{wt.name}</div>
-                          <div className="text-emerald-300 text-sm font-normal">{t('Zpětné zadání docházky / Stopky', 'Retrospective entry / Timer')}</div>
+                          <div className="font-semibold">{wt.name}</div>
+                          <div className="text-[#8a929c] text-sm font-normal">{t('Zpětné zadání docházky / Stopky', 'Retrospective entry / Timer')}</div>
                         </div>
-                        <span className="text-emerald-400 text-xl">→</span>
+                        <span className="text-[#8a929c] text-xl">→</span>
                       </button>
                     ))}
                   </div>
@@ -683,37 +659,35 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 {/* Regular work types — "Typ práce" */}
                 {visibleRegular.length > 0 && (
                   <>
-                    <p className="text-xs text-slate-500 uppercase tracking-widest mt-1 self-start">
+                    <p className="text-[10px] text-[#8a929c] uppercase tracking-[.14em] mt-1 self-start">
                       {t('Typ práce', 'Work type')}
                     </p>
                     {/* Mobile list */}
                     <div className="flex flex-col gap-2 sm:hidden w-full">
-                      {visibleRegular.map((wt, idx) => {
-                        const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-                        const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                      {visibleRegular.map((wt) => {
+                        const cat = catColors(wt.color);
                         const isSelected = selectedWorkType?.id === wt.id;
                         return (
                           <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                            className={`${colorClass} flex items-center gap-3 px-4 py-3 rounded-xl w-full text-white font-semibold text-base transition-all duration-150 active:scale-[0.98] ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1e293b] brightness-110' : 'opacity-80'}`}
+                            style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
+                            className="flex items-center gap-3 px-4 py-4 rounded-[12px] w-full font-semibold text-base transition-all duration-150 active:scale-[0.98]"
                           >
-                            <span className="text-2xl shrink-0">{wt.icon ?? icon}</span>
                             <span className="flex-1 text-left">{wt.name}</span>
-                            {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                            {isSelected && <span className="text-lg">✓</span>}
                           </button>
                         );
                       })}
                     </div>
                     {/* Desktop grid */}
                     <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
-                      {visibleRegular.map((wt, idx) => {
-                        const colorClass = WORK_TYPE_COLORS[wt.name] ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
-                        const icon = WORK_TYPE_ICONS[wt.name] ?? '💼';
+                      {visibleRegular.map((wt) => {
+                        const cat = catColors(wt.color);
                         const isSelected = selectedWorkType?.id === wt.id;
                         return (
                           <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                            className={`${colorClass} flex flex-col items-center justify-center gap-3 p-6 rounded-2xl min-h-[120px] text-white font-semibold text-xl transition-all duration-150 active:scale-95 ${isSelected ? 'ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : ''}`}
+                            style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
+                            className="flex flex-col items-center justify-center gap-2 p-6 rounded-[14px] min-h-[120px] font-semibold text-xl transition-all duration-150 active:scale-95"
                           >
-                            <span className="text-4xl">{wt.icon ?? icon}</span>
                             <span>{wt.name}</span>
                           </button>
                         );
@@ -735,18 +709,19 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 {activityTypes.length > 0 && (
                   <>
                     <div className="w-full border-t border-[#e9e7e3] pt-3">
-                      <p className="text-xs text-purple-400 uppercase tracking-widest mb-3">🎯 {t('Aktivity', 'Activities')}</p>
+                      <p className="text-[10px] text-[#8a929c] uppercase tracking-[.14em] mb-3">{t('Aktivity', 'Activities')}</p>
                       {/* Mobile list */}
                       <div className="flex flex-col gap-2 sm:hidden">
                         {activityTypes.map((wt) => {
+                          const cat = catColors(wt.color);
                           const isSelected = selectedWorkType?.id === wt.id;
                           return (
                             <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                              className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full font-semibold text-base transition-all duration-150 active:scale-[0.98] border ${isSelected ? 'bg-purple-600 border-purple-400 text-white ring-2 ring-white ring-offset-1 ring-offset-[#1e293b]' : 'bg-purple-900/30 border-purple-700/50 text-purple-200 hover:bg-purple-800/40'}`}
+                              style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
+                              className="flex items-center gap-3 px-4 py-4 rounded-[12px] w-full font-semibold text-base transition-all duration-150 active:scale-[0.98]"
                             >
-                              <span className="text-2xl shrink-0">{wt.icon ?? '🎯'}</span>
                               <span className="flex-1 text-left">{wt.name}</span>
-                              {isSelected && <span className="text-white/80 text-lg">✓</span>}
+                              {isSelected && <span className="text-lg">✓</span>}
                             </button>
                           );
                         })}
@@ -754,12 +729,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       {/* Desktop grid */}
                       <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {activityTypes.map((wt) => {
+                          const cat = catColors(wt.color);
                           const isSelected = selectedWorkType?.id === wt.id;
                           return (
                             <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                              className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl min-h-[100px] font-semibold text-lg transition-all duration-150 active:scale-95 border ${isSelected ? 'bg-purple-600 border-purple-400 text-white ring-4 ring-white ring-offset-2 ring-offset-[#1e293b] scale-105' : 'bg-purple-900/30 border-purple-700/50 text-purple-200 hover:bg-purple-800/40'}`}
+                              style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
+                              className="flex flex-col items-center justify-center gap-2 p-5 rounded-[14px] min-h-[100px] font-semibold text-lg transition-all duration-150 active:scale-95"
                             >
-                              <span className="text-3xl">{wt.icon ?? '🎯'}</span>
                               <span className="text-sm">{wt.name}</span>
                             </button>
                           );
@@ -834,7 +810,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           ) : (
             <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-5 flex flex-col gap-4">
               {correctionSuccess ? (
-                <p className="text-emerald-400 font-semibold text-center text-lg">
+                <p className="text-emerald-600 font-semibold text-center text-lg">
                   ✓ {t('Žádost o opravu odeslána', 'Correction request sent')}
                 </p>
               ) : (
@@ -853,7 +829,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       value={correctionNote}
                       onChange={(e) => setCorrectionNote(e.target.value)}
                       placeholder={t('Např. zapomněl/a jsem přijít', 'E.g. forgot to clock in')}
-                      className="bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500"
+                      className="bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder:text-slate-500"
                     />
                   </div>
                   <div className="flex gap-3">
@@ -866,7 +842,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                     <button
                       onClick={handleCheckinCorrectionSubmit}
                       disabled={!correctionTimeIn || correctionLoading}
-                      className="flex-[2] min-h-[48px] bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="flex-[2] min-h-[48px] bg-[#111820] hover:bg-[#2a333e] text-white rounded-xl font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {correctionLoading && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                       {t('Odeslat žádost', 'Send request')}
@@ -929,7 +905,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 value={hoFormDate}
                 max={localDateStr(0)}
                 onChange={(e) => setHoFormDate(e.target.value)}
-                className="flex-1 min-w-[140px] bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]"
+                className="flex-1 min-w-[140px] bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#111820]/20"
               />
             </div>
           </div>
@@ -965,16 +941,16 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 <div className="flex gap-3 items-center">
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[#8a929c] text-xs">{t('Od', 'From')}</span>
-                    <TimeSelect value={hoFormStart} onChange={setHoFormStart} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <TimeSelect value={hoFormStart} onChange={setHoFormStart} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20" />
                   </div>
                   <span className="text-slate-500 text-2xl mt-4">–</span>
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[#8a929c] text-xs">{t('Do', 'To')}</span>
-                    <TimeSelect value={hoFormEnd} onChange={setHoFormEnd} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500" />
+                    <TimeSelect value={hoFormEnd} onChange={setHoFormEnd} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20" />
                   </div>
                 </div>
                 {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (
-                  <p className="text-emerald-400 text-sm text-center">
+                  <p className="text-emerald-600 text-sm text-center">
                     {(() => {
                       const [sh, sm] = hoFormStart.split(':').map(Number);
                       const [eh, em] = hoFormEnd.split(':').map(Number);
@@ -1000,13 +976,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       value={hoFormHours}
                       onChange={(e) => setHoFormHours(e.target.value)}
                       placeholder="8"
-                      className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+                      className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-slate-500"
                     />
                     <span className="text-[#8a929c] text-base font-medium whitespace-nowrap">hod.</span>
                   </div>
                 </div>
                 {hoFormHours && !isNaN(parseFloat(hoFormHours.replace(',', '.'))) && parseFloat(hoFormHours.replace(',', '.')) > 0 && (
-                  <p className="text-emerald-400 text-sm text-center">
+                  <p className="text-emerald-600 text-sm text-center">
                     {t('Celkem', 'Total')}: {parseFloat(hoFormHours.replace(',', '.')).toLocaleString('cs-CZ')}h
                   </p>
                 )}
@@ -1037,7 +1013,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               onChange={(e) => setHoFormSummary(e.target.value)}
               placeholder={t('Např. Zpracování faktur, videokonference, příprava prezentace...', 'E.g. Invoice processing, video call, preparing presentation...')}
               rows={3}
-              className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+              className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-slate-500"
             />
           </div>
 
@@ -1081,7 +1057,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
           {/* Big timer display */}
           <div className="bg-white border border-[#e2e0dc] rounded-[9px] px-10 py-8 text-center w-full">
-            <div className="text-6xl sm:text-7xl font-mono font-bold text-emerald-400 tracking-widest tabular-nums">
+            <div className="text-6xl sm:text-7xl font-mono font-bold text-emerald-600 tracking-widest tabular-nums">
               {hoSwDisplay}
             </div>
             <p className="text-slate-500 text-sm mt-2">{t('hh:mm:ss', 'hh:mm:ss')}</p>
@@ -1122,7 +1098,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             value={hoNote}
             onChange={(e) => setHoNote(e.target.value)}
             placeholder={t('Např. Zpracování faktur, videokonference s klientem, příprava prezentace...', 'E.g. Invoice processing, client video call, preparing presentation...')}
-            className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500"
+            className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-slate-500"
             rows={5}
             autoFocus
           />
