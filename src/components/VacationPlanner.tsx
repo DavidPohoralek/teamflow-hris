@@ -80,9 +80,10 @@ function statusColor(status: string) {
 
 // Spec 4a: light fill + dark text chips (sage for approved, amber pending, red rejected)
 function statusChipStyle(status: string): React.CSSProperties {
-  if (status === 'approved') return { background: '#e7efe8', color: '#41654a' };
-  if (status === 'rejected') return { background: '#f7e9e7', color: '#9c4a3f' };
-  return { background: '#f7f0dd', color: '#8a6d2f' };
+  // Firmer tone + a solid status rail so entries read at a glance (not all pale).
+  if (status === 'approved') return { background: '#e2efe4', color: '#2f5a3c', boxShadow: 'inset 3px 0 0 #3f9e6a', fontWeight: 500 };
+  if (status === 'rejected') return { background: '#f4e2df', color: '#8a3a30', boxShadow: 'inset 3px 0 0 #c25b52', fontWeight: 500 };
+  return { background: '#f6edd3', color: '#7a5f22', boxShadow: 'inset 3px 0 0 #c99a3a', fontWeight: 500 };
 }
 
 function AddVacationModal({ orgId, employees, onClose, onSaved }: {
