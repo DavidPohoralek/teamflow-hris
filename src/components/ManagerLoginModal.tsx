@@ -66,13 +66,13 @@ function AdminForm({ orgId, onSuccess, onBack }: { orgId: string; onSuccess: () 
           onChange={(e) => { setPassword(e.target.value); setError(''); }}
           placeholder="••••••••"
           autoFocus
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25 focus:border-transparent transition"
         />
         {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
         <button
           type="submit"
           disabled={loading || !password}
-          className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition"
+          className="w-full px-4 py-2.5 text-sm font-medium text-white bg-[#111820] hover:bg-[#2a333e] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -165,7 +165,7 @@ function ManagerPinForm({ orgId, onSuccess }: { orgId: string; onSuccess: () => 
         {dots.map((filled, i) => (
           <div
             key={i}
-            className={`w-3 h-3 rounded-full border-2 transition-all ${filled ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}
+            className={`w-3 h-3 rounded-full border-2 transition-all ${filled ? 'bg-[#111820] border-[#111820]' : 'border-gray-300'}`}
           />
         ))}
       </div>
@@ -207,7 +207,7 @@ function ManagerPinForm({ orgId, onSuccess }: { orgId: string; onSuccess: () => 
         type="button"
         onClick={handleSubmit}
         disabled={loading || pin.length < 4}
-        className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition"
+        className="w-full px-4 py-2.5 text-sm font-medium text-white bg-[#111820] hover:bg-[#2a333e] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">

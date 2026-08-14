@@ -264,7 +264,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               onClick={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch { /* unsupported */ } }}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm cursor-pointer"
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm cursor-pointer"
             />
           </div>
 
@@ -415,7 +415,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                     type="text" inputMode="decimal" value={otherHours}
                     onChange={(e) => setOtherHours(e.target.value.replace(/[^0-9.,]/g, ''))}
                     placeholder="8"
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm"
                   />
                 </div>
                 <div>
@@ -426,7 +426,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                     type="text" inputMode="decimal" value={otherBonusPct}
                     onChange={(e) => setOtherBonusPct(e.target.value.replace(/[^0-9.,]/g, ''))}
                     placeholder="0"
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm"
                   />
                 </div>
               </div>
@@ -452,7 +452,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
                 min={dateFrom}
                 onChange={(e) => setDateTo(e.target.value)}
                 onClick={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch { /* unsupported */ } }}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm cursor-pointer"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm cursor-pointer"
               />
             </div>
           )}
@@ -468,7 +468,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Doplňující informace…"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-slate-800 transition text-sm resize-none"
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-[#8a929c] focus:ring-2 focus:ring-[#111820]/10 outline-none text-slate-800 transition text-sm resize-none"
             />
           </div>
 
@@ -492,7 +492,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
             form=""
             disabled={loading || !selectedType || !dateFrom || (isCorrection && !correctionValid) || (isOther && !otherValid)}
             onClick={handleSubmit}
-            className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 text-sm font-bold text-white bg-[#111820] hover:bg-[#2a333e] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
