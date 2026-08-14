@@ -97,6 +97,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [employeeDepartment, setEmployeeDepartment] = useState<string | null>(null);
   const [showAllWorkTypes, setShowAllWorkTypes] = useState(false);
   const [presence, setPresence] = useState<PresenceRecord | null>(null);
+  const [presentCount, setPresentCount] = useState<number | null>(null);
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType | null>(null);
 
@@ -147,6 +148,17 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         if (d.require_ho_activity_report) setRequireHoReport(true);
       })
       .catch(() => {});
+  }, [orgId]);
+
+  // Live "X lidí ve směně" count for the PIN screen (refreshed periodically)
+  useEffect(() => {
+    const load = () => fetch(`/api/public/presence?orgId=${orgId}`)
+      .then((r) => r.json())
+      .then((d: { summary?: { total?: number } }) => setPresentCount(d?.summary?.total ?? null))
+      .catch(() => {});
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
   }, [orgId]);
 
   // Restore active stopwatch from localStorage on mount
@@ -600,6 +612,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         loading={loading}
         error={pinError ? t('Nesprávný PIN. Zkuste to znovu.', 'Incorrect PIN. Please try again.') : null}
         footer={t('Zapomenutý PIN? Obraťte se na manažera.', 'Forgot your PIN? Ask your manager.')}
+        status={presentCount != null && presentCount > 0
+          ? { dot: '#3f9e6a', text: presentCount === 1 ? t('1 člověk ve směně', '1 person on shift') : `${presentCount} ${t('lidí ve směně', 'people on shift')}` }
+          : null}
       />
     );
   }

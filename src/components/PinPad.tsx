@@ -15,6 +15,8 @@ interface PinPadProps {
   showClock?: boolean;
   /** Muted helper line under the pad, e.g. "Zapomenutý PIN? …" */
   footer?: string;
+  /** Silent status line under the clock, e.g. a green dot + "15 lidí ve směně" */
+  status?: { dot: string; text: string } | null;
 }
 
 const CZ_DAYS = ['NEDĚLE', 'PONDĚLÍ', 'ÚTERÝ', 'STŘEDA', 'ČTVRTEK', 'PÁTEK', 'SOBOTA'];
@@ -30,6 +32,7 @@ export default function PinPad({
   maxLength = 8,
   showClock = true,
   footer,
+  status = null,
 }: PinPadProps) {
   const [pin, setPin] = useState('');
   const [now, setNow] = useState<Date | null>(null);
@@ -81,46 +84,58 @@ export default function PinPad({
     : ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
 
   return (
-    <div className="tf-sans flex-1 bg-[#fbfaf8] flex flex-col items-center justify-center p-6 select-none overflow-auto">
-      <div className="w-full max-w-[340px] flex flex-col items-center gap-6">
+    <div className="tf-sans flex-1 bg-[#f2f0ec] flex flex-col items-center justify-center p-6 select-none overflow-auto">
+      <div className="w-full max-w-[400px] bg-white border border-[#e5e3df] rounded-[16px] px-[26px] sm:px-[34px] pt-7 pb-6 flex flex-col items-center gap-5"
+        style={{ boxShadow: '0 1px 2px rgba(17,24,32,.04), 0 12px 32px rgba(17,24,32,.07)' }}>
         {/* Clock header */}
         {showClock && now && (
           <div className="text-center">
-            <p className="tf-mono text-[12px] tracking-[.18em]" style={{ color: '#8a929c' }}>
+            <p className="tf-mono text-[10.5px] tracking-[.14em]" style={{ color: '#a2a8b0' }}>
               {CZ_DAYS[now.getDay()]} {now.getDate()}. {CZ_MONTHS_GEN[now.getMonth()]}
             </p>
-            <p className="tf-mono text-[56px] font-medium leading-tight" style={{ color: '#111820' }}>
+            <p className="tf-mono text-[52px] font-semibold leading-none tracking-tight mt-2" style={{ color: '#111820', fontVariantNumeric: 'tabular-nums' }}>
               {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
             </p>
           </div>
         )}
 
+        {/* Silent status — e.g. "15 lidí ve směně" */}
+        {status && (
+          <div className="flex items-center gap-2 -mt-2">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: status.dot }} />
+            <span className="text-[12px]" style={{ color: '#8a929c' }}>{status.text}</span>
+          </div>
+        )}
+
+        {/* Divider */}
+        <span className="w-8 h-px bg-[#e5e3df] my-1" />
+
         {/* Title */}
         <div className="text-center -mt-1">
-          <h1 className="text-[15px] font-medium" style={{ color: '#111820' }}>{title}</h1>
+          <h1 className="text-[13.5px] font-normal" style={{ color: '#5c6672' }}>{title}</h1>
           {subtitle && <p className="text-[12.5px] mt-1" style={{ color: '#8a929c' }}>{subtitle}</p>}
         </div>
 
         {/* PIN dots */}
-        <div className="flex gap-3.5 items-center justify-center h-6 -mt-1">
+        <div className="flex gap-3.5 items-center justify-center h-4">
           {Array.from({ length: Math.max(pin.length, 4) }).map((_, i) => (
             <div
               key={i}
               className="w-3 h-3 rounded-full transition-all duration-150"
-              style={{ background: i < pin.length ? '#111820' : '#d8d5cf' }}
+              style={{ background: i < pin.length ? '#111820' : '#dedbd6' }}
             />
           ))}
         </div>
 
         {/* Error */}
         {error && (
-          <p className="text-[13px] font-medium animate-pulse -mt-3 text-center px-2" style={{ color: '#9c4a3f' }}>
+          <p className="text-[13px] font-medium animate-pulse -mt-2 text-center px-2" style={{ color: '#9c4a3f' }}>
             {error}
           </p>
         )}
 
         {/* Keypad — white key cards, dark submit (spec 4a) */}
-        <div className="grid grid-cols-3 gap-3 w-full">
+        <div className="grid grid-cols-3 gap-[9px] w-full">
           {buttons.map((btn, idx) => {
             if (btn === '') return <div key={idx} />;
             const isDelete = btn === 'del';
