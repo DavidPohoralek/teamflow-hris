@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { LangProvider } from '@/lib/i18n';
@@ -14,10 +14,24 @@ export const metadata: Metadata = {
   title: 'TeamFlow',
   description: 'Plánování směn, docházka a správa zaměstnanců',
   authors: [{ name: 'SelbickyLabs' }],
+  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
+    apple: '/apple-touch-icon.png',
   },
+  appleWebApp: {
+    capable: true,
+    title: 'TeamFlow',
+    statusBarStyle: 'default',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#262b31',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 // Runs synchronously before React — if no SW is controlling this page the browser

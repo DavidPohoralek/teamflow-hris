@@ -316,8 +316,8 @@ export default function HomePage() {
   // Block ALL render until subscription status is confirmed — prevents back-button bypass
   if (subscriptionStatus === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#fbfaf8]">
+        <TeamFlowMark variant="light" className="w-11 h-11 animate-pulse" />
       </div>
     )
   }
@@ -330,10 +330,10 @@ export default function HomePage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">{t('Načítání systému...', 'Loading...')}</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#fbfaf8]">
+        <div className="flex flex-col items-center gap-5">
+          <TeamFlowMark variant="light" className="w-14 h-14 animate-pulse" />
+          <p className="tf-sans text-[#8a929c] text-sm">{t('Načítání systému...', 'Loading...')}</p>
         </div>
       </div>
     )
