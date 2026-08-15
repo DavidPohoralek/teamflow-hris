@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useT } from '@/lib/i18n';
+import { TeamFlowMark } from '@/components/TeamFlowLogo';
 
 interface ManagerLoginModalProps {
   orgId: string;
@@ -234,9 +235,12 @@ export default function ManagerLoginModal({ orgId, onSuccess, onClose, expired =
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {showAdmin ? t('Admin', 'Admin') : t('Přihlášení manažera', 'Manager login')}
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <TeamFlowMark variant="light" className="w-[22px] h-[22px] shrink-0" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              {showAdmin ? t('Admin', 'Admin') : t('Přihlášení manažera', 'Manager login')}
+            </h2>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
         </div>
 
