@@ -86,8 +86,12 @@ export default function PinPad({
 
   return (
     <div className="tf-sans flex-1 bg-[#f2f0ec] flex flex-col items-center justify-center p-6 select-none overflow-auto">
-      <div className="w-full max-w-[400px] bg-white border border-[#e5e3df] rounded-[16px] px-[26px] sm:px-[34px] pt-7 pb-6 flex flex-col items-center gap-5"
-        style={{ boxShadow: '0 1px 2px rgba(17,24,32,.04), 0 12px 32px rgba(17,24,32,.07)' }}>
+      {/* drop-shadow on the wrapper so the shadow follows the clipped (logo-shaped) corner */}
+      <div className="w-full max-w-[400px]" style={{ filter: 'drop-shadow(0 1px 2px rgba(17,24,32,.05)) drop-shadow(0 12px 30px rgba(17,24,32,.08))' }}>
+      <div className="relative w-full bg-white border border-[#e5e3df] px-[26px] sm:px-[34px] pt-7 pb-6 flex flex-col items-center gap-5"
+        style={{ clipPath: 'polygon(0 0, calc(100% - 42px) 0, 100% 42px, 100% 100%, 0 100%)' }}>
+        {/* Logo-shaped folded corner (top-right), matching the brand mark */}
+        <span aria-hidden className="absolute top-0 right-0" style={{ width: '42px', height: '42px', background: '#E8963C', clipPath: 'polygon(0 0, 100% 100%, 0 100%)' }} />
         {/* Brand mark */}
         <TeamFlowMark variant="light" className="w-[26px] h-[26px] -mb-1" />
 
@@ -196,6 +200,7 @@ export default function PinPad({
         {/* Always render the footer slot so the keypad sits at the same height
             whether or not a footer is supplied (Příchod/Odchod vs Zaměstnanec). */}
         <p className="text-[12.5px] text-center min-h-[16px]" style={{ color: '#8a929c' }}>{footer ?? ' '}</p>
+      </div>
       </div>
     </div>
   );
