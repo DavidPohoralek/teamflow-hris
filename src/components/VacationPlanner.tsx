@@ -1004,9 +1004,9 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                     {hasMyShift && (
                       <span className="text-[9px] font-medium px-1 py-0.5 rounded-[3px]" style={{ background: '#e8edf8', color: '#3d5580' }}>{t('směna', 'shift')}</span>
                     )}
-                    {isClosed && <span className="text-[9px] font-normal uppercase tracking-[.05em]" style={{ color: '#b3aca0' }}>{t('Zavřeno', 'Closed')}</span>}
+                    {isClosed && <span className="hidden sm:inline text-[9px] font-normal uppercase tracking-[.05em]" style={{ color: '#b3aca0' }}>{t('Zavřeno', 'Closed')}</span>}
                     {!isClosed && !isManagerMode && sessionEmployee && (
-                      <span className="hidden group-hover:inline text-[13px] leading-none font-medium" style={{ color: '#41654a' }}>+</span>
+                      <span className="inline sm:hidden sm:group-hover:inline text-[13px] leading-none font-medium" style={{ color: '#41654a' }}>+</span>
                     )}
                     {count > 0 && (
                       <span className="tf-mono text-[11px]" style={{ color: '#8a929c' }}>{count}×</span>

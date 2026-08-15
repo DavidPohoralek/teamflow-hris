@@ -403,7 +403,7 @@ export default function EmployeeRequestModal({ orgId, pin, employeeName, onClose
               <p className="text-xs text-slate-500 -mb-1">
                 Výjimečná událost (např. veletrh). Zadejte odpracované hodiny a případný bonus. Manažer obojí schválí.
               </p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                     Počet hodin <span className="text-red-500">*</span>
