@@ -95,25 +95,33 @@ export default function PinPad({
         {/* Brand mark */}
         <TeamFlowMark variant="light" className="w-[26px] h-[26px] -mb-1" />
 
-        {/* Clock header */}
-        {showClock && now && (
-          <div className="text-center">
-            <p className="tf-mono text-[10.5px] tracking-[.14em]" style={{ color: '#a2a8b0' }}>
-              {CZ_DAYS[now.getDay()]} {now.getDate()}. {CZ_MONTHS_GEN[now.getMonth()]}
-            </p>
-            <p className="tf-mono text-[52px] font-semibold leading-none tracking-tight mt-2" style={{ color: '#111820', fontVariantNumeric: 'tabular-nums' }}>
-              {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
-            </p>
+        {/* Clock header — height reserved so the card doesn't jump when the clock
+            mounts (now is null on the server / first paint to avoid hydration drift). */}
+        {showClock && (
+          <div className="text-center h-[74px] flex flex-col justify-center">
+            {now && (
+              <>
+                <p className="tf-mono text-[10.5px] tracking-[.14em]" style={{ color: '#a2a8b0' }}>
+                  {CZ_DAYS[now.getDay()]} {now.getDate()}. {CZ_MONTHS_GEN[now.getMonth()]}
+                </p>
+                <p className="tf-mono text-[52px] font-semibold leading-none tracking-tight mt-2" style={{ color: '#111820', fontVariantNumeric: 'tabular-nums' }}>
+                  {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
+                </p>
+              </>
+            )}
           </div>
         )}
 
-        {/* Silent status — e.g. "15 lidí ve směně" */}
-        {status && (
-          <div className="flex items-center gap-2 -mt-2">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: status.dot }} />
-            <span className="text-[12px]" style={{ color: '#8a929c' }}>{status.text}</span>
-          </div>
-        )}
+        {/* Silent status — e.g. "15 lidí ve směně". Height is always reserved so
+            the card doesn't resize when the presence count loads asynchronously. */}
+        <div className="flex items-center justify-center gap-2 -mt-2 h-[16px]">
+          {status && (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: status.dot }} />
+              <span className="text-[12px]" style={{ color: '#8a929c' }}>{status.text}</span>
+            </>
+          )}
+        </div>
 
         {/* Divider */}
         <span className="w-8 h-px bg-[#e5e3df] my-1" />
