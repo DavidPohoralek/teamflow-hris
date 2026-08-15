@@ -273,6 +273,7 @@ interface Employee {
   is_owner?: boolean;
   managed_departments?: string[] | null;
   manager_permissions?: string[] | null;
+  hidden_from_shifts?: boolean;
 }
 
 interface WorkType {
@@ -848,6 +849,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [vacBalances, setVacBalances] = useState<Record<string, { remainingDays: number; usedDays: number; pendingDays: number; totalDays: number; hasPaidVacation: boolean }>>({});
+  const [plannedHours, setPlannedHours] = useState<Record<string, number>>({});
   const [logsEmp, setLogsEmp] = useState<{ id: string; name: string } | null>(null);
 
   const fetchEmployees = useCallback(async () => {
@@ -871,6 +873,10 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
       for (const b of (d.balances ?? [])) map[b.employeeId] = b;
       setVacBalances(map);
     }).catch(() => {});
+    // Planned hours this month per employee — for the Fond (target vs planned) column
+    managerFetch('/api/manager/planned-hours').then(r => r.json()).then(d => {
+      setPlannedHours(d.hoursByEmployee ?? {});
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -885,6 +891,28 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
       fetchEmployees();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Chyba při mazání');
+    }
+  };
+
+  // Skrýt / zobrazit zaměstnance v sekci Směny (nemění jeho aktivnost v systému)
+  const [togglingHidden, setTogglingHidden] = useState<string | null>(null);
+  const toggleHidden = async (emp: Employee) => {
+    setTogglingHidden(emp.id);
+    // Optimistic flip so the eye reacts instantly
+    setEmployees((prev) => prev.map((e) => e.id === emp.id ? { ...e, hidden_from_shifts: !emp.hidden_from_shifts } : e));
+    try {
+      const res = await managerFetch(`/api/employees/${emp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden_from_shifts: !emp.hidden_from_shifts }),
+      });
+      if (!res.ok) throw new Error('Nepodařilo se uložit viditelnost.');
+    } catch (e) {
+      // Roll back on failure
+      setEmployees((prev) => prev.map((el) => el.id === emp.id ? { ...el, hidden_from_shifts: emp.hidden_from_shifts } : el));
+      alert(e instanceof Error ? e.message : 'Chyba');
+    } finally {
+      setTogglingHidden(null);
     }
   };
 
@@ -910,7 +938,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), t('Štítky', 'Tags'), t('Cíl. hodiny', 'Target hours'), t('Dovolená', 'Vacation'), 'Tier', t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
+                {[t('Jméno', 'Name'), 'PIN', t('Poměr', 'Contract'), t('Oddělení', 'Department'), t('Pozice', 'Position'), 'Tier', t('Štítky', 'Tags'), t('Fond', 'Quota'), t('Dovolená', 'Vacation'), t('Aktivní', 'Active'), t('Akce', 'Actions')].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -920,7 +948,7 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
             <tbody className="bg-white divide-y divide-gray-200">
               {employees.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-400">
                     {t('Žádní zaměstnanci', 'No employees')}
                   </td>
                 </tr>
@@ -950,7 +978,24 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{emp.target_hours ?? 160}</td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      {(() => {
+                        const fond = emp.target_hours ?? 160;
+                        const planned = plannedHours[emp.id] ?? 0;
+                        const pct = fond > 0 ? Math.min(100, (planned / fond) * 100) : 0;
+                        const barColor = planned > fond ? 'bg-red-500' : planned >= fond * 0.9 ? 'bg-emerald-500' : 'bg-blue-500';
+                        return (
+                          <div className="min-w-[92px]">
+                            <span className="text-xs font-semibold text-gray-700">
+                              {planned} / {fond} h
+                            </span>
+                            <div className="mt-1 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {(() => {
                         const b = vacBalances[emp.id];
@@ -981,6 +1026,29 @@ function EmployeesTab({ isAdmin = true, orgId = '' }: { isAdmin?: boolean; orgId
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleHidden(emp)}
+                        disabled={togglingHidden === emp.id}
+                        className={`align-middle mr-3 transition-colors disabled:opacity-40 ${emp.hidden_from_shifts ? 'text-amber-600 hover:text-amber-700' : 'text-gray-400 hover:text-gray-700'}`}
+                        title={emp.hidden_from_shifts
+                          ? t('Skryto ze Směn — klikni pro zobrazení', 'Hidden from Shifts — click to show')
+                          : t('Zobrazuje se ve Směnách — klikni pro skrytí', 'Shown in Shifts — click to hide')}
+                        aria-label={t('Skrýt ve Směnách', 'Hide in Shifts')}
+                      >
+                        {emp.hidden_from_shifts ? (
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 3l18 18" />
+                            <path d="M10.6 10.6a3 3 0 0 0 4.2 4.2" />
+                            <path d="M9.9 5.1A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a13.4 13.4 0 0 1-2.16 2.86" />
+                            <path d="M6.6 6.6C3.9 8.2 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 3.36-.6" />
+                          </svg>
+                        ) : (
+                          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
                       <button
                         onClick={() => { setEditingEmployee(emp); setShowForm(true); }}
                         className="text-[#111820] hover:text-[#111820] text-sm mr-3"

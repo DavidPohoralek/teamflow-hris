@@ -8,7 +8,11 @@ export async function GET(req: NextRequest) {
   if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   const { orgId, supabase, departments } = resolved;
 
-  const showAll = new URL(req.url).searchParams.get('all') === '1';
+  const params = new URL(req.url).searchParams;
+  const showAll = params.get('all') === '1';
+  // Směny views pass exclude_hidden=1 to drop employees the manager hid from the
+  // shift roster (hidden_from_shifts). They stay everywhere else.
+  const excludeHidden = params.get('exclude_hidden') === '1';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
@@ -29,7 +33,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ employees });
+  // Filter in JS (not via .neq) so this stays safe even before the
+  // hidden_from_shifts column migration is applied — an undefined flag is
+  // treated as "not hidden".
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = excludeHidden
+    ? (employees ?? []).filter((e: any) => e?.hidden_from_shifts !== true)
+    : employees;
+
+  return NextResponse.json({ employees: result });
 }
 
 // POST /api/employees — create a new employee (admin only)

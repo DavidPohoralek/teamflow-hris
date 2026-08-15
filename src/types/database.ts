@@ -117,6 +117,7 @@ export interface Employee {
   max_saturdays: number;
   target_hours: number;
   active: boolean;
+  hidden_from_shifts?: boolean;
   created_at: string;
 }
 
