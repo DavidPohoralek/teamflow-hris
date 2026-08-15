@@ -260,7 +260,7 @@ export default function HomePage() {
             } catch { /* ignore bad JSON */ }
           }
           // Apply custom favicon if set, otherwise fall back to default TeamFlow favicon
-          const faviconUrl = (d.favicon_url as string) || '/favicon.svg'
+          const faviconUrl = (d.favicon_url as string) || '/favicon.svg?v=2'
           let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
           if (!link) {
             link = document.createElement('link')
