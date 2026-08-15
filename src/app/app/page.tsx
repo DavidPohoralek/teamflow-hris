@@ -14,6 +14,7 @@ import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 import ShiftAssistantPlanner from '@/components/ShiftAssistantPlanner'
 import { getTheme, DEFAULT_THEME, type Theme } from '@/lib/themes'
 import TabIcon from '@/components/TabIcons'
+import { TeamFlowMark, TeamFlowWordmark } from '@/components/TeamFlowLogo'
 import { useLang, useT } from '@/lib/i18n'
 import AppTour from '@/components/AppTour'
 import TourSelectModal from '@/components/TourSelectModal'
@@ -365,7 +366,6 @@ export default function HomePage() {
   const sideFootBorder = darkSide ? 'border-[#1e2833]' : 'border-[#eceae6]'
   const itemActiveCls = darkSide ? 'bg-[#2c3b4a] text-white' : 'bg-[#f1efe9] text-[#111820]'
   const itemInactiveCls = darkSide ? 'text-[#c6cfd8] hover:text-white hover:bg-white/[0.06]' : 'text-[#5c6672] hover:text-[#111820] hover:bg-black/[0.04]'
-  const logoSquareCls = darkSide ? 'bg-white' : 'bg-[#111820]'
   const chromeBorderCls = darkSide ? 'border-[#2b3742]' : 'border-[#e2e0dc]'
   const activeRuleColor = darkSide ? '#ffffff' : '#111820'
   const sideTextCls = darkSide ? 'text-white' : 'text-[#111820]'
@@ -400,13 +400,13 @@ export default function HomePage() {
       <aside className={`hidden md:flex flex-col shrink-0 border-r ${sideBorder} ${sideBg} ${theme.navText} transition-[width] duration-200 ${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'}`}>
         {sidebarCollapsed ? (
           <>
-            <div className={`w-[22px] h-[22px] rounded-[6px] ${logoSquareCls} mx-auto mt-3.5 mb-1.5`} />
+            <TeamFlowMark variant={darkSide ? 'dark' : 'light'} className="w-[24px] h-[24px] mx-auto mt-3.5 mb-1.5" />
             <button onClick={toggleSidebar} title={t('Rozbalit', 'Expand')} className={`w-[38px] h-[26px] mx-auto mb-3 flex items-center justify-center rounded-[7px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>»</button>
           </>
         ) : (
           <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
-            <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
-            <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
+            <TeamFlowMark variant={darkSide ? 'dark' : 'light'} className="w-[22px] h-[22px] shrink-0" />
+            <TeamFlowWordmark dark={darkSide} />
             <button onClick={toggleSidebar} title={t('Sbalit', 'Collapse')} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8] hover:text-white' : 'text-[#5c6672] hover:text-[#111820]'} text-xs`}>«</button>
           </div>
         )}
@@ -590,8 +590,8 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
           <aside className={`relative w-[240px] max-w-[82%] flex flex-col border-r ${sideBorder} ${sideBg} ${theme.navText}`}>
             <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3.5 pb-4">
-              <span className={`w-[20px] h-[20px] rounded-[6px] shrink-0 ${logoSquareCls}`} />
-              <span className="text-[15px] font-semibold tracking-tight">TeamFlow</span>
+              <TeamFlowMark variant={darkSide ? 'dark' : 'light'} className="w-[22px] h-[22px] shrink-0" />
+              <TeamFlowWordmark dark={darkSide} />
               <button onClick={() => setMobileNavOpen(false)} className={`ml-auto w-6 h-6 flex items-center justify-center rounded-[6px] border ${chromeBorderCls} ${darkSide ? 'text-[#c6cfd8]' : 'text-[#5c6672]'} text-xs`}>✕</button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-none py-0.5">
@@ -620,8 +620,8 @@ export default function HomePage() {
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`w-[18px] h-[18px] rounded-[5px] shrink-0 ${logoSquareCls}`} />
-            <span className="text-[15px] font-semibold tracking-tight truncate">TeamFlow</span>
+            <TeamFlowMark variant={darkSide ? 'dark' : 'light'} className="w-[20px] h-[20px] shrink-0" />
+            <TeamFlowWordmark dark={darkSide} className="text-[15px] font-semibold tracking-tight truncate" />
           </div>
         </div>
 
