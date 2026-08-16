@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TeamFlowMark } from '@/components/TeamFlowLogo';
 
 interface PinPadProps {
   title: string;
@@ -86,25 +85,29 @@ export default function PinPad({
 
   return (
     <div className="tf-sans flex-1 bg-[#f2f0ec] flex flex-col items-center justify-center p-6 select-none overflow-auto">
-      {/* drop-shadow on the wrapper so the shadow follows the clipped (logo-shaped) corner */}
-      <div className="w-full max-w-[400px]" style={{ filter: 'drop-shadow(0 1px 2px rgba(17,24,32,.05)) drop-shadow(0 12px 30px rgba(17,24,32,.08))' }}>
-      <div className="relative w-full bg-white border border-[#e5e3df] px-[26px] sm:px-[34px] pt-7 pb-6 flex flex-col items-center gap-5"
-        style={{ clipPath: 'polygon(0 0, calc(100% - 42px) 0, 100% 42px, 100% 100%, 0 100%)' }}>
-        {/* Logo-shaped folded corner (top-right), matching the brand mark */}
-        <span aria-hidden className="absolute top-0 right-0" style={{ width: '42px', height: '42px', background: '#E8963C', clipPath: 'polygon(0 0, 100% 100%, 0 100%)' }} />
-        {/* Brand mark */}
-        <TeamFlowMark variant="light" className="w-[26px] h-[26px] -mb-1" />
+      {/* 29b: rounded card with an orange left rail instead of the clipped corner */}
+      <div
+        className="w-full max-w-[352px] bg-white border border-[#e5e3df] rounded-[14px] px-6 sm:px-[28px] pt-6 pb-[22px] flex flex-col items-center"
+        style={{ borderLeft: '3px solid #E8963C', boxShadow: '0 1px 2px rgba(17,24,32,.04), 0 10px 28px rgba(17,24,32,.06)' }}
+      >
+        {/* Flat brand mark — badge + T + accent stripe, no corner fold (29b) */}
+        <svg viewBox="0 0 96 96" className="w-[26px] h-[26px]" role="img" aria-label="TeamFlow">
+          <path d="M10 8h60l16 16v48l-16 16H10z" fill="#23282E" />
+          <path d="M24 30h48v13H55v37H41V43H24z" fill="#FFFFFF" />
+          <path d="M38.5 43h2.5v37h-2.5z" fill="#E8963C" />
+        </svg>
 
-        {/* Clock header — height reserved so the card doesn't jump when the clock
-            mounts (now is null on the server / first paint to avoid hydration drift). */}
+        {/* Clock — height reserved so the card doesn't jump when it mounts
+            (now stays null on the server / first paint to avoid hydration drift) */}
         {showClock && (
-          <div className="text-center h-[74px] flex flex-col justify-center">
+          <div className="text-center h-[63px] mt-[14px] flex flex-col justify-end">
             {now && (
               <>
-                <p className="tf-mono text-[10.5px] tracking-[.14em]" style={{ color: '#a2a8b0' }}>
+                <p className="tf-mono text-[9.5px] tracking-[.16em] uppercase" style={{ color: '#a2a8b0' }}>
                   {CZ_DAYS[now.getDay()]} {now.getDate()}. {CZ_MONTHS_GEN[now.getMonth()]}
                 </p>
-                <p className="tf-mono text-[52px] font-semibold leading-none tracking-tight mt-2" style={{ color: '#111820', fontVariantNumeric: 'tabular-nums' }}>
+                <p className="tf-mono text-[44px] font-semibold leading-none mt-[5px]"
+                  style={{ color: '#111820', letterSpacing: '-0.035em', fontVariantNumeric: 'tabular-nums' }}>
                   {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
                 </p>
               </>
@@ -112,28 +115,27 @@ export default function PinPad({
           </div>
         )}
 
-        {/* Silent status — e.g. "15 lidí ve směně". Height is always reserved so
-            the card doesn't resize when the presence count loads asynchronously. */}
-        <div className="flex items-center justify-center gap-2 -mt-2 h-[16px]">
+        {/* Presence status — slot always rendered so the async count can't resize the card */}
+        <div className="flex items-center justify-center gap-[7px] h-[16px] mt-[9px]">
           {status && (
             <>
-              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: status.dot }} />
-              <span className="text-[12px]" style={{ color: '#8a929c' }}>{status.text}</span>
+              <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ background: status.dot }} />
+              <span className="text-[11.5px]" style={{ color: '#8a929c' }}>{status.text}</span>
             </>
           )}
         </div>
 
-        {/* Divider */}
-        <span className="w-8 h-px bg-[#e5e3df] my-1" />
+        {/* Full-width hairline divider (29b) */}
+        <div className="w-full h-px bg-[#f0eeea] mt-[18px] mb-[14px]" />
 
         {/* Title */}
-        <div className="text-center -mt-1">
-          <h1 className="text-[13.5px] font-normal" style={{ color: '#5c6672' }}>{title}</h1>
-          {subtitle && <p className="text-[12.5px] mt-1" style={{ color: '#8a929c' }}>{subtitle}</p>}
+        <div className="text-center">
+          <h1 className="text-[12.5px] font-normal" style={{ color: '#5c6672' }}>{title}</h1>
+          {subtitle && <p className="text-[11.5px] mt-1" style={{ color: '#8a929c' }}>{subtitle}</p>}
         </div>
 
         {/* PIN dots */}
-        <div className="flex gap-3.5 items-center justify-center h-4">
+        <div className="flex gap-[11px] items-center justify-center h-3 mt-[11px] mb-4">
           {Array.from({ length: Math.max(pin.length, 4) }).map((_, i) => (
             <div
               key={i}
@@ -145,13 +147,13 @@ export default function PinPad({
 
         {/* Error */}
         {error && (
-          <p className="text-[13px] font-medium animate-pulse -mt-2 text-center px-2" style={{ color: '#9c4a3f' }}>
+          <p className="text-[12.5px] font-medium animate-pulse text-center px-2 -mt-1 mb-2" style={{ color: '#9c4a3f' }}>
             {error}
           </p>
         )}
 
-        {/* Keypad — white key cards, dark submit (spec 4a) */}
-        <div className="grid grid-cols-3 gap-[9px] w-full">
+        {/* Keypad — 56px keys, dark #23282e confirm (29b) */}
+        <div className="grid grid-cols-3 gap-2 w-full">
           {buttons.map((btn, idx) => {
             if (btn === '') return <div key={idx} />;
             const isDelete = btn === 'del';
@@ -168,36 +170,29 @@ export default function PinPad({
                   else handleDigit(btn);
                 }}
                 className={[
-                  'min-h-[64px] rounded-[9px] transition-all duration-100 active:scale-[.97] flex items-center justify-center',
+                  'h-[56px] rounded-[10px] transition-all duration-100 active:scale-[.97] flex items-center justify-center',
                   isConfirm
-                    ? 'bg-[#111820] hover:bg-[#2a333e] text-white disabled:opacity-30 disabled:cursor-not-allowed'
-                    : 'bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[22px] font-medium text-[#111820]',
+                    ? 'bg-[#23282e] hover:bg-[#2f3a45] text-white text-[16px] disabled:opacity-30 disabled:cursor-not-allowed'
+                    : isDelete
+                      ? 'bg-white border border-[#e5e3df] hover:bg-[#f4f2ef] text-[16px] font-medium text-[#111820]'
+                      : 'bg-white border border-[#e5e3df] hover:bg-[#f4f2ef] text-[20px] font-medium text-[#111820]',
                   'disabled:cursor-not-allowed',
                 ].join(' ')}
               >
                 {loading && isConfirm ? (
                   <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : isDelete ? (
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 6H8l-5 6 5 6h13a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Z" />
-                    <path d="m12 9 6 6M18 9l-6 6" />
-                  </svg>
-                ) : isConfirm ? (
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M13 6l6 6-6 6" />
-                  </svg>
-                ) : btn}
+                ) : isDelete ? '\u232B' : isConfirm ? '\u2192' : btn}
               </button>
             );
           })}
         </div>
 
-        {/* Optional confirm button below pad */}
+        {/* Optional confirm button below the pad */}
         {confirmLabel && (
           <button
             onClick={handleConfirm}
             disabled={pin.length < 4 || loading}
-            className="w-full min-h-[52px] bg-[#111820] hover:bg-[#2a333e] text-white text-[15px] font-medium rounded-[9px] transition-all active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full h-[52px] mt-2 bg-[#23282e] hover:bg-[#2f3a45] text-white text-[15px] font-medium rounded-[10px] transition-all active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {loading ? (
               <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -205,10 +200,9 @@ export default function PinPad({
           </button>
         )}
 
-        {/* Always render the footer slot so the keypad sits at the same height
-            whether or not a footer is supplied (Příchod/Odchod vs Zaměstnanec). */}
-        <p className="text-[12.5px] text-center min-h-[16px]" style={{ color: '#8a929c' }}>{footer ?? ' '}</p>
-      </div>
+        {/* Footer slot always rendered — keeps the keypad at the same height on
+            Příchod/Odchod (with footer) and Zaměstnanec (without) */}
+        <p className="text-[11px] text-center min-h-[14px] mt-4" style={{ color: '#a2a8b0' }}>{footer ?? ' '}</p>
       </div>
     </div>
   );
