@@ -236,7 +236,7 @@ export default function Sidebar({ userEmail, displayName }: SidebarProps) {
         </svg>
         <div className="flex-1 min-w-0">
           <div className="text-white font-bold text-sm leading-tight">TeamFlow</div>
-          <div className="text-slate-400 text-xs">by SelbickyLabs</div>
+          <div className="text-slate-400 text-xs">by Shelbitsky</div>
         </div>
         <button
           onClick={() => setLang(lang === 'cs' ? 'en' : 'cs')}

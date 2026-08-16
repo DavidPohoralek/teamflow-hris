@@ -1,6 +1,6 @@
 # HRIS — HR Information System
 
-Multi-tenant HR/shift planning SaaS by **SelbickyLabs**.
+Multi-tenant HR/shift planning SaaS by **Shelbitsky**.
 
 ## Tech stack
 

@@ -170,7 +170,7 @@ function ConfirmShiftContent() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-4">
-          Powered by TeamFlow · SelbickyLabs
+          Powered by TeamFlow · Shelbitsky
         </p>
       </div>
     </div>

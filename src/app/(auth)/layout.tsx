@@ -29,7 +29,7 @@ export default function AuthLayout({
         </div>
 
         <p className="text-center text-[#8a929c] text-xs mt-6">
-          © {new Date().getFullYear()} SelbickyLabs ·{' '}
+          © {new Date().getFullYear()} Shelbitsky ·{' '}
           <Link href="/" className="hover:text-[#111820] transition-colors">tmflw.com</Link>
         </p>
       </div>

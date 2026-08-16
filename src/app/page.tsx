@@ -485,7 +485,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2.5">
             <TeamFlowMark variant="light" className="w-[18px] h-[18px]" />
             <span className="text-[12.5px] text-[#8a929c]">
-              TeamFlow · SelbickyLabs · {new Date().getFullYear()}
+              TeamFlow · Shelbitsky · {new Date().getFullYear()}
             </span>
           </div>
           <div className="flex gap-5 text-[12.5px] text-[#5c6672]">
