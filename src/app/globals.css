@@ -155,7 +155,7 @@ a {
 }
 
 .btn-primary {
-  @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+  @apply btn bg-[#111820] text-white hover:bg-[#2a333e] focus:ring-[#8a929c];
 }
 
 .btn-secondary {
@@ -168,9 +168,84 @@ a {
 
 /* Form input */
 .form-input {
-  @apply w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all;
+  @apply w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-[#111820]/25 focus:border-transparent transition-all;
 }
 
 .form-label {
   @apply block text-sm font-medium text-slate-700 mb-1.5;
+}
+
+/* ── Landing page motion ─────────────────────────────────────────────
+   Reveal on scroll, self-drawing line icons and staggered shift chips.
+   Everything collapses to a static state under prefers-reduced-motion. */
+.tf-reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .6s cubic-bezier(.22,.61,.36,1), transform .6s cubic-bezier(.22,.61,.36,1);
+}
+.tf-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Icons draw themselves. pathLength="100" normalises every shape, so one
+   dash length works for circles, rects and paths alike. */
+.tf-draw [pathLength] {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+.tf-draw.is-visible [pathLength] {
+  animation: tf-draw-in 1.15s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes tf-draw-in { to { stroke-dashoffset: 0; } }
+
+@keyframes tf-pop {
+  from { opacity: 0; transform: translateY(4px) scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+.tf-chip-in { animation: tf-pop .42s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-reveal { opacity: 1; transform: none; transition: none; }
+  .tf-draw [pathLength] { stroke-dashoffset: 0; }
+  .tf-draw.is-visible [pathLength] { animation: none; }
+  .tf-chip-in { animation: none; }
+}
+
+/* Hero: words rise in one after another; the orange fold unfolds. */
+@keyframes tf-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.tf-rise { animation: tf-rise .65s cubic-bezier(.22,.61,.36,1) both; }
+
+@keyframes tf-fold {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+.tf-fold { animation: tf-fold .55s cubic-bezier(.34,1.3,.5,1) .35s both; }
+
+/* Demo: each screen slides in when you switch tabs, like a real app view. */
+@keyframes tf-tab {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: none; }
+}
+.tf-tabfade { animation: tf-tab .28s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-rise, .tf-fold, .tf-tabfade { animation: none; }
+}
+
+/* Hero: the orange underline sweeps in under "bez chaosu"… */
+@keyframes tf-sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.tf-underline { transform-origin: 0 50%; animation: tf-sweep .6s cubic-bezier(.22,.61,.36,1) .75s both; }
+
+/* …and a quiet ticker of system events glides along the hero's bottom edge.
+   Two identical halves; shifting by -50% loops seamlessly. */
+@keyframes tf-ticker { to { transform: translateX(-50%); } }
+.tf-ticker { animation: tf-ticker 36s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-underline { animation: none; transform: none; }
+  .tf-ticker { animation: none; }
 }

@@ -11,6 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.tmflw.com'),
   title: 'TeamFlow',
   description: 'Plánování směn, docházka a správa zaměstnanců',
   authors: [{ name: 'SelbickyLabs' }],
