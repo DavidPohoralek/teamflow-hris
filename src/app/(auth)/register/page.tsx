@@ -249,7 +249,7 @@ export default function RegisterPage() {
         {t('Již máte účet?', 'Already have an account?')}{' '}
         <Link
           href="/login"
-          className="text-blue-600 hover:text-blue-700 font-medium"
+          className="text-[#C97C2A] hover:text-[#8a5514] font-medium"
         >
           {t('Přihlásit se', 'Sign in')}
         </Link>

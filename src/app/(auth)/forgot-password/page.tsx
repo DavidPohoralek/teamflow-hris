@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="vas@email.cz"
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25"
               />
             </div>
 
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-colors"
+              className="w-full py-2.5 bg-[#111820] hover:bg-[#2a333e] disabled:opacity-50 text-white font-semibold rounded-xl transition-colors"
             >
               {loading ? 'Odesílám...' : 'Odeslat odkaz'}
             </button>

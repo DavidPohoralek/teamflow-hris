@@ -59,7 +59,7 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="min. 6 znaků"
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25"
               />
             </div>
             <div>
@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
                 placeholder="Zopakujte heslo"
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#111820]/25"
               />
             </div>
 
@@ -81,7 +81,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-colors"
+              className="w-full py-2.5 bg-[#111820] hover:bg-[#2a333e] disabled:opacity-50 text-white font-semibold rounded-xl transition-colors"
             >
               {loading ? 'Ukládám...' : 'Nastavit heslo'}
             </button>

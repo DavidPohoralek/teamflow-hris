@@ -105,7 +105,7 @@ export default function LoginPage() {
             </label>
             <Link
               href="/forgot-password"
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              className="text-xs text-[#C97C2A] hover:text-[#8a5514] font-medium"
             >
               {t('Zapomenuté heslo?', 'Forgot password?')}
             </Link>
@@ -160,7 +160,7 @@ export default function LoginPage() {
         {t('Nemáte účet?', "Don't have an account?")}{' '}
         <Link
           href="/register"
-          className="text-blue-600 hover:text-blue-700 font-medium"
+          className="text-[#C97C2A] hover:text-[#8a5514] font-medium"
         >
           {t('Registrovat organizaci', 'Register organization')}
         </Link>

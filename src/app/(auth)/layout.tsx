@@ -1,47 +1,36 @@
+import Link from 'next/link';
+import { TeamFlowMark } from '@/components/TeamFlowLogo';
+
+// Shared shell for /login, /register and the password flows — the warm kiosk
+// surface with a white card in the brand-mark shape (clipped top-right corner
+// + orange fold), matching the PIN kiosk and the marketing site.
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+    <div className="tf-sans min-h-screen bg-[#f2f0ec] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo area */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <svg width="48" height="48" viewBox="0 0 250 260" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="125,130 225,72 225,187 125,244" fill="#C87C1A"/>
-              <polygon points="25,72 125,130 125,244 25,187" fill="#E09828"/>
-              <polygon points="125,15 225,72 213,72 125,22" fill="#EDB84A"/>
-              <polygon points="25,72 125,15 125,22 37,72" fill="#E09828"/>
-              <polygon points="225,72 125,130 125,122 213,72" fill="#96560A"/>
-              <polygon points="125,130 25,72 37,72 125,122" fill="#AE6A10"/>
-              <polygon points="37,72 125,22 125,122" fill="#2A4878"/>
-              <polygon points="213,72 125,22 125,122" fill="#05080F"/>
-              <line x1="125" y1="22" x2="125" y2="122" stroke="#1A2E58" strokeWidth="1.5"/>
-              <polyline points="125,22 213,72 125,122 37,72 125,22" fill="none" stroke="#182840" strokeWidth="1.8"/>
-              <polygon points="35,98 115,145 115,163 35,117" fill="#7A4808"/>
-              <polygon points="61,139 89,155 89,210 61,194" fill="#7A4808"/>
-              <polygon points="135,145 215,98 215,117 135,163" fill="#6A3806"/>
-              <polygon points="135,170 153,159 153,211 135,221" fill="#6A3806"/>
-              <polygon points="157,171 200,146 200,163 157,188" fill="#6A3806"/>
-              <polyline points="25,72 125,15 225,72" fill="none" stroke="#C07010" strokeWidth="2.5" strokeLinejoin="round"/>
-              <line x1="25" y1="72" x2="25" y2="187" stroke="#C07010" strokeWidth="2"/>
-              <line x1="225" y1="72" x2="225" y2="187" stroke="#8A4A08" strokeWidth="2"/>
-              <line x1="25" y1="187" x2="125" y2="244" stroke="#B07010" strokeWidth="2"/>
-              <line x1="225" y1="187" x2="125" y2="244" stroke="#8A4A08" strokeWidth="2"/>
-              <line x1="125" y1="130" x2="125" y2="244" stroke="#9A5C10" strokeWidth="2.5"/>
-            </svg>
-            <h1 className="text-3xl font-bold text-white tracking-tight">TeamFlow</h1>
-          </div>
-          <p className="text-slate-400 text-sm">by SelbickyLabs</p>
+        {/* Logo */}
+        <div className="flex items-center justify-center gap-3 mb-7">
+          <TeamFlowMark variant="light" className="w-[34px] h-[34px] shrink-0" />
+          <span className="text-[25px] font-semibold tracking-tight text-[#111820]">
+            Team<span style={{ color: '#C97C2A' }}>Flow</span>
+          </span>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">{children}</div>
+        <div
+          className="bg-white border border-[#e5e3df] rounded-[14px] px-6 sm:px-8 pt-8 pb-7"
+          style={{ boxShadow: '0 1px 2px rgba(17,24,32,.04), 0 14px 32px rgba(17,24,32,.08)' }}
+        >
+          {children}
+        </div>
 
-        <p className="text-center text-slate-500 text-xs mt-6">
-          © 2025 SelbickyLabs. Všechna práva vyhrazena.
+        <p className="text-center text-[#8a929c] text-xs mt-6">
+          © {new Date().getFullYear()} SelbickyLabs ·{' '}
+          <Link href="/" className="hover:text-[#111820] transition-colors">tmflw.com</Link>
         </p>
       </div>
     </div>
