@@ -43,7 +43,34 @@ interface HoStopwatchData {
   employeeId: string;
   workTypeId: string;
   workTypeName: string;
-  startAt: string; // ISO string
+  startAt: string;              // ISO — original start, used for the "Zahájeno" label
+  runningSince: string | null;  // ISO of the current running segment, or null when paused
+  accumulatedMs: number;        // worked ms from already-closed segments (before the current one)
+}
+
+// Back-fills stopwatches saved before pause/resume existed (only had startAt):
+// treat them as running since startAt with no accumulated time.
+function normalizeSw(raw: Partial<HoStopwatchData> & { startAt: string; orgId: string; employeeId: string; workTypeId: string; workTypeName: string }): HoStopwatchData {
+  return {
+    orgId: raw.orgId,
+    employeeId: raw.employeeId,
+    workTypeId: raw.workTypeId,
+    workTypeName: raw.workTypeName,
+    startAt: raw.startAt,
+    runningSince: raw.runningSince === undefined ? raw.startAt : raw.runningSince,
+    accumulatedMs: raw.accumulatedMs ?? 0,
+  };
+}
+
+// Total worked ms = closed segments + the current running segment (0 when paused).
+function swElapsedMs(sw: HoStopwatchData): number {
+  const running = sw.runningSince ? Date.now() - new Date(sw.runningSince).getTime() : 0;
+  return sw.accumulatedMs + Math.max(0, running);
+}
+
+function formatMs(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 function isHomeOffice(name: string | null | undefined): boolean {
@@ -113,7 +140,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
   // HomeOffice retrospective form
   const [hoFormDate, setHoFormDate] = useState('');
-  const [hoFormMode, setHoFormMode] = useState<'range' | 'hours' | 'stopwatch'>('range');
+  // Live timer is the primary path — retrospective range/hours stay available behind tabs.
+  const [hoFormMode, setHoFormMode] = useState<'range' | 'hours' | 'stopwatch'>('stopwatch');
   const [hoFormStart, setHoFormStart] = useState('');
   const [hoFormEnd, setHoFormEnd] = useState('');
   const [hoFormHours, setHoFormHours] = useState('');
@@ -166,25 +194,18 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     try {
       const raw = localStorage.getItem(HO_SW_KEY);
       if (!raw) return;
-      const data: HoStopwatchData = JSON.parse(raw);
+      const data = normalizeSw(JSON.parse(raw));
       if (data.orgId === orgId) setHoSw(data);
     } catch { /* ignore */ }
   }, [orgId]);
 
-  // Tick elapsed time while ho-stopwatch screen is active
+  // Tick elapsed time while the ho-stopwatch screen is active. When paused
+  // (runningSince === null) the value is constant, so no interval is needed.
   useEffect(() => {
     if (screen !== 'ho-stopwatch' || !hoSw) return;
-    const tick = () => {
-      const ms = Date.now() - new Date(hoSw.startAt).getTime();
-      const h = Math.floor(ms / 3600000);
-      const m = Math.floor((ms % 3600000) / 60000);
-      const s = Math.floor((ms % 60000) / 1000);
-      setHoSwDisplay(
-        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-      );
-    };
-    tick();
-    const id = setInterval(tick, 1000);
+    setHoSwDisplay(formatMs(swElapsedMs(hoSw)));
+    if (!hoSw.runningSince) return;
+    const id = setInterval(() => setHoSwDisplay(formatMs(swElapsedMs(hoSw))), 1000);
     return () => clearInterval(id);
   }, [screen, hoSw]);
 
@@ -261,7 +282,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       try {
         const raw = localStorage.getItem(HO_SW_KEY);
         if (raw) {
-          const sw: HoStopwatchData = JSON.parse(raw);
+          const sw = normalizeSw(JSON.parse(raw));
           if (sw.orgId === orgId && sw.employeeId === data.employeeId) {
             setHoSw(sw);
             setScreen('ho-stopwatch');
@@ -433,12 +454,15 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         setHoFormError(json.error ?? t('Chyba při záznamu příchodu.', 'Error recording clock-in.'));
         return;
       }
+      const nowIso = new Date().toISOString();
       const sw: HoStopwatchData = {
         orgId,
         employeeId,
         workTypeId: hoFormWorkTypeId,
         workTypeName: hoFormWorkTypeName || 'HomeOffice',
-        startAt: new Date().toISOString(),
+        startAt: nowIso,
+        runningSince: nowIso,
+        accumulatedMs: 0,
       };
       localStorage.setItem(HO_SW_KEY, JSON.stringify(sw));
       setHoSw(sw);
@@ -450,14 +474,110 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     }
   };
 
+  // Pause = close the current work segment in the DB (checkout) and freeze the
+  // display. The already-recorded segments hold the worked time, so the paused
+  // employee correctly drops out of "kdo je ve směně".
+  const handleHoStopwatchPause = async () => {
+    if (!hoSw || !hoSw.runningSince) return;
+    setHoLoading(true);
+    setHoFormError('');
+    try {
+      const segStart = new Date(hoSw.runningSince);
+      const now = new Date();
+      const res = await fetch('/api/public/kiosk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'checkout', orgId, pin }),
+      });
+      // No open session (legacy start before this record existed) → save the
+      // current segment explicitly so the worked time isn't lost.
+      if (!res.ok && res.status === 404) {
+        const fb = await fetch('/api/public/kiosk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'ho-record', orgId, pin,
+            workTypeId: hoSw.workTypeId || undefined, workTypeName: hoSw.workTypeName,
+            date: toISODateLocal(segStart),
+            startTime: segStart.toISOString(), endTime: now.toISOString(), note: null,
+          }),
+        });
+        if (!fb.ok && fb.status !== 409) {
+          const j = await fb.json().catch(() => ({})) as { error?: string };
+          setHoFormError(j.error ?? t('Nepodařilo se pozastavit.', 'Could not pause.'));
+          return;
+        }
+      } else if (!res.ok) {
+        const j = await res.json().catch(() => ({})) as { error?: string };
+        setHoFormError(j.error ?? t('Nepodařilo se pozastavit.', 'Could not pause.'));
+        return;
+      }
+      const next: HoStopwatchData = {
+        ...hoSw,
+        runningSince: null,
+        accumulatedMs: hoSw.accumulatedMs + (now.getTime() - segStart.getTime()),
+      };
+      localStorage.setItem(HO_SW_KEY, JSON.stringify(next));
+      setHoSw(next);
+    } catch {
+      setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
+    } finally {
+      setHoLoading(false);
+    }
+  };
+
+  // Resume = open a fresh work segment (checkin) and start counting again.
+  const handleHoStopwatchResume = async () => {
+    if (!hoSw || hoSw.runningSince) return;
+    setHoLoading(true);
+    setHoFormError('');
+    try {
+      const res = await fetch('/api/public/kiosk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'checkin', orgId, pin,
+          workTypeId: hoSw.workTypeId || undefined, workTypeName: hoSw.workTypeName,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({})) as { error?: string };
+        setHoFormError(j.error ?? t('Nepodařilo se pokračovat.', 'Could not resume.'));
+        return;
+      }
+      const next: HoStopwatchData = { ...hoSw, runningSince: new Date().toISOString() };
+      localStorage.setItem(HO_SW_KEY, JSON.stringify(next));
+      setHoSw(next);
+    } catch {
+      setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
+    } finally {
+      setHoLoading(false);
+    }
+  };
+
   const handleHoStopwatchStop = async () => {
     if (!hoSw) return;
     setHoLoading(true);
+    setHoFormError('');
+    // Total across every segment (closed ones + the running one), captured before we mutate state.
+    const totalLabel = formatMs(swElapsedMs(hoSw));
+    const finish = () => {
+      localStorage.removeItem(HO_SW_KEY);
+      setHoSw(null);
+      setSuccessMessage(`HomeOffice zaznamenán ✓ ${totalLabel}`);
+      setScreen('success-checkin');
+      resetKiosk();
+    };
     try {
-      const startAt = new Date(hoSw.startAt);
+      // Paused → all segments are already saved; nothing left to close.
+      if (!hoSw.runningSince) {
+        finish();
+        return;
+      }
+
+      const segStart = new Date(hoSw.runningSince);
       const endAt = new Date();
 
-      // Try checkout first (works for sessions started after the checkin-on-start fix)
       const res = await fetch('/api/public/kiosk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -465,29 +585,21 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       });
       const json = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; logId?: string; workTypeName?: string; duration?: string; durationLabel?: string };
 
-      // Fallback: no open session in DB (session started before the fix) → create full record
+      // No open session in DB → record just the current segment (never from startAt,
+      // which would double-count any earlier paused segments).
       if (!res.ok && res.status === 404) {
-        const date = toISODateLocal(startAt);
         const fbRes = await fetch('/api/public/kiosk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'ho-record',
-            orgId,
-            pin,
-            workTypeId: hoSw.workTypeId || undefined,
-            workTypeName: hoSw.workTypeName,
-            date,
-            startTime: startAt.toISOString(),
-            endTime: endAt.toISOString(),
-            note: null,
+            action: 'ho-record', orgId, pin,
+            workTypeId: hoSw.workTypeId || undefined, workTypeName: hoSw.workTypeName,
+            date: toISODateLocal(segStart),
+            startTime: segStart.toISOString(), endTime: endAt.toISOString(), note: null,
           }),
         });
-        const fbJson = await fbRes.json().catch(() => ({})) as { ok?: boolean; error?: string; durationLabel?: string };
+        const fbJson = await fbRes.json().catch(() => ({})) as { ok?: boolean; error?: string };
         if (!fbRes.ok) {
-          // 409 = the interval overlaps an existing closed record → this session
-          // was already ended on another device (e.g. PC). Hours are in the DB;
-          // just clear the stale stopwatch on this device instead of erroring forever.
           if (fbRes.status === 409) {
             localStorage.removeItem(HO_SW_KEY);
             setHoSw(null);
@@ -499,11 +611,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           setHoFormError(fbJson.error ?? t('Chyba při zápisu záznamu.', 'Error saving record.'));
           return;
         }
-        localStorage.removeItem(HO_SW_KEY);
-        setHoSw(null);
-        setSuccessMessage(`HomeOffice zaznamenán ✓ ${fbJson.durationLabel ?? hoSwDisplay}`);
-        setScreen('success-checkin');
-        resetKiosk();
+        finish();
         return;
       }
 
@@ -512,18 +620,16 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         return;
       }
 
-      localStorage.removeItem(HO_SW_KEY);
-      setHoSw(null);
       const checkoutWt = json.workTypeName ?? hoSw.workTypeName;
       if (requireHoReport && isHomeOffice(checkoutWt) && json.logId) {
+        localStorage.removeItem(HO_SW_KEY);
+        setHoSw(null);
         setHoLogId(json.logId);
         setHoNote('');
-        setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.duration ?? hoSwDisplay}`);
+        setSuccessMessage(`HomeOffice zaznamenán ✓ ${totalLabel}`);
         setScreen('ho-activity');
       } else {
-        setSuccessMessage(`HomeOffice zaznamenán ✓ ${json.duration ?? hoSwDisplay}`);
-        setScreen('success-checkin');
-        resetKiosk();
+        finish();
       }
     } catch {
       setHoFormError(t('Síťová chyba. Zkuste to prosím znovu.', 'Network error. Please try again.'));
@@ -648,6 +754,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       <button
                         key={wt.id}
                         onClick={() => {
+                          setHoFormMode('stopwatch');
                           setHoFormDate(localDateStr(0));
                           setHoFormStart('');
                           setHoFormEnd('');
@@ -663,7 +770,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                         <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0" fill="none" stroke="#2f6b45" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6.5 8 6.5M6.5 9.6V19h11V9.6" /></svg>
                         <div className="flex-1 text-left">
                           <div className="font-semibold">{wt.name}</div>
-                          <div className="text-[#8a929c] text-sm font-normal">{t('Zpětné zadání docházky / Stopky', 'Retrospective entry / Timer')}</div>
+                          <div className="text-[#8a929c] text-sm font-normal">{t('Spustit stopky nebo zadat zpětně', 'Start the timer or enter it later')}</div>
                         </div>
                         <span className="text-[#8a929c] text-xl">→</span>
                       </button>
@@ -894,11 +1001,16 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
         <div className="w-full max-w-lg flex flex-col items-center gap-5">
           <div className="text-center">
             <div className="text-5xl mb-2">🏠</div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#111820]">{t('HomeOffice — Zpětné zadání', 'HomeOffice — Retrospective entry')}</h1>
-            <p className="text-[#8a929c] mt-1 text-base">{t('Zadejte kdy jste pracoval(a) z domova', 'Enter when you worked from home')}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#111820]">{hoFormWorkTypeName || 'HomeOffice'}</h1>
+            <p className="text-[#8a929c] mt-1 text-base">
+              {hoFormMode === 'stopwatch'
+                ? t('Spusťte si stopky — zastavíte je, až skončíte', 'Start the timer — stop it when you finish')
+                : t('Zadejte kdy jste pracoval(a) z domova', 'Enter when you worked from home')}
+            </p>
           </div>
 
-          {/* Date picker with quick buttons */}
+          {/* Date picker with quick buttons — retrospective modes only (live timer is "now") */}
+          {hoFormMode !== 'stopwatch' && (
           <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-4 flex flex-col gap-3">
             <label className="text-[#8a929c] text-sm font-medium uppercase tracking-wider">{t('Datum', 'Date')}</label>
             <div className="flex gap-2 flex-wrap">
@@ -924,12 +1036,19 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               />
             </div>
           </div>
+          )}
 
           {/* Time range / Hours / Stopwatch toggle */}
           <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-[#8a929c] text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
               <div className="flex rounded-lg overflow-hidden border border-[#e2e0dc] text-sm">
+                <button
+                  onClick={() => setHoFormMode('stopwatch')}
+                  className={`px-3 py-1 transition-all ${hoFormMode === 'stopwatch' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
+                >
+                  ⏱ {t('Stopky', 'Timer')}
+                </button>
                 <button
                   onClick={() => setHoFormMode('range')}
                   className={`px-3 py-1 transition-all ${hoFormMode === 'range' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
@@ -941,12 +1060,6 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                   className={`px-3 py-1 transition-all ${hoFormMode === 'hours' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
                 >
                   {t('Počet hodin', 'Total hours')}
-                </button>
-                <button
-                  onClick={() => setHoFormMode('stopwatch')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'stopwatch' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
-                >
-                  ⏱ {t('Stopky', 'Timer')}
                 </button>
               </div>
             </div>
@@ -1060,34 +1173,43 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       )}
 
       {/* HomeOffice Stopwatch Screen */}
-      {screen === 'ho-stopwatch' && hoSw && (
+      {screen === 'ho-stopwatch' && hoSw && (() => {
+        const paused = !hoSw.runningSince;
+        return (
         <div className="w-full max-w-lg flex flex-col items-center gap-6">
           <div className="text-center">
-            <div className="text-5xl mb-2">⏱</div>
+            <div className="text-5xl mb-2">{paused ? '⏸' : '⏱'}</div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#111820]">{hoSw.workTypeName}</h1>
             <p className="text-[#8a929c] mt-1 text-sm">
               {t('Zahájeno', 'Started')}: {new Date(hoSw.startAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
 
-          {/* Big timer display */}
+          {/* Big timer display — amber + "Pozastaveno" tag while paused */}
           <div className="bg-white border border-[#e2e0dc] rounded-[9px] px-10 py-8 text-center w-full">
-            <div className="text-6xl sm:text-7xl font-mono font-bold text-emerald-600 tracking-widest tabular-nums">
+            <div className={`text-6xl sm:text-7xl font-mono font-bold tracking-widest tabular-nums ${paused ? 'text-amber-600' : 'text-emerald-600'}`}>
               {hoSwDisplay}
             </div>
-            <p className="text-slate-500 text-sm mt-2">{t('hh:mm:ss', 'hh:mm:ss')}</p>
+            <p className="text-slate-500 text-sm mt-2">
+              {paused
+                ? <span className="inline-flex items-center gap-1.5 text-amber-600 font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{t('Pozastaveno', 'Paused')}</span>
+                : t('hh:mm:ss', 'hh:mm:ss')}
+            </p>
           </div>
 
           {hoFormError && (
             <p className="text-red-400 text-sm text-center bg-red-900/30 rounded-xl px-4 py-2 w-full">{hoFormError}</p>
           )}
 
+          {/* Pause / Resume + Stop */}
           <div className="flex gap-3 w-full">
             <button
-              onClick={() => { setHoFormError(''); setScreen('pin'); setPin(''); }}
-              className="flex-1 min-h-[56px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base font-semibold rounded-xl transition-all active:scale-95"
+              onClick={paused ? handleHoStopwatchResume : handleHoStopwatchPause}
+              disabled={hoLoading}
+              className="flex-1 min-h-[56px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {t('Zpět na kiosk', 'Back to kiosk')}
+              {hoLoading ? <span className="inline-block w-5 h-5 border-2 border-[#111820] border-t-transparent rounded-full animate-spin" /> : <span className="text-lg leading-none">{paused ? '▶' : '⏸'}</span>}
+              {paused ? t('Pokračovat', 'Resume') : t('Pozastavit', 'Pause')}
             </button>
             <button
               onClick={handleHoStopwatchStop}
@@ -1098,8 +1220,17 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               {t('Ukončit a uložit', 'Stop & save')}
             </button>
           </div>
+
+          {/* Sharing the kiosk while the timer runs — leaves it running */}
+          <button
+            onClick={() => { setHoFormError(''); setScreen('pin'); setPin(''); }}
+            className="text-[#8a929c] hover:text-[#111820] text-sm font-medium transition-colors"
+          >
+            {t('Zpět na kiosk', 'Back to kiosk')}
+          </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* HomeOffice Activity Dialog */}
       {screen === 'ho-activity' && (
