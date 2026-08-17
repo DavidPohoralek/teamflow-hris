@@ -894,6 +894,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       onConfirm={handlePinSubmit}
       loading={loading}
       error={error || null}
+      footer="Zapomenutý PIN? Obraťte se na manažera."
       status={presentCount != null && presentCount > 0
         ? { dot: '#3f9e6a', text: presentCount === 1 ? '1 člověk ve směně' : `${presentCount} lidí ve směně` }
         : null}
