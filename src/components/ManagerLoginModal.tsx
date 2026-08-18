@@ -36,6 +36,8 @@ function AdminForm({ orgId, onSuccess, onBack }: { orgId: string; onSuccess: () 
         const data = await res.json();
         if (data.token) localStorage.setItem(MANAGER_SESSION_KEY, data.token);
         onSuccess();
+      } else if (res.status === 429) {
+        setError(t('Příliš mnoho pokusů. Zkuste to za 15 minut.', 'Too many attempts. Try again in 15 minutes.'));
       } else {
         setError(t('Nesprávné heslo', 'Incorrect password'));
       }
