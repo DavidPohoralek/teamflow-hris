@@ -1353,13 +1353,16 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         <tr key={`${emp.id}-${wDays[0]}`}
           className="group border-b border-[#f4f2ef] last:border-b-0 bg-white transition-colors duration-75">
           <td
-            className="sticky left-0 z-10 pl-3 pr-3.5 py-[3px] border-r border-[#ececea] transition-colors duration-75 h-[31px]"
+            className="sticky left-0 z-10 pl-3 pr-3.5 py-[3px] border-r border-[#ececea] transition-colors duration-75 h-[31px] relative"
             style={{
               backgroundColor: deptColor ? catColors(deptColor).tint : '#ffffff',
               borderLeft: `3px solid ${deptColor ? catColors(deptColor).solid : 'transparent'}`,
             }}
           >
-            <div className="flex items-center gap-1.5 min-w-0">
+            {/* Row-hover highlight — darkens the name cell together with the day cells.
+                An overlay (not a bg class) so it works over the inline department tint. */}
+            <span aria-hidden className="pointer-events-none absolute inset-0 transition-colors duration-75 group-hover:bg-[#111820]/[0.05]" />
+            <div className="relative flex items-center gap-1.5 min-w-0">
               {/* Narrow screens: department shown as a color dot before the name */}
               {emp.department && deptColor && (
                 <span
