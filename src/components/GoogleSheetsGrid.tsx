@@ -1238,12 +1238,8 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           </div>
         );
       }
-      // Empty cell — quiet center dot (spec: no hatching, no XXX)
-      return (
-        <div className="flex items-center justify-center h-full w-full">
-          <span className="select-none text-[13px] leading-none" style={{ color: '#dad7d1', userSelect: 'none' }}>·</span>
-        </div>
-      );
+      // Variant A: empty is truly empty — no filler dot.
+      return null;
     }
 
     return (
@@ -1351,11 +1347,14 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       const deptColor = emp.department ? (deptColorMap.get(emp.department) ?? '#94a3b8') : null;
       return (
         <tr key={`${emp.id}-${wDays[0]}`}
-          className="group border-b border-[#f4f2ef] last:border-b-0 bg-white transition-colors duration-75">
+          className={`group border-b border-[#f4f2ef] last:border-b-0 transition-colors duration-75 ${ri % 2 === 1 ? 'bg-[#faf9f7]' : 'bg-white'}`}>
           <td
             className="sticky left-0 z-10 pl-3 pr-3.5 py-[3px] border-r border-[#ececea] transition-colors duration-75 h-[31px] relative"
             style={{
-              backgroundColor: deptColor ? catColors(deptColor).tint : '#ffffff',
+              // Variant A: calm rows — no department tint on the name cell, just
+              // the zebra background (opaque so day cells don't bleed under the
+              // sticky column) plus the department rail + label.
+              backgroundColor: ri % 2 === 1 ? '#faf9f7' : '#ffffff',
               borderLeft: `3px solid ${deptColor ? catColors(deptColor).solid : 'transparent'}`,
             }}
           >
@@ -1396,7 +1395,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isQuietDay = isClosed || isDimmed;
             return (
               <td key={date}
-                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#f5f3ef] transition-colors duration-75 ${isStaged ? 'bg-[#111820]/[0.07] border-[#111820]/25' : isToday ? 'bg-[#111820]/[0.04] border-[#111820]/15' : 'border-[#f4f2ef]'}`}
+                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#f5f3ef] transition-colors duration-75 ${isStaged ? 'bg-[#111820]/[0.07] border-[#111820]/25' : isToday ? 'bg-[#fdf3e7] border-[#eecfa8]' : 'border-[#f4f2ef]'}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
@@ -1716,7 +1715,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                       <th key={d} className={`tf-mono py-2 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#e9e7e3] last:border-r-0 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
                         style={{ color: isNonWorking ? '#8a929c' : '#111820', borderBottom: '2px solid #111820' }}
                       >
-                        <span className={isToday ? 'border-b-2 border-[#111820] pb-0.5' : ''}>{DAY_NAMES[i]} {dayNum}</span>
+                        <span className={isToday ? 'border-b-2 border-[#C97C2A] pb-0.5' : ''}>{DAY_NAMES[i]} {dayNum}</span>
                       </th>
                     );
                   })}
@@ -1736,7 +1735,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         className={`tf-mono px-1 py-2.5 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#f4f2ef] last:border-r-0 ${isQuiet ? 'bg-[#faf9f7]' : 'bg-white'}`}
                         style={{ color: isQuiet ? '#8a929c' : '#111820', borderBottom: '2px solid #111820' }}
                       >
-                        <span className={isToday ? 'border-b-2 border-[#111820] pb-0.5' : ''}>{name} {dayNum}</span>
+                        <span className={isToday ? 'border-b-2 border-[#C97C2A] pb-0.5' : ''}>{name} {dayNum}</span>
                       </th>
                     );
                   })}
@@ -1819,7 +1818,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         return (
                           <td key={d} className={`tf-mono py-1 text-center border-r border-[#e9e7e3] last:border-r-0 group-hover/sep:py-1.5 transition-all duration-150 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
                             style={{ borderTop: '2px solid #111820', borderBottom: '2px solid #111820' }}>
-                            <span className={`text-[10.5px] font-medium uppercase tracking-[.04em] leading-tight ${isToday ? 'border-b-2 border-[#111820] pb-px' : ''}`}
+                            <span className={`text-[10.5px] font-medium uppercase tracking-[.04em] leading-tight ${isToday ? 'border-b-2 border-[#C97C2A] pb-px' : ''}`}
                               style={{ color: isNonWorking ? '#8a929c' : '#111820' }}>
                               {DAY_NAMES[i]} {dayNum}
                             </span>
