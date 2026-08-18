@@ -1356,43 +1356,30 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       const k = `${e.id}|${d}`;
       return (dataMap.get(k)?.length ?? 0) > 0 || vacationSet.has(k);
     });
-    const renderOneRow = (emp: Employee) => {
+    const renderOneRow = (emp: Employee, ri = 0) => {
       const deptColor = emp.department ? (deptColorMap.get(emp.department) ?? '#94a3b8') : null;
+      // Very light zebra — a warm off-white, kept lighter than the weekend/DOV grey.
+      const zebra = ri % 2 === 1 ? '#f9f8f6' : '#ffffff';
       return (
         <tr key={`${emp.id}-${wDays[0]}`}
-          className={`group border-b border-[#f4f2ef] last:border-b-0 transition-colors duration-75 bg-white`}>
+          className={`group border-b border-[#f4f2ef] last:border-b-0 transition-colors duration-75`}
+          style={{ backgroundColor: zebra }}>
           <td
             className="sticky left-0 z-10 pl-3 pr-3.5 py-[3px] border-r border-[#ececea] transition-colors duration-75 h-[31px] relative"
             style={{
-              // Variant A: calm rows — no department tint on the name cell, just
-              // the zebra background (opaque so day cells don't bleed under the
-              // sticky column) plus the department rail + label.
-              backgroundColor: '#ffffff',
+              // No department tint on the name cell — just the light zebra
+              // background (opaque so day cells don't bleed under the sticky
+              // column) plus the department rail + label.
+              backgroundColor: zebra,
               borderLeft: `3px solid ${deptColor ? catColors(deptColor).solid : 'transparent'}`,
             }}
           >
             {/* Row-hover highlight — darkens the name cell together with the day cells.
                 An overlay (not a bg class) so it works over the inline department tint. */}
             <span aria-hidden className="pointer-events-none absolute inset-0 transition-colors duration-75 group-hover:bg-[#111820]/[0.08]" />
-            <div className="relative flex items-center gap-1.5 min-w-0">
-              {/* Narrow screens: department shown as a color dot before the name */}
-              {!grouped && emp.department && deptColor && (
-                <span
-                  className="xl:hidden flex-shrink-0 w-2 h-2 rounded-full"
-                  style={{ background: catColors(deptColor).solid }}
-                  title={emp.department}
-                />
-              )}
+            <div className="relative flex items-center min-w-0">
+              {/* Department is conveyed only by the subtle coloured left rail. */}
               <span className="text-[12.5px] font-normal leading-tight truncate" style={{ color: '#111820' }} title={emp.name}>{emp.name}</span>
-              {/* Wide screens: uppercase department label (category fill/text) */}
-              {!grouped && emp.department && deptColor && (
-                <span
-                  className="hidden xl:inline flex-shrink-0 text-[9.5px] font-normal uppercase tracking-[.05em] leading-none px-1.5 py-[3px] rounded-[3px] whitespace-nowrap"
-                  style={{ background: catColors(deptColor).fill, color: catColors(deptColor).text }}
-                >
-                  {emp.department}
-                </span>
-              )}
             </div>
           </td>
           {wDays.map((date, di) => {
@@ -1445,7 +1432,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
     // Month view keeps the flat list. Week/day groups by department and
     // collapses everyone without a shift this period into an expander.
     if (!grouped) {
-      return displayEmployees.map((emp) => renderOneRow(emp));
+      return displayEmployees.map((emp, ri) => renderOneRow(emp, ri));
     }
 
     const groups: { dept: string; emps: Employee[] }[] = [];
@@ -1858,7 +1845,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               </tr>
             )}
 
-            {!loading && viewMode === 'week' && renderEmployeeRows(weekDays, plansMap, false, true)}
+            {!loading && viewMode === 'week' && renderEmployeeRows(weekDays, plansMap)}
 
             {!loading && viewMode === 'month' && monthWeeks.map((weekMon, wi) => {
               const wDays = getWeekDays(weekMon);
@@ -1904,7 +1891,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                       })}
                     </tr>
                   )}
-                  {renderEmployeeRows(wDays, fullPlansMap, true, true)}
+                  {renderEmployeeRows(wDays, fullPlansMap, true)}
                 </>
               );
             })}
