@@ -122,11 +122,16 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [employeeName, setEmployeeName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [employeeDepartment, setEmployeeDepartment] = useState<string | null>(null);
-  const [showAllWorkTypes, setShowAllWorkTypes] = useState(false);
   const [presence, setPresence] = useState<PresenceRecord | null>(null);
   const [presentCount, setPresentCount] = useState<number | null>(null);
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType | null>(null);
+  // Optional activity tag added on top of the department (recorded as the log note)
+  const [selectedActivity, setSelectedActivity] = useState<WorkType | null>(null);
+  const [showOtherWork, setShowOtherWork] = useState(false);
+  const [showActivityPicker, setShowActivityPicker] = useState(false);
+  // Live clock shown in the check-in header (null until mounted → no SSR mismatch)
+  const [nowTs, setNowTs] = useState<Date | null>(null);
 
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -189,6 +194,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
     return () => clearInterval(id);
   }, [orgId]);
 
+  // Live clock for the check-in header — updates every 15s so the minute never lags.
+  useEffect(() => {
+    setNowTs(new Date());
+    const id = setInterval(() => setNowTs(new Date()), 15_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Restore active stopwatch from localStorage on mount
   useEffect(() => {
     try {
@@ -218,6 +230,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setEmployeeId('');
       setPresence(null);
       setSelectedWorkType(null);
+      setSelectedActivity(null);
+      setShowOtherWork(false);
+      setShowActivityPicker(false);
       setSuccessMessage('');
       setErrorMessage('');
       setPinError(false);
@@ -270,7 +285,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setEmployeeId(data.employeeId ?? '');
       const dept = data.employeeDepartment ?? null;
       setEmployeeDepartment(dept);
-      setShowAllWorkTypes(false);
+      setSelectedActivity(null);
+      setShowOtherWork(false);
+      setShowActivityPicker(false);
       // Auto-select the primary department work type if it exists
       if (dept) {
         const match = workTypes.find((wt) => wt.name.toLowerCase() === dept.toLowerCase());
@@ -321,6 +338,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           pin,
           workTypeId: selectedWorkType.id,
           workTypeName: selectedWorkType.name,
+          note: selectedActivity?.name ?? undefined,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -728,168 +746,179 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   return (
     <div className="tf-sans flex-1 bg-[#fbfaf8] text-[#111820] flex flex-col items-center justify-center p-4 select-none overflow-auto">
       {/* Check-in Screen */}
-      {screen === 'checkin' && (
-        <div className="w-full max-w-2xl flex flex-col items-center gap-4 sm:gap-8">
-          <h1 className="text-2xl sm:text-4xl font-bold text-[#111820] text-center">
-            {t('Dobrý den', 'Hello')}, {employeeName}!
-          </h1>
-          <p className="text-[#8a929c] text-sm sm:text-xl">{t('Vyberte typ pracovního místa:', 'Select work location:')}</p>
+      {screen === 'checkin' && (() => {
+        const hoWorkTypes = workTypes.filter((wt) => isHomeOffice(wt.name));
+        const activityTypes = workTypes.filter((wt) => wt.category === 'activity');
+        const regularTypes = workTypes.filter((wt) => !isHomeOffice(wt.name) && wt.category !== 'activity');
+        const primaryWt = employeeDepartment
+          ? regularTypes.find((wt) => wt.name.toLowerCase() === employeeDepartment.toLowerCase())
+          : null;
+        const otherRegular = regularTypes.filter((wt) => wt.id !== primaryWt?.id);
+        const firstName = employeeName.trim().split(/\s+/).pop() || employeeName;
+        const timeStr = nowTs ? nowTs.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : '';
+        const hoWt = hoWorkTypes[0];
 
-          {/* Work type selection */}
-          {(() => {
-            const hoWorkTypes = workTypes.filter((wt) => isHomeOffice(wt.name));
-            const activityTypes = workTypes.filter((wt) => wt.category === 'activity');
-            const regularTypes = workTypes.filter((wt) => !isHomeOffice(wt.name) && wt.category !== 'activity');
-            const primaryWt = employeeDepartment
-              ? regularTypes.find((wt) => wt.name.toLowerCase() === employeeDepartment.toLowerCase())
-              : null;
-            const visibleRegular = (primaryWt && !showAllWorkTypes) ? [primaryWt] : regularTypes;
-            return (
-              <div className="w-full flex flex-col items-center gap-4">
-                {/* HomeOffice banner — distinct section for retrospective entry */}
-                {hoWorkTypes.length > 0 && (
-                  <div className="w-full">
-                    <p className="text-[10px] text-[#8a929c] uppercase tracking-[.14em] mb-2 text-center">{t('HomeOffice', 'HomeOffice')}</p>
-                    {hoWorkTypes.map((wt) => (
-                      <button
-                        key={wt.id}
-                        onClick={() => {
-                          setHoFormMode('stopwatch');
-                          setHoFormDate(localDateStr(0));
-                          setHoFormStart('');
-                          setHoFormEnd('');
-                          setHoFormSummary('');
-                          setHoFormError('');
-                          setHoFormWorkTypeId(wt.id);
-                          setHoFormWorkTypeName(wt.name);
-                          setScreen('ho-form');
-                        }}
-                        style={{ boxShadow: 'inset 3px 0 0 #4a9d6a' }}
-                        className="w-full flex items-center gap-4 px-5 py-4 rounded-[12px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] font-semibold text-base sm:text-lg transition-all duration-150 active:scale-[0.98]"
-                      >
-                        <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0" fill="none" stroke="#2f6b45" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6.5 8 6.5M6.5 9.6V19h11V9.6" /></svg>
-                        <div className="flex-1 text-left">
-                          <div className="font-semibold">{wt.name}</div>
-                          <div className="text-[#8a929c] text-sm font-normal">{t('Spustit stopky nebo zadat zpětně', 'Start the timer or enter it later')}</div>
-                        </div>
-                        <span className="text-[#8a929c] text-xl">→</span>
-                      </button>
-                    ))}
+        // A single selectable work-type row (radio + colour swatch + name)
+        const workRow = (wt: WorkType) => {
+          const sel = selectedWorkType?.id === wt.id;
+          const cat = catColors(wt.color);
+          return (
+            <button
+              key={wt.id}
+              onClick={() => { setSelectedWorkType(wt); setShowOtherWork(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-[12px] border text-left transition-all active:scale-[0.99] ${sel ? 'border-[#111820] bg-white' : 'border-[#e2e0dc] bg-white hover:bg-[#f7f5f1]'}`}
+              style={sel ? { boxShadow: `inset 3px 0 0 ${cat.solid}` } : undefined}
+            >
+              <span className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${sel ? 'border-[#111820]' : 'border-[#c9cdd3]'}`}>
+                {sel && <span className="w-2.5 h-2.5 rounded-full bg-[#111820]" />}
+              </span>
+              <span className="w-3.5 h-3.5 rounded-[3px] shrink-0" style={{ background: cat.solid }} />
+              <span className="flex-1 min-w-0">
+                <span className="block font-semibold text-[#111820] truncate">{wt.name}</span>
+                {wt.id === primaryWt?.id && (
+                  <span className="block text-[13px] text-[#8a929c]">{t('Vaše primární oddělení', 'Your primary department')}</span>
+                )}
+              </span>
+            </button>
+          );
+        };
+
+        return (
+          <div className="w-full max-w-xl flex flex-col gap-4">
+            {/* ── Check-in card ── */}
+            <div className="w-full bg-white border border-[#e9e7e3] rounded-2xl shadow-sm p-5 sm:p-6 flex flex-col gap-4">
+              {/* Greeting + live clock */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-[27px] font-bold text-[#111820] leading-tight truncate">
+                    {t('Dobrý den', 'Hello')}, {firstName}
+                  </h1>
+                  <p className="text-[#8a929c] text-sm mt-0.5">{t('Kam dnes zapisujete příchod?', 'Where are you clocking in today?')}</p>
+                </div>
+                <div className="tf-mono text-xl sm:text-2xl font-semibold text-[#111820] tabular-nums shrink-0 pt-1">{timeStr}</div>
+              </div>
+
+              <div className="border-t border-[#f0eee9]" />
+
+              {/* Department / work type */}
+              <div className="flex flex-col gap-2">
+                {primaryWt
+                  ? workRow(primaryWt)
+                  : (regularTypes.length > 0
+                      ? regularTypes.map(workRow)
+                      : <p className="text-[#8a929c] text-sm py-1">{t('Nemáte přiřazené oddělení — vyberte typ práce níže.', 'No department assigned — pick a work type below.')}</p>)}
+
+                {primaryWt && otherRegular.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setShowOtherWork((v) => !v)}
+                      className="self-start inline-flex items-center gap-1 text-[14px] text-[#8a929c] hover:text-[#111820] font-medium transition-colors"
+                    >
+                      {t('Jiné oddělení nebo typ práce', 'Other department or work type')}
+                      <span className={`text-[11px] transition-transform ${showOtherWork ? 'rotate-180' : ''}`}>▾</span>
+                    </button>
+                    {showOtherWork && <div className="flex flex-col gap-2">{otherRegular.map(workRow)}</div>}
                   </div>
                 )}
-
-                {/* Regular work types — "Typ práce" */}
-                {visibleRegular.length > 0 && (
-                  <>
-                    <p className="text-[10px] text-[#8a929c] uppercase tracking-[.14em] mt-1 self-start">
-                      {t('Typ práce', 'Work type')}
-                    </p>
-                    {/* Mobile list */}
-                    <div className="flex flex-col gap-2 sm:hidden w-full">
-                      {visibleRegular.map((wt) => {
-                        const cat = catColors(wt.color);
-                        const isSelected = selectedWorkType?.id === wt.id;
-                        return (
-                          <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                            style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
-                            className="flex items-center gap-3 px-4 py-4 rounded-[12px] w-full font-semibold text-base transition-all duration-150 active:scale-[0.98]"
-                          >
-                            <span className="flex-1 text-left">{wt.name}</span>
-                            {isSelected && <span className="text-lg">✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {/* Desktop grid */}
-                    <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
-                      {visibleRegular.map((wt) => {
-                        const cat = catColors(wt.color);
-                        const isSelected = selectedWorkType?.id === wt.id;
-                        return (
-                          <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                            style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
-                            className="flex flex-col items-center justify-center gap-2 p-6 rounded-[14px] min-h-[120px] font-semibold text-xl transition-all duration-150 active:scale-95"
-                          >
-                            <span>{wt.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {/* "Více" button */}
-                    {primaryWt && !showAllWorkTypes && (
-                      <button
-                        onClick={() => setShowAllWorkTypes(true)}
-                        className="text-[#8a929c] hover:text-[#111820] text-sm font-medium underline underline-offset-2 transition-colors mt-1"
-                      >
-                        {t('Více možností', 'More options')}
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {/* Activity types — "Aktivity" */}
-                {activityTypes.length > 0 && (
-                  <>
-                    <div className="w-full border-t border-[#e9e7e3] pt-3">
-                      <p className="text-[10px] text-[#8a929c] uppercase tracking-[.14em] mb-3">{t('Aktivity', 'Activities')}</p>
-                      {/* Mobile list */}
-                      <div className="flex flex-col gap-2 sm:hidden">
-                        {activityTypes.map((wt) => {
-                          const cat = catColors(wt.color);
-                          const isSelected = selectedWorkType?.id === wt.id;
-                          return (
-                            <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                              style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
-                              className="flex items-center gap-3 px-4 py-4 rounded-[12px] w-full font-semibold text-base transition-all duration-150 active:scale-[0.98]"
-                            >
-                              <span className="flex-1 text-left">{wt.name}</span>
-                              {isSelected && <span className="text-lg">✓</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {/* Desktop grid */}
-                      <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {activityTypes.map((wt) => {
-                          const cat = catColors(wt.color);
-                          const isSelected = selectedWorkType?.id === wt.id;
-                          return (
-                            <button key={wt.id} onClick={() => setSelectedWorkType(wt)}
-                              style={{ background: cat.fill, color: cat.text, boxShadow: `inset 4px 0 0 ${cat.solid}${isSelected ? `, 0 0 0 2px ${cat.solid}` : ''}` }}
-                              className="flex flex-col items-center justify-center gap-2 p-5 rounded-[14px] min-h-[100px] font-semibold text-lg transition-all duration-150 active:scale-95"
-                            >
-                              <span className="text-sm">{wt.name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
-            );
-          })()}
 
-          <div className="flex gap-3 w-full mt-1">
-            <button
-              onClick={() => { setScreen('pin'); setPin(''); }}
-              className="flex-1 min-h-[48px] sm:min-h-[64px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base sm:text-xl font-semibold rounded-xl transition-all active:scale-95"
-            >
-              {t('Zpět', 'Back')}
-            </button>
-            <button
-              onClick={handleCheckin}
-              disabled={!selectedWorkType || loading}
-              className="flex-[2] min-h-[48px] sm:min-h-[64px] bg-[#111820] hover:bg-[#2a333e] text-white text-base sm:text-xl font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : null}
-              {t('Zaznamenat příchod', 'Clock in')}
-            </button>
+              {/* Activity (optional) */}
+              {activityTypes.length > 0 && (
+                <>
+                  <div className="border-t border-[#f0eee9]" />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#8a929c] text-sm font-medium">{t('Aktivita (nepovinné)', 'Activity (optional)')}</span>
+                      {selectedActivity ? (
+                        <button
+                          onClick={() => setSelectedActivity(null)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e2e0dc] bg-white text-sm font-semibold text-[#111820] hover:bg-[#f7f5f1] transition-colors"
+                        >
+                          <span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: catColors(selectedActivity.color).solid }} />
+                          {selectedActivity.name}
+                          <span className="text-[#8a929c] ml-0.5">✕</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowActivityPicker((v) => !v)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#e2e0dc] bg-white text-sm font-semibold text-[#111820] hover:bg-[#f7f5f1] transition-colors"
+                        >
+                          {t('Přidat aktivitu', 'Add activity')}
+                          <span className={`text-[11px] transition-transform ${showActivityPicker ? 'rotate-180' : ''}`}>▾</span>
+                        </button>
+                      )}
+                    </div>
+                    {showActivityPicker && !selectedActivity && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {activityTypes.map((wt) => {
+                          const cat = catColors(wt.color);
+                          return (
+                            <button
+                              key={wt.id}
+                              onClick={() => { setSelectedActivity(wt); setShowActivityPicker(false); }}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-[10px] border border-[#e2e0dc] bg-white hover:bg-[#f7f5f1] text-sm font-medium text-[#111820] transition-colors"
+                            >
+                              <span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: cat.solid }} />
+                              {wt.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div className="border-t border-[#f0eee9]" />
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setScreen('pin'); setPin(''); }}
+                  className="px-5 min-h-[52px] bg-white border border-[#e2e0dc] hover:bg-[#f4f2ef] text-[#111820] text-base font-semibold rounded-xl transition-all active:scale-95"
+                >
+                  {t('Zpět', 'Back')}
+                </button>
+                <button
+                  onClick={handleCheckin}
+                  disabled={!selectedWorkType || loading}
+                  className="flex-1 min-h-[52px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 px-3"
+                >
+                  {loading && <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  <span className="truncate">
+                    {selectedWorkType
+                      ? `${t('Zaznamenat příchod', 'Clock in')} — ${selectedWorkType.name}${timeStr ? `, ${timeStr}` : ''}`
+                      : t('Zaznamenat příchod', 'Clock in')}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Home office card ── */}
+            {hoWt && (
+              <button
+                onClick={() => {
+                  setHoFormMode('stopwatch');
+                  setHoFormDate(localDateStr(0));
+                  setHoFormStart(''); setHoFormEnd(''); setHoFormSummary(''); setHoFormError('');
+                  setHoFormWorkTypeId(hoWt.id); setHoFormWorkTypeName(hoWt.name);
+                  setScreen('ho-form');
+                }}
+                className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-white border border-[#e9e7e3] shadow-sm hover:bg-[#f7f5f1] text-left transition-all active:scale-[0.99]"
+              >
+                <span className="w-10 h-10 rounded-xl bg-[#eef3ee] flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#2f6b45" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6.5 8 6.5M6.5 9.6V19h11V9.6" /></svg>
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-semibold text-[#111820]">{t('Pracuji z domu', 'Working from home')}</span>
+                  <span className="block text-[13px] text-[#8a929c]">{t('Otevřít home office — stopky nebo zadat zpětně', 'Open home office — timer or enter later')}</span>
+                </span>
+                <span className="text-[#8a929c] text-xl shrink-0">→</span>
+              </button>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Check-out Screen */}
       {screen === 'checkout' && (
@@ -999,14 +1028,18 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       {/* HomeOffice Retrospective Form */}
       {screen === 'ho-form' && (
         <div className="w-full max-w-lg flex flex-col items-center gap-5">
-          <div className="text-center">
-            <div className="text-5xl mb-2">🏠</div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#111820]">{hoFormWorkTypeName || 'HomeOffice'}</h1>
-            <p className="text-[#8a929c] mt-1 text-base">
-              {hoFormMode === 'stopwatch'
-                ? t('Spusťte si stopky — zastavíte je, až skončíte', 'Start the timer — stop it when you finish')
-                : t('Zadejte kdy jste pracoval(a) z domova', 'Enter when you worked from home')}
-            </p>
+          <div className="w-full flex items-center gap-3.5">
+            <span className="w-12 h-12 rounded-2xl bg-[#eef3ee] flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="#2f6b45" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-6.5 8 6.5M6.5 9.6V19h11V9.6" /></svg>
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#111820] leading-tight truncate">{hoFormWorkTypeName || t('Pracuji z domu', 'Working from home')}</h1>
+              <p className="text-[#8a929c] text-sm mt-0.5">
+                {hoFormMode === 'stopwatch'
+                  ? t('Spusťte si stopky — zastavíte je, až skončíte', 'Start the timer — stop it when you finish')
+                  : t('Zadejte, kdy jste pracoval(a) z domova', 'Enter when you worked from home')}
+              </p>
+            </div>
           </div>
 
           {/* Date picker with quick buttons — retrospective modes only (live timer is "now") */}

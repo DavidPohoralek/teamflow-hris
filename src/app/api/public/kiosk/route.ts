@@ -60,12 +60,13 @@ async function notifyDoctorVisit(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { orgId, pin, action, workTypeId, workTypeName } = body as {
+    const { orgId, pin, action, workTypeId, workTypeName, note: checkinNote } = body as {
       orgId: string
       pin: string
       action: 'checkin' | 'checkout' | 'ho-record'
       workTypeId?: string
       workTypeName?: string
+      note?: string
     }
 
     if (!orgId || !pin || !action) {
@@ -125,6 +126,8 @@ export async function POST(req: NextRequest) {
       }
       if (workTypeId) insertData.work_type_id = workTypeId
       if (workTypeName) insertData.work_type_name = workTypeName
+      // Optional activity tag chosen at check-in, stored as the log note
+      if (checkinNote && checkinNote.trim()) insertData.note = checkinNote.trim()
 
       const { error: insertError } = await supabase
         .from('attendance_logs')
