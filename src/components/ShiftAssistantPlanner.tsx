@@ -418,8 +418,20 @@ function PlannerView({ orgId, month, onMonthChange, onOpenNotifications, onSwitc
 
   useEffect(() => {
     fetchBell();
-    const iv = setInterval(fetchBell, 60_000);
-    return () => clearInterval(iv);
+    // Pause while the tab is hidden; refresh on return.
+    let iv = setInterval(fetchBell, 180_000);
+    const onVisibility = () => {
+      clearInterval(iv);
+      if (!document.hidden) {
+        fetchBell();
+        iv = setInterval(fetchBell, 180_000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [fetchBell]);
 
   const unreadBellCount = bellItems.filter(n => !n.read).length;

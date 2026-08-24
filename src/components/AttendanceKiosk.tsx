@@ -183,15 +183,28 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       .catch(() => {});
   }, [orgId]);
 
-  // Live "X lidí ve směně" count for the PIN screen (refreshed periodically)
+  // Live "X lidí ve směně" count for the PIN screen (refreshed periodically).
+  // Polling pauses while the tab is hidden and refreshes on return — cuts
+  // needless compute hits on kiosks/tabs left open in the background.
   useEffect(() => {
     const load = () => fetch(`/api/public/presence?orgId=${orgId}`)
       .then((r) => r.json())
       .then((d: { summary?: { total?: number } }) => setPresentCount(d?.summary?.total ?? null))
       .catch(() => {});
     load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
+    let id = setInterval(load, 120_000);
+    const onVisibility = () => {
+      clearInterval(id);
+      if (!document.hidden) {
+        load();
+        id = setInterval(load, 120_000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [orgId]);
 
   // Live clock for the check-in header — updates every 15s so the minute never lags.

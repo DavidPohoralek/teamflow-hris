@@ -50,6 +50,8 @@ export async function GET(req: NextRequest) {
       .limit(1)
     const openLog = openLogs?.[0] ?? null;
 
+    // Per-employee (PIN) response — never cache: it's personal and must reflect
+    // a check-in/out the instant it happens.
     return NextResponse.json({
       employeeId: employee.id,
       employeeName: employee.name,
@@ -58,7 +60,7 @@ export async function GET(req: NextRequest) {
       presence: openLog
         ? { checkIn: openLog.check_in, workTypeName: openLog.work_type_name ?? null }
         : null,
-    });
+    }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
   // --- DASHBOARD MODE: no pin → return all present employees ---
@@ -136,11 +138,15 @@ export async function GET(req: NextRequest) {
     (a, b) => b.count - a.count
   );
 
+  // Org-wide presence (no PIN) is identical for everyone in the org and is
+  // polled by the kiosk / employee portal / dashboard. A short CDN cache lets
+  // those polls hit the edge instead of compute; ≤30 s staleness is harmless
+  // for a "who's on shift" count.
   return NextResponse.json({
     present,
     summary: {
       total: present.length,
       byWorkType,
     },
-  });
+  }, { headers: { 'Cache-Control': 'public, max-age=15, s-maxage=30, stale-while-revalidate=30' } });
 }

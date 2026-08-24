@@ -145,8 +145,20 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       .then((d: { summary?: { total?: number } }) => setPresentCount(d?.summary?.total ?? null))
       .catch(() => {});
     load();
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
+    // Pause polling while the tab is hidden; refresh on return.
+    let id = setInterval(load, 120_000);
+    const onVisibility = () => {
+      clearInterval(id);
+      if (!document.hidden) {
+        load();
+        id = setInterval(load, 120_000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [orgId]);
 
   const fetchVacationBalance = async (enteredPin: string) => {
