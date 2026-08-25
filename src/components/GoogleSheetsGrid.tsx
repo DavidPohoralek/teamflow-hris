@@ -537,6 +537,75 @@ function BulkShiftModal({ orgId, month, workTypes, isManagerMode, sessionEmploye
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// ── .ics export (employee's own shifts) ─────────────────────────────────────
+function icsEscape(s: string) {
+  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+function toIcsDateTime(date: string, time: string): string {
+  // date = YYYY-MM-DD, time = HH:MM → 20260601T090000
+  return `${date.replace(/-/g, '')}T${time.replace(':', '')}00`;
+}
+function toIcsDate(date: string): string {
+  return date.replace(/-/g, '');
+}
+/** Generate and trigger an .ics download of an employee's shifts (current month + 5 ahead). */
+async function downloadShiftsIcs(orgId: string, employeeId: string, employeeName: string, currentMonth: string) {
+  const [y, m] = currentMonth.split('-').map(Number);
+  const months: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(y, m - 1 + i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  const allPlans: { date: string; start_time: string | null; end_time: string | null; work_type: string | null }[] = [];
+  await Promise.all(months.map(async (mo) => {
+    try {
+      const res = await fetch(`/api/public/work-plans?orgId=${encodeURIComponent(orgId)}&employeeId=${encodeURIComponent(employeeId)}&month=${encodeURIComponent(mo)}`);
+      if (res.ok) {
+        const json = await res.json() as { plans?: { date: string; start_time: string | null; end_time: string | null; work_type: string | null }[] };
+        allPlans.push(...(json.plans ?? []));
+      }
+    } catch { /* ignore */ }
+  }));
+
+  allPlans.sort((a, b) => a.date.localeCompare(b.date));
+
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TeamFlow HRIS//CS',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsEscape(`Směny — ${employeeName}`)}`,
+    'X-WR-TIMEZONE:Europe/Prague',
+  ];
+
+  for (const plan of allPlans) {
+    const start = plan.start_time ? toIcsDateTime(plan.date, plan.start_time) : `${toIcsDate(plan.date)}T080000`;
+    const end   = plan.end_time   ? toIcsDateTime(plan.date, plan.end_time)   : `${toIcsDate(plan.date)}T160000`;
+    const summary = icsEscape(plan.work_type ?? 'Směna');
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:teamflow-shift-${plan.date}-${employeeId}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${summary}`,
+      `DESCRIPTION:${icsEscape(`${employeeName} · ${summary}`)}`,
+      'END:VEVENT',
+    );
+  }
+
+  lines.push('END:VCALENDAR');
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `smeny-${employeeName.replace(/\s+/g, '-').toLowerCase()}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthChange, hiddenElements = [] }: GoogleSheetsGridProps) {
   const t = useT();
 
@@ -1690,6 +1759,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           {/* PIN session — green pill (unified with Dovolená) OR attached PIN+OK */}
           {!isManagerMode && (
             sessionEmployee ? (
+              <>
+                <button
+                  onClick={() => downloadShiftsIcs(orgId, sessionEmployee.id, sessionEmployee.name, weekDays[3].slice(0, 7))}
+                  title={t('Stáhnout mé směny jako kalendář (.ics)', 'Download my shifts as a calendar (.ics)')}
+                  className="flex items-center gap-1.5 px-3 py-[7px] rounded-lg border border-[#e2e0dc] bg-white text-[#5c6672] hover:text-[#111820] hover:bg-[#f4f2ef] text-[12.5px] font-medium transition-colors shrink-0"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>
+                  .ics
+                </button>
               <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-[7px]">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                 <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
@@ -1699,6 +1777,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                   title={t('Odhlásit', 'Log out')}
                 >✕</button>
               </div>
+              </>
             ) : (
               <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className={`flex items-center rounded-lg overflow-hidden border ${pinInputError ? 'border-red-400' : 'border-[#e2e0dc]'} bg-white`}>
                 <input
