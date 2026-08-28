@@ -23,6 +23,7 @@ interface WorkPlanEntry {
   endTime: string | null;
   isEvening?: boolean;
   note?: string | null;
+  createdAt?: string | null;
 }
 
 interface WorkType {
@@ -2009,7 +2010,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
 
       {/* Context menu */}
       {contextMenu && (() => {
-        const MENU_H = 128, MENU_W = 168;
+        // Managers see when the shift was entered (date only) at the top.
+        const showCreated = isManagerMode && !!contextMenu.entry.createdAt;
+        const createdDate = showCreated
+          ? new Date(contextMenu.entry.createdAt as string).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Europe/Prague' })
+          : null;
+        const MENU_H = (showCreated ? 176 : 128), MENU_W = 168;
         const top = contextMenu.y + MENU_H > window.innerHeight ? contextMenu.y - MENU_H : contextMenu.y;
         const left = contextMenu.x + MENU_W > window.innerWidth ? contextMenu.x - MENU_W : contextMenu.x;
         return (
@@ -2018,6 +2024,15 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             className="bg-white rounded-xl shadow-xl border border-slate-200 py-1 min-w-[160px]"
             onClick={(e) => e.stopPropagation()}
           >
+            {showCreated && (
+              <>
+                <div className="px-4 pt-2 pb-1.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[.07em] text-[#8a929c]">{t('Zadáno', 'Created')}</div>
+                  <div className="tf-mono text-[12.5px] text-[#111820] mt-0.5">{createdDate}</div>
+                </div>
+                <div className="h-px bg-slate-100 my-1" />
+              </>
+            )}
             <button
               onClick={() => { setEditEntry(contextMenu.entry); setContextMenu(null); }}
               className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"

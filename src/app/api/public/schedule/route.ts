@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
       end_time,
       note,
       is_evening,
+      created_at,
       employees ( name, department ),
       work_types ( name, color )
     `
@@ -80,6 +81,7 @@ export async function GET(req: NextRequest) {
     endTime: row.end_time ?? null,
     isEvening: row.is_evening ?? false,
     note: row.note ?? null,
+    createdAt: row.created_at ?? null,
   }));
 
   // Query schedule_days for draft='A'
