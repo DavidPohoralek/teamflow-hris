@@ -1446,10 +1446,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
           >
             {/* Row-hover highlight — darkens the name cell together with the day cells.
                 An overlay (not a bg class) so it works over the inline department tint. */}
-            <span aria-hidden className="pointer-events-none absolute inset-0 transition-colors duration-75 group-hover:bg-[#111820]/[0.08]" />
+            <span aria-hidden className="pointer-events-none absolute inset-0 transition-colors duration-75 group-hover:bg-[#e9e2d5]" />
             <div className="relative flex items-center min-w-0">
               {/* Department is conveyed only by the subtle coloured left rail. */}
-              <span className="text-[12.5px] font-normal leading-tight truncate" style={{ color: '#111820' }} title={emp.name}>{emp.name}</span>
+              <span className="text-[12.5px] font-normal group-hover:font-semibold leading-tight truncate" style={{ color: '#111820' }} title={emp.name}>{emp.name}</span>
             </div>
           </td>
           {wDays.map((date, di) => {
@@ -1465,7 +1465,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             const isQuietDay = isClosed || isDimmed;
             return (
               <td key={date}
-                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#e9e5df] transition-colors duration-75 ${isStaged ? 'bg-[#111820]/[0.07] border-[#111820]/25' : isToday ? 'bg-[#fdf3e7] border-[#eecfa8]' : 'border-[#f4f2ef]'}`}
+                className={`px-[5px] py-[3px] border-r last:border-r-0 align-middle h-[31px] group-hover:bg-[#e9e2d5] transition-colors duration-75 ${isStaged ? 'bg-[#111820]/[0.07] border-[#111820]/25' : isToday ? 'bg-[#fdf3e7] border-[#eecfa8]' : (isQuietDay ? 'bg-[#faf9f7] border-[#f4f2ef]' : 'border-[#f4f2ef]')}`}
                 onClick={() => {
                   const canInteract = isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id);
                   if (!canInteract) return;
@@ -1474,7 +1474,6 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                 }}
                 style={{
                   cursor: (isManagerMode || (sessionEmployee && sessionEmployee.id === emp.id)) ? (clipboard ? 'copy' : 'pointer') : 'default',
-                  ...(isQuietDay && !isStaged && !isToday ? { backgroundColor: '#faf9f7' } : {}),
                 }}
               >
                 {isStaged
