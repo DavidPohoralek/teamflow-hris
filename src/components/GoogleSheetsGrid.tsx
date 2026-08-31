@@ -1453,7 +1453,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             </div>
           </td>
           {wDays.map((date, di) => {
-            const isOutside = maskOutsideMonth && date.slice(0, 7) !== currentMonth;
+            // Never mask today's column — a Monday like 31. 8. belongs to a week
+            // that spills into September, so in the September view it would
+            // otherwise blank out even though it's today.
+            const isOutside = maskOutsideMonth && date.slice(0, 7) !== currentMonth && date !== today;
             if (isOutside) {
               return <td key={date} className="border-r border-gray-100 last:border-r-0 bg-gray-50/20" />;
             }
@@ -1847,7 +1850,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                     })()}
                   </th>
                   {stickyDays.map((d, i) => {
-                    const isOutside = d.slice(0, 7) !== weekDays[3].slice(0, 7);
+                    const isOutside = d.slice(0, 7) !== weekDays[3].slice(0, 7) && d !== today;
                     if (isOutside) {
                       return <th key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#fbfaf8]" style={{ borderBottom: '2px solid #111820' }} />;
                     }
@@ -1951,7 +1954,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         <span className="tf-mono text-[11px] font-medium leading-tight" style={{ color: '#111820' }}>{wLabel}</span>
                       </td>
                       {wDays.map((d, i) => {
-                        const isOutside = d.slice(0, 7) !== currentMonth;
+                        const isOutside = d.slice(0, 7) !== currentMonth && d !== today;
                         if (isOutside) {
                           return <td key={d} className="border-r border-[#e9e7e3] last:border-r-0 bg-[#f3f1ed]" style={{ borderTop: '2px solid #111820', borderBottom: '2px solid #111820' }} />;
                         }
