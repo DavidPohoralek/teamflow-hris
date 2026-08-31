@@ -895,13 +895,15 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                 <button
                   onClick={handleCheckin}
                   disabled={!selectedWorkType || loading}
-                  className="flex-1 min-h-[52px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 px-3"
+                  className="flex-1 min-w-0 min-h-[52px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 px-3"
                 >
-                  {loading && <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {loading && <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />}
+                  {/* Mobile: short label only — the dept + time overflowed narrow screens */}
                   <span className="truncate">
-                    {selectedWorkType
-                      ? `${t('Zaznamenat příchod', 'Clock in')} — ${selectedWorkType.name}${timeStr ? `, ${timeStr}` : ''}`
-                      : t('Zaznamenat příchod', 'Clock in')}
+                    {t('Zaznamenat příchod', 'Clock in')}
+                    {selectedWorkType && (
+                      <span className="hidden sm:inline"> — {selectedWorkType.name}{timeStr ? `, ${timeStr}` : ''}</span>
+                    )}
                   </span>
                 </button>
               </div>
