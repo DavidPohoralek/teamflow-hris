@@ -1802,7 +1802,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       <div className="px-4 md:px-6 pb-4 md:pb-6 pt-4">
       {/* Grid — split into sticky header + scrollable body; header uses measured column
            widths from the body table so borders align pixel-perfectly */}
-      <div className="rounded-xl border border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
+      <div className="rounded-b-xl border border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
 
         {/* Sticky header — uses exact column widths measured from the body table */}
         <div
@@ -1813,7 +1813,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             // duplicate — hide the sticky clone and let the row do the job.
             visibility: viewMode === 'month' && stickyCollapsed ? 'hidden' : 'visible',
           }}
-          className={viewMode === 'month' ? 'rounded-t-xl' : 'bg-white rounded-t-xl'}
+          className={viewMode === 'month' ? '' : 'bg-white'}
         >
           <table className="text-sm" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0, width: colWidths.length === 8 ? colWidths.reduce((a, b) => a + b, 0) : undefined, minWidth: '100%' }}>
             {colWidths.length === 8 ? (
