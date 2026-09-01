@@ -1802,7 +1802,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       <div className="px-4 md:px-6 pb-4 md:pb-6 pt-4">
       {/* Grid — split into sticky header + scrollable body; header uses measured column
            widths from the body table so borders align pixel-perfectly */}
-      <div className="rounded-b-xl border border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
+      <div className="rounded-b-xl border-x border-b border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
 
         {/* Sticky header — uses exact column widths measured from the body table */}
         <div
@@ -1812,6 +1812,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
             // grid has at the top (pt-4); the toolbar's 16px box-shadow fills
             // and masks that gap so rows don't scroll into it.
             position: 'sticky', top: toolbarHeight + 16, zIndex: 20, overflow: 'hidden',
+            // Grey top line so the bar stays framed once the card's top edge
+            // scrolls away (the card itself drops its top border to avoid a
+            // double line at rest).
+            borderTop: '1px solid #e5e7eb',
             // While a week separator row sits right under this bar, the two would
             // duplicate — hide the sticky clone and let the row do the job.
             visibility: viewMode === 'month' && stickyCollapsed ? 'hidden' : 'visible',
