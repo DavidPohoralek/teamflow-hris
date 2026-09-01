@@ -1633,7 +1633,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       {/* Header toolbar — sticky panel on a tinted surface (variant B) */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-30 bg-[#faf9f7] shadow-[0_16px_0_0_#fbfaf8] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12.5px]"
+        className="sticky top-0 z-30 bg-[#faf9f7] shadow-[0_8px_0_0_#fbfaf8] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12.5px]"
       >
         {/* Left: section title + date nav */}
         <span className="text-[15px] font-semibold tracking-tight text-[#111820]">{t('Směny', 'Shifts')}</span>
@@ -1799,7 +1799,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         </div>
       </div>
 
-      <div className="px-4 md:px-6 pb-4 md:pb-6 pt-4">
+      <div className="px-4 md:px-6 pb-4 md:pb-6 pt-2">
       {/* Grid — split into sticky header + scrollable body; header uses measured column
            widths from the body table so borders align pixel-perfectly */}
       <div className="rounded-b-xl border-x border-b border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
@@ -1808,10 +1808,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         <div
           ref={headerScrollRef}
           style={{
-            // +16 keeps the same breathing room under the toolbar that the
-            // grid has at the top (pt-4); the toolbar's 16px box-shadow fills
-            // and masks that gap so rows don't scroll into it.
-            position: 'sticky', top: toolbarHeight + 16, zIndex: 20, overflow: 'hidden',
+            // +8 keeps the same breathing room under the toolbar that the grid
+            // has at the top (pt-2); the toolbar's 8px box-shadow fills and
+            // masks that gap so rows don't scroll into it.
+            position: 'sticky', top: toolbarHeight + 8, zIndex: 20, overflow: 'hidden',
             // Grey top line so the bar stays framed once the card's top edge
             // scrolls away (the card itself drops its top border to avoid a
             // double line at rest).
