@@ -1868,7 +1868,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                       <th key={d} className={`tf-mono py-2 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#e9e7e3] last:border-r-0 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
                         style={{ color: isNonWorking ? '#8a929c' : '#111820', borderBottom: '2px solid #111820' }}
                       >
-                        <span className={isToday ? 'border-b-2 border-[#C97C2A] pb-0.5' : ''}>{DAY_NAMES[i]} {dayNum}</span>
+                        <span className="tf-sans inline-flex items-baseline justify-center gap-1 normal-case">
+                          <span className="text-[10.5px] font-medium lowercase" style={{ color: '#8a929c' }}>{DAY_NAMES[i]}</span>
+                          <span className="text-[16px] font-semibold leading-none" style={{ color: isToday ? '#C97C2A' : (isNonWorking ? '#8a929c' : '#111820') }}>{dayNum}</span>
+                        </span>
                       </th>
                     );
                   })}
@@ -1888,7 +1891,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         className={`tf-mono px-1 py-2.5 text-center text-[11px] font-medium uppercase tracking-[.04em] border-r border-[#f4f2ef] last:border-r-0 ${isQuiet ? 'bg-[#faf9f7]' : 'bg-white'}`}
                         style={{ color: isQuiet ? '#8a929c' : '#111820', borderBottom: '2px solid #111820' }}
                       >
-                        <span className={isToday ? 'border-b-2 border-[#C97C2A] pb-0.5' : ''}>{name} {dayNum}</span>
+                        <span className="tf-sans inline-flex items-baseline justify-center gap-1 normal-case">
+                          <span className="text-[10.5px] font-medium lowercase" style={{ color: '#8a929c' }}>{name}</span>
+                          <span className="text-[16px] font-semibold leading-none" style={{ color: isToday ? '#C97C2A' : (isQuiet ? '#8a929c' : '#111820') }}>{dayNum}</span>
+                        </span>
                       </th>
                     );
                   })}
@@ -1971,9 +1977,9 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                         return (
                           <td key={d} className={`tf-mono py-1 text-center border-r border-[#e9e7e3] last:border-r-0 group-hover/sep:py-1.5 transition-all duration-150 ${isNonWorking ? 'bg-[#f3f1ed]' : 'bg-[#fbfaf8]'}`}
                             style={{ borderTop: '2px solid #111820', borderBottom: '2px solid #111820' }}>
-                            <span className={`text-[10.5px] font-medium uppercase tracking-[.04em] leading-tight ${isToday ? 'border-b-2 border-[#C97C2A] pb-px' : ''}`}
-                              style={{ color: isNonWorking ? '#8a929c' : '#111820' }}>
-                              {DAY_NAMES[i]} {dayNum}
+                            <span className="tf-sans inline-flex items-baseline justify-center gap-1 normal-case leading-none">
+                              <span className="text-[10px] font-medium lowercase" style={{ color: '#8a929c' }}>{DAY_NAMES[i]}</span>
+                              <span className="text-[15px] font-semibold leading-none" style={{ color: isToday ? '#C97C2A' : (isNonWorking ? '#8a929c' : '#111820') }}>{dayNum}</span>
                             </span>
                           </td>
                         );
