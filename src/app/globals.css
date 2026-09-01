@@ -1,17 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Redesign typography (spec 4a):
-   UI text — IBM Plex Sans 400/500/600
-   numbers, times, dates — IBM Plex Mono 400/500, always tabular */
+/* Redesign typography:
+   UI text — Geist 400/500/600/700
+   numbers, times, dates — Geist Mono 400/500, always tabular */
 .tf-sans {
-  font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Geist', -apple-system, 'Segoe UI', sans-serif;
 }
 .tf-mono {
-  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 
