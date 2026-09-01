@@ -1633,7 +1633,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       {/* Header toolbar — sticky panel on a tinted surface (variant B) */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-30 bg-[#faf9f7] border-b-2 border-[#111820] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12.5px]"
+        className="sticky top-0 z-30 bg-[#faf9f7] border-b-2 border-[#111820] shadow-[0_16px_0_0_#fbfaf8] px-4 md:px-[18px] py-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[12.5px]"
       >
         {/* Left: section title + date nav */}
         <span className="text-[15px] font-semibold tracking-tight text-[#111820]">{t('Směny', 'Shifts')}</span>
@@ -1808,7 +1808,10 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
         <div
           ref={headerScrollRef}
           style={{
-            position: 'sticky', top: toolbarHeight, zIndex: 20, overflow: 'hidden',
+            // +16 keeps the same breathing room under the toolbar that the
+            // grid has at the top (pt-4); the toolbar's 16px box-shadow fills
+            // and masks that gap so rows don't scroll into it.
+            position: 'sticky', top: toolbarHeight + 16, zIndex: 20, overflow: 'hidden',
             // While a week separator row sits right under this bar, the two would
             // duplicate — hide the sticky clone and let the row do the job.
             visibility: viewMode === 'month' && stickyCollapsed ? 'hidden' : 'visible',
