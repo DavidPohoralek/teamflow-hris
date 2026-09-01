@@ -24,7 +24,7 @@ const config: Config = {
         background: '#f8fafc',
       },
       fontFamily: {
-        sans: ['Geist', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
       },
     },
   },
