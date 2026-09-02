@@ -7,6 +7,11 @@ import { countUniqueVacationDays, toISODateLocal, VACATION_LOG_NOTE } from '@/li
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export type EmployeeStat = {
+  // Identity — added so per-person consumers can name each row. Purely additive;
+  // the team summary ignores these and only sums the numeric fields.
+  id: string;
+  name: string | null;
+  email: string | null;
   workedHours: number;
   targetHours: number;
   utilizationPct: number;
@@ -31,7 +36,7 @@ export async function computeMonthlyStats(
 
   let empQuery = sb
     .from('employees')
-    .select('id, department, target_hours, vacation_days_per_year')
+    .select('id, department, target_hours, vacation_days_per_year, name, email')
     .eq('organization_id', orgId)
     .eq('active', true)
     .order('id');
@@ -54,7 +59,7 @@ export async function computeMonthlyStats(
     sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
 
-  const employees: { id: string; department: string | null; target_hours: number; vacation_days_per_year: number }[] = empRes.data ?? [];
+  const employees: { id: string; department: string | null; target_hours: number; vacation_days_per_year: number; name: string | null; email: string | null }[] = empRes.data ?? [];
   const vacRequests: { employee_id: string; date_from: string; date_to: string | null }[] = requestsRes.data ?? [];
   const extraSettings = (settingsRes.data as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
   const countWeekends = (extraSettings['vacation_counting_mode'] as string | undefined) === 'all';
@@ -106,6 +111,9 @@ export async function computeMonthlyStats(
     const targetHours = emp.target_hours ?? 160;
 
     return {
+      id: emp.id,
+      name: emp.name ?? null,
+      email: emp.email ?? null,
       workedHours: Math.round(workedHours * 10) / 10,
       targetHours,
       utilizationPct: targetHours > 0 ? Math.round((workedHours / targetHours) * 100) : 0,
