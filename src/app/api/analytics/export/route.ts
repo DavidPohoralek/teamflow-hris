@@ -3,6 +3,27 @@ import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 import { countUniqueVacationDays, pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
 import * as XLSX from 'xlsx';
+import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate';
+
+// SheetJS (community) can't write frozen panes. Post-process the finished .xlsx
+// zip and inject a freeze on the top row (header stays put while scrolling).
+function freezeHeaderRow(xlsxBuf: Uint8Array): Uint8Array {
+  try {
+    const files = unzipSync(xlsxBuf);
+    const sheetPath = 'xl/worksheets/sheet1.xml';
+    const entry = files[sheetPath];
+    if (!entry) return xlsxBuf;
+    const pane = '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/>';
+    const xml = strFromU8(entry).replace(
+      /<sheetView([^>]*?)\/>/,
+      `<sheetView$1>${pane}</sheetView>`,
+    );
+    files[sheetPath] = strToU8(xml);
+    return zipSync(files);
+  } catch {
+    return xlsxBuf; // never fail the export over the freeze cosmetic
+  }
+}
 
 // GET /api/analytics/export?month=YYYY-MM&lang=cs|en&format=csv|xlsx
 export async function GET(req: NextRequest) {
@@ -207,13 +228,14 @@ export async function GET(req: NextRequest) {
   if (col('workedHours'))    colDefs.push({ key: 'workedHours', label: isEn ? 'Hours worked' : 'Odpracováno (h)' });
   if (col('saturdayHours'))  colDefs.push({ key: 'saturdayHours', label: isEn ? 'Of which Saturday' : 'Z toho soboty (h)' });
   if (col('satBonusHours'))  colDefs.push({ key: 'satBonusHours', label: isEn ? 'Saturday bonus (h)' : 'Bonus soboty (h)' });
+  // Dovolená hned vpravo od bonusu za soboty (na přání)
+  if (col('vacDays'))        colDefs.push({ key: 'vacHours', label: isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)' });
   if (col('otBonusHours'))   colDefs.push({ key: 'otBonusHours', label: isEn ? 'Overtime bonus (h)' : 'Bonus přesčas (h)' });
   if (includeBenefits) for (const b of activeBenefits) colDefs.push({ key: `benefit_${b.key}`, label: isEn ? `${b.enLabel} (h)` : `${b.czLabel} (h)` });
   if (col('totalBonusHours')) colDefs.push({ key: 'totalBonusHours', label: isEn ? 'Total bonus (h)' : 'Bonus celkem (h)' });
   if (col('finalHours'))     colDefs.push({ key: 'finalHours', label: isEn ? 'Final total (h)' : 'Výsledek (h)' });
   if (col('targetHours'))    colDefs.push({ key: 'targetHours', label: isEn ? 'Target hours' : 'Fond hodin (h)' });
   if (col('delta'))          colDefs.push({ key: 'delta', label: isEn ? 'Difference' : 'Rozdíl (h)' });
-  if (col('vacDays'))        colDefs.push({ key: 'vacHours', label: isEn ? 'Vacation used (h)' : 'Dovolená čerpáno (h)' });
   if (col('finalWithVac'))   colDefs.push({ key: 'finalWithVac', label: isEn ? 'Total incl. vacation (h)' : 'Výsledek vč. dovolené (h)' });
   if (col('managerBonus'))   colDefs.push({ key: 'managerBonus', label: isEn ? 'Manager bonus (CZK)' : 'Bonus od vedoucího (Kč)' });
   if (includeRate) {
@@ -240,7 +262,8 @@ export async function GET(req: NextRequest) {
       case 'finalWithVac': return r.finalWithVac;
       case 'managerBonus': return r.managerBonus;
       case 'hourlyRate': return r.hourlyRate;
-      case 'billableTotal': return r.billableTotal;
+      // Konečný mzdový náklad zaokrouhlený na celé Kč (bez haléřů)
+      case 'billableTotal': return r.billableTotal == null ? null : Math.round(r.billableTotal);
       default: return null;
     }
   };
@@ -318,19 +341,21 @@ export async function GET(req: NextRequest) {
         const mb = refOrConst('managerBonus', excelRow, r.managerBonus);
         const rate = cellRef('hourlyRate', excelRow);
         const isHPP = r.employmentType === 'HPP';
+        // Zaokrouhleno na celé Kč (bez haléřů), i v živé Excel formuli
         if (isHPP) {
           const vh = refOrConst('vacHours', excelRow, r.vacHours);
-          setFormula('billableTotal', `ROUND((${fh}+${vh})*${rate}+${mb},2)`, r.billableTotal ?? 0);
+          setFormula('billableTotal', `ROUND((${fh}+${vh})*${rate}+${mb},0)`, Math.round(r.billableTotal ?? 0));
         } else {
-          setFormula('billableTotal', `ROUND(${fh}*${rate}+${mb},2)`, r.billableTotal ?? 0);
+          setFormula('billableTotal', `ROUND(${fh}*${rate}+${mb},0)`, Math.round(r.billableTotal ?? 0));
         }
       }
     });
 
     XLSX.utils.book_append_sheet(wb, ws, isEn ? 'Export' : 'Export');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const buf = freezeHeaderRow(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Uint8Array);
+    const body = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 
-    return new NextResponse(buf, {
+    return new NextResponse(body, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
