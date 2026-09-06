@@ -46,10 +46,15 @@ export default function RegisterPage() {
     // 0. Check the invite code first — a wrong code must not leave an orphaned
     //    auth account behind, which would block a retry with the same e-mail.
     try {
-      const check = await fetch(`/api/register?code=${encodeURIComponent(formData.code)}`);
+      const check = await fetch(
+        `/api/register?code=${encodeURIComponent(formData.code)}&email=${encodeURIComponent(formData.email)}`
+      );
       const { ok } = await check.json();
       if (!ok) {
-        setError(t('Neplatný nebo již použitý přístupový kód.', 'Invalid or already used access code.'));
+        setError(t(
+          'Kód je neplatný, už byl použit, nebo nepatří k této e-mailové adrese.',
+          'The code is invalid, already used, or does not belong to this e-mail address.',
+        ));
         setLoading(false);
         return;
       }

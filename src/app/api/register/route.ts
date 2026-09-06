@@ -12,16 +12,19 @@ function adminClient() {
 // Registration is invite-only: the code must exist in registration_codes and not
 // have been used yet. Fails CLOSED — any lookup problem means "not valid", so a
 // missing table or a DB hiccup can never accidentally open registration up.
+// A code is also bound to the e-mail it was issued for, so a forwarded code
+// can't be redeemed by someone else. A NULL e-mail on the row means "any".
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function findUnusedCode(sb: any, code: string): Promise<string | null> {
+async function findUnusedCode(sb: any, code: string, email: string): Promise<string | null> {
   const normalized = code.trim().toUpperCase();
   if (!normalized) return null;
   const { data, error } = await sb
     .from('registration_codes')
-    .select('code, used_at')
+    .select('code, used_at, email')
     .eq('code', normalized)
     .maybeSingle();
   if (error || !data || data.used_at) return null;
+  if (data.email && data.email.trim().toLowerCase() !== email.trim().toLowerCase()) return null;
   return data.code as string;
 }
 
@@ -29,8 +32,10 @@ async function findUnusedCode(sb: any, code: string): Promise<string | null> {
 // Lightweight check the form runs BEFORE creating the auth user, so a wrong code
 // doesn't leave an orphaned account that blocks a retry with the same e-mail.
 export async function GET(req: NextRequest) {
-  const code = new URL(req.url).searchParams.get('code') ?? '';
-  const valid = await findUnusedCode(adminClient(), code);
+  const params = new URL(req.url).searchParams;
+  const code = params.get('code') ?? '';
+  const email = params.get('email') ?? '';
+  const valid = await findUnusedCode(adminClient(), code, email);
   return NextResponse.json({ ok: Boolean(valid) });
 }
 
@@ -44,10 +49,10 @@ export async function POST(req: NextRequest) {
   const supabaseAdmin = adminClient();
 
   // Invite gate — before anything is created.
-  const validCode = await findUnusedCode(supabaseAdmin, code ?? '');
+  const validCode = await findUnusedCode(supabaseAdmin, code ?? '', userEmail ?? '');
   if (!validCode) {
     return NextResponse.json(
-      { error: 'Neplatný nebo již použitý přístupový kód.' },
+      { error: 'Neplatný nebo již použitý přístupový kód, nebo nepatří k této e-mailové adrese.' },
       { status: 403 }
     );
   }
