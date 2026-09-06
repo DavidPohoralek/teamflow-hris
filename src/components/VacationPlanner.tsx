@@ -877,19 +877,20 @@ export default function VacationPlanner({ orgId, isManagerMode }: VacationPlanne
                 >
                   {myShiftsLoading ? t('Načítám…', 'Loading…') : t('Mé směny', 'My shifts')}
                 </button>
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <div className="flex items-center gap-2 rounded-xl px-3 py-2"
+                  style={{ background: '#fbf8f3', border: '1px solid #e6e2db' }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#C97C2A' }} />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
+                    <span className="text-[13px] font-semibold leading-tight" style={{ color: '#111820' }}>{sessionEmployee.name}</span>
                     {vacBalance && vacBalance.totalDays > 0 && (() => {
                       const usedPct = Math.min(100, ((vacBalance.totalDays - vacBalance.remainingDays) / vacBalance.totalDays) * 100);
                       const barColor = usedPct >= 90 ? 'bg-red-400' : usedPct >= 70 ? 'bg-amber-400' : 'bg-emerald-500';
                       return (
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <div className="w-20 h-1.5 bg-emerald-200 rounded-full overflow-hidden">
+                          <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: '#e6e2db' }}>
                             <div className={`h-full rounded-full ${barColor}`} style={{ width: `${usedPct}%` }} />
                           </div>
-                          <span className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
+                          <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: '#6b7480' }}>
                             {vacBalance.remainingHours} / {vacBalance.totalHours} h
                           </span>
                         </div>
