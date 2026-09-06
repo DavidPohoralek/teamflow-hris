@@ -628,18 +628,18 @@ function DayCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`group rounded-xl border p-2.5 flex flex-col gap-1.5 transition-colors relative ${expanded ? 'min-h-[100px]' : 'h-[106px] overflow-hidden'} ${
+      className={`group rounded-[10px] border p-2 flex flex-col gap-1 transition-colors relative ${expanded ? 'min-h-[100px]' : 'min-h-[168px]'} ${
         isMyVacation
-          ? 'bg-pink-50 border-pink-300 shadow-sm cursor-pointer hover:border-pink-400'
+          ? 'bg-[#fdf1f5] border-[#f0cddb] cursor-pointer hover:border-[#e3b3c6]'
           : isPasteMode
-          ? 'cursor-copy border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 bg-blue-50/20'
+          ? 'cursor-copy bg-[#fdf5ec] border-[#e8c79b] hover:border-[#C97C2A]'
           : isToday
-          ? 'bg-white border-rose-400 shadow-sm shadow-rose-100 cursor-pointer hover:border-rose-500 ring-1 ring-rose-300'
+          ? 'bg-white border-[#C97C2A] ring-1 ring-[#C97C2A] cursor-pointer'
           : isClosed
-          ? 'bg-slate-100 border-slate-200 cursor-pointer hover:border-slate-300'
+          ? 'bg-[#f1efea] border-[#e6e2db] cursor-pointer hover:border-[#d8d3ca]'
           : isWeekend
-          ? 'bg-blue-50/30 border-blue-100 hover:border-blue-200 cursor-pointer hover:bg-blue-50/50'
-          : 'bg-white border-slate-200 shadow-sm hover:shadow-md cursor-pointer hover:border-blue-300'
+          ? 'bg-[#faf9f7] border-[#e6e2db] cursor-pointer hover:border-[#d8d3ca]'
+          : 'bg-white border-[#e6e2db] cursor-pointer hover:border-[#c9c3b9]'
       }`}
     >
       {/* Closed day hatching — light whitish-gray stripes so a closed day is
@@ -648,7 +648,7 @@ function DayCard({
         <div
           className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
           style={{
-            background: 'repeating-linear-gradient(-45deg, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 5px, rgba(148,163,184,0.28) 5px, rgba(148,163,184,0.28) 8px)',
+            background: 'repeating-linear-gradient(-45deg, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 5px, rgba(138,146,156,0.22) 5px, rgba(138,146,156,0.22) 8px)',
           }}
         />
       )}
@@ -656,7 +656,7 @@ function DayCard({
       {isManagerMode && !isPasteMode && onEditDay && (
         <button
           onClick={(e) => { e.stopPropagation(); onEditDay(dateStr); }}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-[#f4f2ee] hover:bg-[#fdf5ec] text-[#8a929c] hover:text-[#C97C2A]"
           aria-label={`${t('Upravit den', 'Edit day')} ${dateStr}`}
           title={t('Upravit den', 'Edit day')}
         >
@@ -668,33 +668,33 @@ function DayCard({
 
       {/* Header row */}
       <div className="relative z-10 flex items-center justify-between mb-0.5">
-        <span className={`text-xs font-semibold ${isWeekend ? 'text-slate-400' : 'text-slate-500'}`}>
-          {dayName}{isClosed && <span className="ml-1 text-[9px] font-bold text-slate-400 bg-slate-200 px-1 py-0.5 rounded-full uppercase tracking-wide">{t('Zavřeno', 'Closed')}</span>}
+        <span className="text-[10.5px] font-medium lowercase" style={{ color: '#8a929c' }}>
+          {dayName}{isClosed && <span className="ml-1 text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded-full" style={{ color: '#8a929c', background: '#e6e2db' }}>{t('Zavřeno', 'Closed')}</span>}
         </span>
         <div className="flex items-center gap-1.5">
           {isManagerMode && scheduleMeta && (
             <span
               className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
                 scheduleMeta.assignedCount >= scheduleMeta.requiredTotal
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-orange-100 text-orange-600'
+                  ? 'bg-[#eaf3ec] text-[#2f7d46]'
+                  : 'bg-[#fdf1e8] text-[#C97C2A]'
               }`}
             >
               {scheduleMeta.assignedCount}/{scheduleMeta.requiredTotal}
             </span>
           )}
-          <span className={`text-sm font-bold ${isManagerMode ? 'mr-5' : ''} ${
-            isToday ? 'bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs'
-            : isWeekend ? 'text-slate-400' : 'text-slate-700'
-          }`}>
+          <span
+            className={`text-[15px] font-semibold leading-none ${isManagerMode ? 'mr-5' : ''}`}
+            style={{ color: isToday ? '#C97C2A' : isWeekend ? '#8a929c' : '#111820' }}
+          >
             {dayNum}
           </span>
         </div>
       </div>
 
-      {/* Chips — scrollable in month view, full list in week view */}
-      <div className={`relative z-10 flex flex-col gap-1 ${expanded ? '' : 'overflow-y-auto flex-1 min-h-0 scrollbar-thin'}`}>
-        {entries.map((entry, idx) => (
+      {/* Chips — capped in month view, full list in week view */}
+      <div className="relative z-10 flex flex-col gap-1">
+        {(expanded ? entries : entries.slice(0, MONTH_CELL_CHIPS)).map((entry, idx) => (
           <EntryChip
             key={idx}
             entry={entry}
@@ -707,11 +707,20 @@ function DayCard({
             t={t}
           />
         ))}
+        {!expanded && entries.length > MONTH_CELL_CHIPS && (
+          <span className="text-[11px] font-medium px-[7px] pt-0.5" style={{ color: '#8a929c' }}>
+            + {entries.length - MONTH_CELL_CHIPS} {t('dalších', 'more')}
+          </span>
+        )}
       </div>
 
     </div>
   );
 }
+
+// How many people a month-view day cell shows before collapsing the rest. The
+// day detail (click the cell) lists everyone.
+const MONTH_CELL_CHIPS = 5;
 
 // ─── EntryChip ────────────────────────────────────────────────────────────────
 
@@ -750,14 +759,14 @@ function EntryChip({
       style={{
         borderLeft: `3px solid ${color}`,
         backgroundColor: `${color}22`,
-        color: '#1e293b',
+        color: '#111820',
       }}
       title={chipTitle}
       onContextMenu={canEdit && onEditEntry ? (e) => { e.preventDefault(); e.stopPropagation(); onEditEntry(entry); } : undefined}
     >
       <span className="truncate min-w-0">
         <span className="font-semibold">{shortName}{eveningMark}</span>
-        {timeLabel && <span className="font-normal ml-1" style={{ color: '#475569' }}>{timeLabel.trim()}</span>}
+        {timeLabel && <span className="font-normal ml-1" style={{ color: '#5c6672' }}>{timeLabel.trim()}</span>}
         {noteText && <span className="ml-1 opacity-60" title={noteText}>📝</span>}
       </span>
       {(isManagerMode ? onRemoveEmployee : (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
@@ -766,7 +775,7 @@ function EntryChip({
             <button
               data-tour="copy-shift"
               onClick={(e) => { e.stopPropagation(); onCopyEntry({ employeeId: entry.employeeId, employeeName: entry.employeeName, workTypeId: entry.workTypeId, workTypeName: entry.workTypeName, workTypeColor: entry.workTypeColor, startTime: entry.startTime, endTime: entry.endTime }); }}
-              className="text-slate-400 hover:text-blue-500 p-0.5"
+              className="text-[#8a929c] hover:text-[#C97C2A] p-0.5"
               aria-label={t('Kopírovat směnu', 'Copy shift')}
               title={t('Kopírovat na jiné dny', 'Copy to other days')}
             >
@@ -779,7 +788,7 @@ function EntryChip({
           {onRemoveEmployee && (isManagerMode || (sessionEmployeeId && entry.employeeId === sessionEmployeeId)) && (
             <button
               onClick={(e) => { e.stopPropagation(); onRemoveEmployee(dateStr, entry.id); }}
-              className="text-slate-400 hover:text-red-500"
+              className="text-[#8a929c] hover:text-[#b3261e]"
               aria-label={`Odebrat ${entry.employeeName ?? entry.employeeId}`}
               title={t('Odebrat ze dne', 'Remove from day')}
             >
@@ -1507,7 +1516,21 @@ export default function WorkPlanGrid({
     }
     return map;
   })();
-  const [showPlannedPanel, setShowPlannedPanel] = useState(true);
+  const [showPlannedPanel, setShowPlannedPanel] = useState(false);
+
+  // Remember whether the manager wants the planned-hours panel open.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('tf_planned_panel') === '1') setShowPlannedPanel(true);
+    } catch { /* private window — stay collapsed */ }
+  }, []);
+
+  function togglePlannedPanel() {
+    setShowPlannedPanel((v) => {
+      try { localStorage.setItem('tf_planned_panel', v ? '0' : '1'); } catch { /* ignore */ }
+      return !v;
+    });
+  }
 
   useEffect(() => {
     if (!orgId) return;
@@ -2009,7 +2032,7 @@ export default function WorkPlanGrid({
         <div className="shrink-0 p-4 bg-white border-t border-slate-200">
           <button
             onClick={() => { setAddShiftDate(todayISO()); setShowModal(true); }}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[#111820] hover:bg-[#2a333e] text-white text-sm font-semibold rounded-xl transition-colors active:scale-95"
           >
             <span className="text-lg font-light">+</span>
             {t('Přidat směnu', 'Add shift')}
@@ -2023,11 +2046,11 @@ export default function WorkPlanGrid({
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         {/* View mode toggle */}
-        <div className="flex rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+        <div className="flex rounded-lg border border-[#e2e0dc] overflow-hidden">
           <button
             onClick={() => setDesktopViewMode('month')}
             title={t('Měsíční pohled', 'Month view')}
-            className={`px-2.5 py-2 transition-colors ${desktopViewMode === 'month' ? 'bg-slate-700 text-white' : 'bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            className={`px-2.5 py-2 transition-colors ${desktopViewMode === 'month' ? 'bg-[#111820] text-white' : 'bg-white text-[#8a929c] hover:text-[#111820] hover:bg-[#faf9f7]'}`}
           >
             <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
               <rect x="1" y="1" width="6" height="6" rx="1"/>
@@ -2045,7 +2068,7 @@ export default function WorkPlanGrid({
               if (newMonth !== month) onMonthChange(newMonth);
             }}
             title={t('Týdenní pohled', 'Week view')}
-            className={`px-2.5 py-2 transition-colors border-l border-slate-200 ${desktopViewMode === 'week' ? 'bg-slate-700 text-white' : 'bg-white text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}
+            className={`px-2.5 py-2 transition-colors border-l border-[#e2e0dc] ${desktopViewMode === 'week' ? 'bg-[#111820] text-white' : 'bg-white text-[#8a929c] hover:text-[#111820] hover:bg-[#faf9f7]'}`}
           >
             <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
               <rect x="1" y="2" width="2" height="12" rx="0.5"/>
@@ -2058,22 +2081,22 @@ export default function WorkPlanGrid({
         </div>
 
         {/* Month / Week navigation */}
-        <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1">
+        <div className="flex items-center gap-1 bg-white rounded-lg border border-[#e2e0dc] p-1">
           <button
             onClick={() => onMonthChange(prevMonth(month))}
-            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            className="p-2 rounded-lg hover:bg-[#f4f2ee] text-[#8a929c] hover:text-[#111820] transition-colors"
             aria-label={t('Předchozí měsíc', 'Previous month')}
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-slate-800 min-w-[160px] text-center px-2">
+          <span className="text-[13px] font-semibold text-[#111820] min-w-[160px] text-center px-2">
             {formatMonthLabel(month, MONTH_NAMES)}
           </span>
           <button
             onClick={() => onMonthChange(nextMonth(month))}
-            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+            className="p-2 rounded-lg hover:bg-[#f4f2ee] text-[#8a929c] hover:text-[#111820] transition-colors"
             aria-label={t('Následující měsíc', 'Next month')}
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -2087,7 +2110,7 @@ export default function WorkPlanGrid({
           {/* Vše */}
           <button
             onClick={() => { setDeptFilters([]); setActivityFilter(false); setEveningFilter(false); setNameSearch(''); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilters.length === 0 && !activityFilter && !eveningFilter && !nameSearch ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${deptFilters.length === 0 && !activityFilter && !eveningFilter && !nameSearch ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-[#5c6672] border-[#e2e0dc] hover:border-[#c9c3b9]'}`}
           >
             {t('Vše', 'All')}
           </button>
@@ -2097,7 +2120,7 @@ export default function WorkPlanGrid({
             <div className="relative" ref={deptDropdownRef}>
               <button
                 onClick={() => setDeptDropdownOpen((v) => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${deptFilters.length > 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${deptFilters.length > 0 ? 'bg-[#111820] text-white border-[#111820]' : 'bg-white text-[#5c6672] border-[#e2e0dc] hover:border-[#c9c3b9] hover:text-[#111820]'}`}
               >
                 {deptFilters.length > 0 ? `${t('Typ práce', 'Work type')} (${deptFilters.length})` : t('Typ práce', 'Work type')}
                 <svg className={`w-3 h-3 transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -2293,12 +2316,12 @@ export default function WorkPlanGrid({
                   value={pinInputValue}
                   onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
                   placeholder={t('Váš kód', 'Your code')}
-                  className={`w-24 text-sm px-3 py-2 rounded-xl border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-slate-200'} focus:outline-none focus:ring-2 focus:ring-blue-400 text-center tracking-widest`}
+                  className={`w-24 text-[12.5px] px-3 py-[7px] rounded-lg border ${pinInputError ? 'border-red-400 bg-red-50' : 'border-[#e2e0dc]'} focus:outline-none focus:border-[#111820] text-center tracking-widest`}
                 />
                 <button
                   type="submit"
                   disabled={pinInputValue.length < 4 || pinInputLoading}
-                  className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-40"
+                  className="px-3.5 py-[7px] bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium rounded-lg transition-colors disabled:opacity-40"
                 >
                   {pinInputLoading ? '…' : 'OK'}
                 </button>
@@ -2310,19 +2333,19 @@ export default function WorkPlanGrid({
           {isManagerMode && (
             <button
               onClick={() => setShowBulkModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-violet-500/20 active:scale-95"
+              className="flex items-center gap-2 px-3 py-[7px] rounded-lg border border-[#e2e0dc] bg-white text-[#111820] hover:bg-[#f4f2ef] text-[12.5px] font-medium transition-colors"
               title={t('Plošné zadání směn na celý měsíc', 'Bulk shift assignment for whole month')}
             >
-              ⚡ {t('Plošné zadání', 'Bulk assign')}
+              {t('Plošné zadání', 'Bulk assign')}
             </button>
           )}
           {/* Add shift button */}
           <button
             data-tour="add-shift"
             onClick={() => { setAddShiftDate(todayISO()); setShowModal(true); }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-[7px] rounded-lg bg-[#111820] hover:bg-[#2a333e] text-white text-[12.5px] font-medium transition-colors"
           >
-            <span className="text-lg leading-none font-light">+</span>
+            <span className="leading-none">+</span>
             {t('Přidat směnu', 'Add shift')}
           </button>
         </div>
@@ -2330,20 +2353,20 @@ export default function WorkPlanGrid({
 
       {/* ── PLANNED HOURS PANEL (manager only) ──────────────────────────── */}
       {isManagerMode && data && plannedHoursPerEmp.size > 0 && (
-        <div className="mb-4 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="mb-3 bg-white border border-[#e6e2db] rounded-[10px] overflow-hidden">
           <button
-            onClick={() => setShowPlannedPanel(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 transition-colors"
+            onClick={togglePlannedPanel}
+            className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-[#faf9f7] transition-colors"
           >
-            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-              Naplánované hodiny — {month}
+            <span className="text-[11px] font-semibold uppercase tracking-[.07em]" style={{ color: '#8a929c' }}>
+              {t('Naplánované hodiny', 'Planned hours')} — {month}
             </span>
-            <svg className={`w-4 h-4 text-slate-400 transition-transform ${showPlannedPanel ? '' : '-rotate-90'}`} viewBox="0 0 20 20" fill="currentColor">
+            <svg className={`w-4 h-4 text-[#8a929c] transition-transform ${showPlannedPanel ? '' : '-rotate-90'}`} viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
           </button>
           {showPlannedPanel && (
-            <div className="border-t border-slate-100 px-4 py-3">
+            <div className="border-t border-[#e6e2db] px-4 py-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-2">
                 {Array.from(plannedHoursPerEmp.entries())
                   .sort((a, b) => {
@@ -2401,13 +2424,12 @@ export default function WorkPlanGrid({
       {desktopViewMode === 'month' && !loading && !error && (
         <>
           {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-1.5 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2">
+          <div className="grid grid-cols-7 gap-1 mb-2 px-1 pt-1 pb-2">
             {DAY_NAMES_SHORT.map((d, idx) => (
               <div
                 key={idx}
-                className={`text-center text-xs font-semibold py-0.5 ${
-                  idx >= 5 ? 'text-slate-500' : 'text-slate-300'
-                }`}
+                className="text-center text-[10.5px] font-medium lowercase py-0.5"
+                style={{ color: idx >= 5 ? '#a8afb7' : '#8a929c' }}
               >
                 {d}
               </div>
@@ -2486,9 +2508,9 @@ export default function WorkPlanGrid({
         return (
           <>
             {/* Sticky day-name header */}
-            <div className="grid grid-cols-7 gap-2 mb-3 bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl px-1 py-2 sticky top-0 z-10">
+            <div className="grid grid-cols-7 gap-2 mb-3 px-1 pt-1 pb-2 sticky top-0 z-10 bg-[#faf9f7]">
               {DAY_NAMES_SHORT.map((d, idx) => (
-                <div key={idx} className={`text-center text-xs font-semibold py-0.5 ${idx >= 5 ? 'text-slate-500' : 'text-slate-300'}`}>
+                <div key={idx} className="text-center text-[10.5px] font-medium lowercase py-0.5" style={{ color: idx >= 5 ? '#a8afb7' : '#8a929c' }}>
                   {d}
                 </div>
               ))}
