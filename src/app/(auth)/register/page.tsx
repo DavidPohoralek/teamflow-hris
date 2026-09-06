@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const t = useT();
 
   const [formData, setFormData] = useState({
+    code: '',
     companyName: '',
     firstName: '',
     lastName: '',
@@ -41,6 +42,22 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
+
+    // 0. Check the invite code first — a wrong code must not leave an orphaned
+    //    auth account behind, which would block a retry with the same e-mail.
+    try {
+      const check = await fetch(`/api/register?code=${encodeURIComponent(formData.code)}`);
+      const { ok } = await check.json();
+      if (!ok) {
+        setError(t('Neplatný nebo již použitý přístupový kód.', 'Invalid or already used access code.'));
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError(t('Nepodařilo se ověřit kód. Zkuste to znovu.', 'Could not verify the code. Please try again.'));
+      setLoading(false);
+      return;
+    }
 
     // 1. Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -75,6 +92,7 @@ export default function RegisterPage() {
       body: JSON.stringify({
         userId: authData.user.id,
         userEmail: formData.email,
+        code: formData.code,
         companyName: formData.companyName,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -110,6 +128,29 @@ export default function RegisterPage() {
             {error}
           </div>
         )}
+
+        <div>
+          <label htmlFor="code" className="form-label">
+            {t('Přístupový kód', 'Access code')}
+          </label>
+          <input
+            id="code"
+            name="code"
+            type="text"
+            required
+            autoComplete="off"
+            value={formData.code}
+            onChange={handleChange}
+            className="form-input"
+            style={{ letterSpacing: '.12em', textTransform: 'uppercase' }}
+            placeholder="XXXXXXXX"
+          />
+          <p className="text-xs text-slate-500 mt-1.5">
+            {t('Nemáte kód? Napište nám na ', 'No code yet? Write to ')}
+            <a href="mailto:david.pohoralek03@gmail.com" className="underline hover:text-slate-700">david.pohoralek03@gmail.com</a>
+            {t(' a pošleme vám ho.', ' and we\'ll send you one.')}
+          </p>
+        </div>
 
         <div>
           <label htmlFor="companyName" className="form-label">

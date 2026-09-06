@@ -167,8 +167,8 @@ export default function LandingPage() {
               <Link href="/register"
                 className="px-3 sm:px-4 py-2 text-[13px] font-medium rounded-[8px] whitespace-nowrap text-[#111820] transition hover:brightness-105"
                 style={{ background: '#E8963C' }}>
-                <span className="sm:hidden">Vyzkoušet</span>
-                <span className="hidden sm:inline">Vyzkoušet zdarma</span>
+                <span className="sm:hidden">Přístup</span>
+                <span className="hidden sm:inline">Získat přístup</span>
               </Link>
             </div>
           </div>
@@ -198,7 +198,7 @@ export default function LandingPage() {
             <Link href="/register"
               className="px-7 py-3.5 rounded-[9px] font-medium text-[15px] text-[#111820] text-center transition hover:brightness-105"
               style={{ background: '#E8963C' }}>
-              Registrovat firmu zdarma
+              Získat přístup
             </Link>
             <a href="#funkce"
               className="px-7 py-3.5 rounded-[9px] text-[15px] text-white text-center border border-white/20 hover:bg-white/5 transition">
@@ -362,7 +362,7 @@ export default function LandingPage() {
             </ul>
             <Link href="/register"
               className="block w-full py-3 text-center rounded-[9px] text-[14px] font-medium border border-[#d8d5d0] hover:bg-[#f4f2ef] transition">
-              Vyzkoušet zdarma
+              Získat přístup
             </Link>
           </div>
 
@@ -400,7 +400,7 @@ export default function LandingPage() {
             <Link href="/register"
               className="block w-full py-3 text-center rounded-[9px] text-[14px] font-medium text-[#111820] transition hover:brightness-105"
               style={{ background: '#E8963C' }}>
-              Vyzkoušet zdarma
+              Získat přístup
             </Link>
           </div>
         </div>
@@ -472,7 +472,7 @@ export default function LandingPage() {
           <Link href="/register"
             className="inline-block px-8 py-3.5 rounded-[9px] font-medium text-[15px] text-[#111820] transition hover:brightness-105"
             style={{ background: '#E8963C' }}>
-            Registrovat firmu zdarma
+            Získat přístup
           </Link>
         </div>
       </section>
