@@ -1771,14 +1771,12 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>
                   .ics
                 </button>
-              <div className="flex items-center gap-2 rounded-lg px-3 py-[7px]"
-                style={{ background: '#fbf8f3', border: '1px solid #e6e2db' }}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#C97C2A' }} />
-                <span className="text-[13px] font-semibold leading-tight" style={{ color: '#111820' }}>{sessionEmployee.name}</span>
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-[7px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-emerald-700 text-sm font-semibold leading-tight">{sessionEmployee.name}</span>
                 <button
                   onClick={() => { setSessionEmployee(null); setSessionPin(''); try { localStorage.removeItem('hris_employee_session'); } catch { /* ignore */ } }}
-                  className="transition-colors ml-1 shrink-0 hover:text-[#111820]"
-                  style={{ color: '#9aa1aa' }}
+                  className="text-emerald-400 hover:text-emerald-700 transition-colors ml-1 shrink-0"
                   title={t('Odhlásit', 'Log out')}
                 >✕</button>
               </div>
