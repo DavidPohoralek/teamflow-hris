@@ -9,6 +9,7 @@ const MUTED = '#6b7480';
 const FAINT = '#9aa1aa';
 const LINE = '#e6e2db';
 const ORANGE = '#C97C2A';
+const ORANGE_B = '#E8963C';
 
 interface Props {
   onStart: (lang: 'cs' | 'en') => void;
@@ -36,13 +37,16 @@ export default function TourSelectModal({ onStart, onSkip, canClose, onClose }: 
       <div className="absolute inset-0" style={{ background: 'rgba(17,24,32,.55)', backdropFilter: 'blur(3px)' }} />
 
       <div
-        className="relative w-full max-w-[380px] bg-white rounded-2xl"
+        className="relative w-full max-w-[380px] bg-white rounded-2xl overflow-hidden"
         style={{ border: `1px solid ${LINE}`, boxShadow: '0 24px 56px -16px rgba(17,24,32,.45)' }}
       >
+        {/* One deliberate stroke of brand colour across the top of the card. */}
+        <div className="h-1" style={{ background: `linear-gradient(90deg, ${ORANGE}, ${ORANGE_B})` }} />
+
         {canClose && onClose && (
           <button
             onClick={onClose}
-            className="absolute top-3.5 right-3.5 w-7 h-7 flex items-center justify-center rounded-full text-xs transition-opacity hover:opacity-70"
+            className="absolute top-[18px] right-3.5 w-7 h-7 flex items-center justify-center rounded-full text-xs transition-opacity hover:opacity-70"
             style={{ background: '#f4f2ee', color: FAINT }}
             aria-label="Zavřít"
           >
@@ -50,7 +54,7 @@ export default function TourSelectModal({ onStart, onSkip, canClose, onClose }: 
           </button>
         )}
 
-        <div className="px-6 pt-6 pb-5">
+        <div className="px-6 pt-5 pb-5">
           {/* Header — mark and title on one line, not a stacked hero */}
           <div className="flex items-center gap-2.5">
             <TeamFlowMark className="w-[30px] h-[30px]" />
@@ -73,7 +77,7 @@ export default function TourSelectModal({ onStart, onSkip, canClose, onClose }: 
             <button
               onClick={() => onStart('cs')}
               className="py-2.5 px-3 rounded-[10px] text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: INK }}
+              style={{ background: ORANGE }}
             >
               Česky →
             </button>
