@@ -1,6 +1,14 @@
 'use client';
 
+import { TeamFlowMark } from '@/components/TeamFlowLogo';
+
 const PRICING_URL = 'https://tmflw.com/#cenik';
+
+const INK = '#111820';
+const MUTED = '#6b7480';
+const FAINT = '#9aa1aa';
+const LINE = '#e6e2db';
+const ORANGE = '#C97C2A';
 
 interface Props {
   onStart: (lang: 'cs' | 'en') => void;
@@ -24,65 +32,77 @@ export default function TourSelectModal({ onStart, onSkip, canClose, onClose }: 
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div className="tf-sans fixed inset-0 z-[9999] flex items-center justify-center px-4">
+      <div className="absolute inset-0" style={{ background: 'rgba(17,24,32,.55)', backdropFilter: 'blur(3px)' }} />
+      <div
+        className="relative w-full max-w-[420px] bg-white rounded-2xl overflow-hidden"
+        style={{ border: `1px solid ${LINE}`, boxShadow: '0 24px 56px -16px rgba(17,24,32,.45)' }}
+      >
         {canClose && onClose && (
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+            className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full text-xs transition-opacity hover:opacity-70"
+            style={{ background: '#f4f2ee', color: FAINT }}
             aria-label="Zavřít"
           >
             ✕
           </button>
         )}
-        {/* Header gradient */}
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 px-8 py-8 text-white text-center">
-          <div className="text-4xl mb-3">🎓</div>
-          <h2 className="text-xl font-bold">Průvodce aplikací</h2>
-          <p className="text-blue-100 text-sm mt-1">App tutorial</p>
+
+        <div className="px-8 pt-8 pb-6 text-center">
+          <div className="flex justify-center mb-4">
+            <TeamFlowMark className="w-[38px] h-[38px]" />
+          </div>
+          <h2 className="text-[20px] font-semibold tracking-[-.015em] m-0" style={{ color: INK }}>
+            Průvodce aplikací
+          </h2>
+          <p className="text-sm mt-2 leading-relaxed" style={{ color: MUTED }}>
+            Ukážeme vám, kde se plánují směny, jak se lidé hlásí do docházky a co všechno najdete ve Správě.
+            Trvá to asi minutu.
+          </p>
+          <p className="text-[13px] mt-1.5" style={{ color: FAINT }}>
+            A quick tour of shifts, attendance and the manager view.
+          </p>
         </div>
 
-        <div className="px-8 py-6">
-          <p className="text-slate-700 text-sm text-center mb-6">
-            Chcete si projít průvodce aplikací?<br/>
-            <span className="text-slate-400">Would you like a quick app tour?</span>
-          </p>
-
-          {/* Language choice + start */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="px-8 pb-7">
+          <div className="grid grid-cols-2 gap-2.5 mb-4">
             <button
               onClick={() => onStart('cs')}
-              className="flex flex-col items-center gap-2 py-4 px-4 bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-400 rounded-xl transition-all group"
+              className="flex flex-col items-center gap-0.5 py-3.5 px-4 rounded-xl transition-colors hover:bg-[#faf9f7]"
+              style={{ border: `1.5px solid ${LINE}` }}
             >
-              <span className="text-2xl">🇨🇿</span>
-              <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">Česky</span>
-              <span className="text-xs text-slate-400">Spustit průvodce</span>
+              <span className="text-sm font-semibold" style={{ color: INK }}>Česky</span>
+              <span className="text-xs" style={{ color: FAINT }}>Spustit průvodce</span>
             </button>
             <button
               onClick={() => onStart('en')}
-              className="flex flex-col items-center gap-2 py-4 px-4 bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-400 rounded-xl transition-all group"
+              className="flex flex-col items-center gap-0.5 py-3.5 px-4 rounded-xl transition-colors hover:bg-[#faf9f7]"
+              style={{ border: `1.5px solid ${LINE}` }}
             >
-              <span className="text-2xl">🇬🇧</span>
-              <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-700">English</span>
-              <span className="text-xs text-slate-400">Start tour</span>
+              <span className="text-sm font-semibold" style={{ color: INK }}>English</span>
+              <span className="text-xs" style={{ color: FAINT }}>Start tour</span>
             </button>
           </div>
 
           <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100" /></div>
-            <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-slate-400">nebo / or</span></div>
+            <div className="absolute inset-0 flex items-center"><div className="w-full" style={{ borderTop: `1px solid ${LINE}` }} /></div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-xs" style={{ color: FAINT }}>nebo / or</span>
+            </div>
           </div>
 
           <button
             onClick={handleSkip}
-            className="w-full py-2.5 px-4 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors border border-slate-200"
+            className="w-full py-2.5 px-4 text-sm font-medium rounded-[10px] transition-colors hover:bg-[#faf9f7]"
+            style={{ border: `1px solid #ddd8d0`, color: MUTED }}
           >
             Přeskočit a vybrat předplatné → / Skip to pricing →
           </button>
 
-          <p className="text-xs text-slate-400 text-center mt-3">
-            Průvodce lze spustit kdykoliv přes tlačítko <strong>?</strong> v aplikaci
+          <p className="text-xs text-center mt-3 leading-snug" style={{ color: FAINT }}>
+            Průvodce spustíte kdykoli později tlačítkem{' '}
+            <strong style={{ color: ORANGE }}>?</strong> vpravo dole.
           </p>
         </div>
       </div>
