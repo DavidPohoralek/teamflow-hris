@@ -4136,7 +4136,7 @@ function VacationCountingModeSetting() {
 
 function ShiftViewModeSetting() {
   const t = useT();
-  const [mode, setMode] = useState<'teamflow' | 'googlesheets'>('teamflow');
+  const [mode, setMode] = useState<'teamflow' | 'googlesheets'>('googlesheets');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -4144,8 +4144,10 @@ function ShiftViewModeSetting() {
     managerFetch('/api/manager/settings')
       .then((r) => r.json())
       .then((d: Record<string, unknown>) => {
-        if (d.shift_view_mode === 'googlesheets') setMode('googlesheets');
-        else setMode('teamflow');
+        // Unset means the company never chose — fall back to the same default
+        // the app renders (the table), not to the calendar.
+        if (d.shift_view_mode === 'teamflow') setMode('teamflow');
+        else setMode('googlesheets');
       })
       .catch(() => {});
   }, []);

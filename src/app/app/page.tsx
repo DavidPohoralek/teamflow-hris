@@ -87,7 +87,7 @@ export default function HomePage() {
   const [showTour, setShowTour] = useState(false)
   const [tourLang, setTourLang] = useState<'cs' | 'en'>('cs')
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
-  const [shiftViewMode, setShiftViewMode] = useState<'teamflow' | 'googlesheets'>('teamflow')
+  const [shiftViewMode, setShiftViewMode] = useState<'teamflow' | 'googlesheets'>('googlesheets')
   const [layout, setLayout] = useState<LayoutConfig>(DEFAULT_LAYOUT)
   const [showLayoutEditor, setShowLayoutEditor] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
