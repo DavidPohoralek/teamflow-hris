@@ -8,25 +8,36 @@ function getServiceClient() {
   );
 }
 
-export async function GET() {
-  const supabase = getServiceClient();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profile } = await (supabase as any)
-    .from('profiles')
-    .select('organization_id')
-    .eq('email', 'info@helveti.cz')
+// The questionnaire is reachable only with an explicit company slug — without it
+// the page would publicly list every employee's name, which must not happen on a
+// multi-tenant product.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function orgIdFromSlug(supabase: any, slug: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', slug)
     .maybeSingle();
+  return data?.id ?? null;
+}
 
-  if (!profile?.organization_id) {
-    return NextResponse.json({ names: [] });
+export async function GET(req: NextRequest) {
+  const slug = new URL(req.url).searchParams.get('org');
+  if (!slug) {
+    return NextResponse.json({ error: 'Chybí parametr org.' }, { status: 400 });
+  }
+
+  const supabase = getServiceClient();
+  const orgId = await orgIdFromSlug(supabase, slug);
+  if (!orgId) {
+    return NextResponse.json({ error: 'Organizace nenalezena.' }, { status: 404 });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: employees } = await (supabase as any)
     .from('employees')
     .select('name')
-    .eq('organization_id', profile.organization_id)
+    .eq('organization_id', orgId)
     .eq('active', true)
     .order('name', { ascending: true });
 
@@ -57,19 +68,14 @@ export async function POST(req: NextRequest) {
 
   const supabase = getServiceClient();
 
-  // Find org for info@helveti.cz
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profile } = await (supabase as any)
-    .from('profiles')
-    .select('organization_id')
-    .eq('email', 'info@helveti.cz')
-    .maybeSingle();
-
-  if (!profile?.organization_id) {
-    return NextResponse.json({ error: 'Organizace nenalezena.' }, { status: 500 });
+  const slug = (body as { org?: string }).org;
+  if (!slug) {
+    return NextResponse.json({ error: 'Chybí parametr org.' }, { status: 400 });
   }
-
-  const orgId = profile.organization_id;
+  const orgId = await orgIdFromSlug(supabase, slug);
+  if (!orgId) {
+    return NextResponse.json({ error: 'Organizace nenalezena.' }, { status: 404 });
+  }
 
   // Find existing employee by name within org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

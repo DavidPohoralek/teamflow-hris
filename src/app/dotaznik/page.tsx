@@ -42,8 +42,20 @@ export default function DotaznikPage() {
   const [error, setError] = useState<string | null>(null);
   const [names, setNames] = useState<string[]>([]);
 
+  // Company comes from ?org=<slug>. Without it the form shows nothing — otherwise
+  // the page would publicly list every employee's name.
+  const [orgSlug, setOrgSlug] = useState<string | null>(null);
+  const [slugChecked, setSlugChecked] = useState(false);
+
   useEffect(() => {
-    fetch('/api/dotaznik').then(r => r.json()).then(d => setNames(d.names ?? []));
+    const s = new URLSearchParams(window.location.search).get('org');
+    setOrgSlug(s);
+    setSlugChecked(true);
+    if (!s) return;
+    fetch(`/api/dotaznik?org=${encodeURIComponent(s)}`)
+      .then(r => r.json())
+      .then(d => setNames(d.names ?? []))
+      .catch(() => {});
   }, []);
 
   // Running button state
@@ -65,7 +77,7 @@ export default function DotaznikPage() {
       const res = await fetch('/api/dotaznik', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, org: orgSlug }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Chyba. Zkuste to znovu.'); return; }
@@ -100,6 +112,19 @@ export default function DotaznikPage() {
     const y = Math.random() * maxY;
     setBtnPos({ x, y });
   }, [showReward]);
+
+  if (slugChecked && !orgSlug) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5', fontFamily: 'system-ui, -apple-system, sans-serif', padding: 24 }}>
+        <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 14, padding: '32px 28px', maxWidth: 420, textAlign: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#111820' }}>Neplatný odkaz</div>
+          <p style={{ fontSize: 14, color: '#6b7480', lineHeight: 1.5, margin: '8px 0 0' }}>
+            Tento formulář je dostupný jen přes odkaz od vaší firmy. Vyžádejte si ho prosím u svého nadřízeného.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
