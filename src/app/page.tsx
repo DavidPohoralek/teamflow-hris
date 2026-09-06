@@ -467,7 +467,7 @@ export default function LandingPage() {
             Připraveni začít?
           </h2>
           <p className="text-[14.5px] text-[#aab3bd] mb-9 max-w-[42ch] mx-auto">
-            Registrace trvá méně než minutu.
+            Napište nám a pošleme vám přístupový kód. Nastavení firmy pak zabere pár minut.
           </p>
           <Link href="/register"
             className="inline-block px-8 py-3.5 rounded-[9px] font-medium text-[15px] text-[#111820] transition hover:brightness-105"
