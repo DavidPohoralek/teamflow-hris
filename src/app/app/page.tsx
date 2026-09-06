@@ -737,6 +737,7 @@ export default function HomePage() {
           canClose={subscriptionStatus === 'active'}
           paid={subscriptionStatus !== 'pending' && subscriptionStatus !== 'expired'}
           onSwitchTab={(tab) => setActiveTab(tab as Tab)}
+          shiftView={shiftViewMode}
         />
       )}
 
@@ -754,7 +755,8 @@ export default function HomePage() {
         <div className="fixed bottom-6 right-6 z-50 group">
           <button
             onClick={() => setShowTourSelect(true)}
-            className="w-11 h-11 rounded-full bg-white border-2 border-slate-200 shadow-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-400 hover:shadow-blue-100 transition-all duration-200 font-bold text-lg"
+            className="w-11 h-11 rounded-full bg-white shadow-lg flex items-center justify-center transition-all duration-200 font-bold text-lg hover:border-[#E8963C] hover:text-[#C97C2A]"
+            style={{ border: '2px solid #e6e2db', color: '#6b7480' }}
             aria-label="Spustit průvodce"
           >
             ?

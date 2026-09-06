@@ -1782,7 +1782,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
               </div>
               </>
             ) : (
-              <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className={`flex items-center rounded-lg overflow-hidden border ${pinInputError ? 'border-red-400' : 'border-[#e2e0dc]'} bg-white`}>
+              <form data-tour="pin-input" onSubmit={(e) => { e.preventDefault(); handlePinLogin(); }} className={`flex items-center rounded-lg overflow-hidden border ${pinInputError ? 'border-red-400' : 'border-[#e2e0dc]'} bg-white`}>
                 <input
                   type="password" inputMode="numeric" maxLength={8} value={pinInputValue}
                   onChange={(e) => { setPinInputValue(e.target.value.replace(/\D/g, '')); setPinInputError(false); }}
@@ -1802,7 +1802,7 @@ export default function GoogleSheetsGrid({ orgId, month, isManagerMode, onMonthC
       <div className="px-4 md:px-6 pb-4 md:pb-6 pt-2">
       {/* Grid — split into sticky header + scrollable body; header uses measured column
            widths from the body table so borders align pixel-perfectly */}
-      <div className="rounded-b-xl border-x border-b border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
+      <div data-tour="shift-grid" className="rounded-b-xl border-x border-b border-gray-200 shadow-sm bg-white" style={{ overflow: 'clip' }}>
 
         {/* Sticky header — uses exact column widths measured from the body table */}
         <div
