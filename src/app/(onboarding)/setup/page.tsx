@@ -246,7 +246,7 @@ export default function SetupPage() {
           <ul className="list-none p-0 mt-5 mb-0 flex flex-col gap-2.5">
             {[
               ['Heslo manažera', 'kterým se dostanete do Správy'],
-              ['Oddělení', 'kam se lidé budou píchat a podle čeho plánujete směny'],
+              ['Oddělení', 'kde u vás lidé pracují a podle čeho plánujete směny'],
               ['Zaměstnanci', 'jméno a PIN do docházky'],
             ].map(([title, desc], i) => (
               <li key={title} className="flex gap-2.5 text-sm" style={{ color: MUTED }}>
@@ -278,7 +278,8 @@ export default function SetupPage() {
         <div className={CARD} style={CARD_STYLE}>
           <h2 className="text-[21px] font-bold tracking-[-.015em] m-0">Nastavte heslo manažera</h2>
           <p className="text-sm mt-2 leading-relaxed" style={{ color: MUTED }}>
-            Tímto heslem se budete přihlašovat do Správy. Zaměstnanci ho nepotřebují — ti se píchají PINem.
+            Tímto heslem se budete přihlašovat do Správy. Zaměstnanci ho nepotřebují — ti se do docházky
+            hlásí svým PINem.
           </p>
 
           <form onSubmit={handleSetPassword} className="mt-6">
@@ -311,7 +312,8 @@ export default function SetupPage() {
         <div className={CARD} style={CARD_STYLE}>
           <h2 className="text-[21px] font-bold tracking-[-.015em] m-0">Kde u vás lidi pracují?</h2>
           <p className="text-sm mt-2 leading-relaxed" style={{ color: MUTED }}>
-            Vyberte oddělení nebo typy směn. Podle nich se plánuje a lidé si vybírají, kam se píchají.
+            Vyberte oddělení nebo typy směn. Podle nich plánujete směny a lidé při příchodu vybírají, kde
+            zrovna pracují.
           </p>
 
           <div className="mt-6">
@@ -390,7 +392,7 @@ export default function SetupPage() {
         <div className={CARD} style={CARD_STYLE}>
           <h2 className="text-[21px] font-bold tracking-[-.015em] m-0">Přidejte zaměstnance</h2>
           <p className="text-sm mt-2 leading-relaxed" style={{ color: MUTED }}>
-            Stačí jméno a PIN — tím se budou píchat do docházky. Zbytek (oddělení, úvazek, mzda) doplníte
+            Stačí jméno a PIN — tím se budou hlásit do docházky. Zbytek (oddělení, úvazek, mzda) doplníte
             kdykoli později ve Správě.
           </p>
 
@@ -493,7 +495,7 @@ export default function SetupPage() {
               </button>
             </div>
             <p className="text-[12.5px] mt-2.5 mb-0 leading-snug" style={{ color: FAINT }}>
-              Naplánujte první směny ve <b style={{ color: MUTED }}>Směnách</b>, nebo rovnou pusťte lidi píchat
+              Naplánujte první směny ve <b style={{ color: MUTED }}>Směnách</b>, nebo rovnou spusťte docházku
               v <b style={{ color: MUTED }}>Příchod/Odchod</b>. Kiosek můžete otevřít na tabletu u vchodu.
             </p>
           </div>

@@ -439,7 +439,7 @@ export default function LandingPage() {
             },
             {
               q: 'Jak dlouho trvá zavedení?',
-              a: 'Většině firem stačí odpoledne: založíte firmu, nahrajete jména a PIN kódy a tým může začít píchat ještě tentýž den.',
+              a: 'Většině firem stačí odpoledne: založíte firmu, nahrajete jména a PIN kódy a tým může začít zaznamenávat docházku ještě tentýž den.',
             },
             {
               q: 'Co když budeme chtít skončit?',
