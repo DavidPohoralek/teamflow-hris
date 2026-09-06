@@ -167,7 +167,7 @@ export default function IntegrationSettings() {
                 className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
               <button
-                onClick={() => save({ resend_api_key: resendInput, email_from: emailFromInput || 'asistent@helvetiplanovac.cz' })}
+                onClick={() => save({ resend_api_key: resendInput, email_from: emailFromInput || 'noreply@tmflw.com' })}
                 disabled={saving || !resendInput}
                 className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-40"
               >

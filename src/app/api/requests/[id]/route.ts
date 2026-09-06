@@ -467,7 +467,7 @@ export async function PUT(
 
       await sendApprovalEmail({
         resendApiKey: integMap['resend_api_key'] ?? '',
-        emailFrom: integMap['email_from'] ?? 'noreply@teamflow.app',
+        emailFrom: integMap['email_from'] ?? 'noreply@tmflw.com',
         employeeEmail: emp.email,
         employeeName: emp.name ?? '',
         requestType: existing.type,

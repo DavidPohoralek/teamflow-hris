@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const dlcToken = await getOrgDlcToken(supabase, orgId);
   if (!dlcToken) {
     return NextResponse.json(
-      { error: 'Asistent směn není aktivován. Dokupte licenci na helvetiplanovac.cz/assistant', licensed: false },
+      { error: 'Asistent směn není aktivován. Licenci si můžete dokoupit na tmflw.com.', licensed: false },
       { status: 403 },
     );
   }

@@ -27,7 +27,7 @@ async function getOrgIntegrations(supabase: unknown, orgId: string) {
   return {
     slackWebhookUrl: map['slack_webhook_url'] ?? '',
     resendApiKey:    map['resend_api_key'] ?? '',
-    emailFrom:       map['email_from'] ?? 'asistent@helvetiplanovac.cz',
+    emailFrom:       map['email_from'] ?? 'noreply@tmflw.com',
   };
 }
 

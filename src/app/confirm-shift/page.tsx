@@ -67,7 +67,7 @@ function ConfirmShiftContent() {
         <div className="text-center mb-6">
           <div className="text-3xl mb-2">📅</div>
           <h1 className="text-xl font-bold text-slate-800">Nabídka směny</h1>
-          <p className="text-sm text-slate-500 mt-1">TeamFlow – HelvetiPlánovač</p>
+          <p className="text-sm text-slate-500 mt-1">TeamFlow</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
