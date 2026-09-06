@@ -112,6 +112,32 @@ function formatDuration(checkIn: string): string {
   return `${hours}h ${minutes}m`;
 }
 
+// Mode icons for the Home-office "Pracovní doba" switcher.
+function HoIconTimer() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2M9 2h6" />
+    </svg>
+  );
+}
+function HoIconRange() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <path d="M4 12h16M4 12l4-4M20 12l-4 4" />
+    </svg>
+  );
+}
+function HoIconSum() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <path d="M5 5h14L11 12l8 7H5" />
+    </svg>
+  );
+}
+
 export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const t = useT();
   const [screen, setScreen] = useState<KioskScreen>('pin');
@@ -1088,31 +1114,31 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
           {/* Time range / Hours / Stopwatch toggle */}
           <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <label className="text-[#8a929c] text-sm font-medium uppercase tracking-wider">{t('Pracovní doba', 'Working hours')}</label>
-              <div className="flex rounded-lg overflow-hidden border border-[#e2e0dc] text-sm">
-                <button
-                  onClick={() => setHoFormMode('stopwatch')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'stopwatch' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
-                >
-                  ⏱ {t('Stopky', 'Timer')}
-                </button>
-                <button
-                  onClick={() => setHoFormMode('range')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'range' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
-                >
-                  {t('Od / Do', 'From / To')}
-                </button>
-                <button
-                  onClick={() => setHoFormMode('hours')}
-                  className={`px-3 py-1 transition-all ${hoFormMode === 'hours' ? 'bg-[#111820] text-white font-semibold' : 'bg-white border border-[#e2e0dc] text-[#8a929c] hover:bg-[#f4f2ef]'}`}
-                >
-                  {t('Počet hodin', 'Total hours')}
-                </button>
-              </div>
+            <label className="text-[#8a929c] text-[11px] font-semibold uppercase tracking-[.09em]">
+              {t('Pracovní doba', 'Working hours')}
+            </label>
+            <div className="grid grid-cols-3 gap-[3px] rounded-[11px] p-[3px]" style={{ background: '#f4f2ee' }}>
+              {([
+                { mode: 'stopwatch' as const, icon: <HoIconTimer />, label: t('Stopky', 'Timer') },
+                { mode: 'range' as const, icon: <HoIconRange />, label: t('Od / Do', 'From / To') },
+                { mode: 'hours' as const, icon: <HoIconSum />, label: t('Hodin', 'Hours') },
+              ]).map((o) => {
+                const on = hoFormMode === o.mode;
+                return (
+                  <button
+                    key={o.mode}
+                    onClick={() => setHoFormMode(o.mode)}
+                    className={`flex items-center justify-center gap-1.5 h-[38px] rounded-lg text-[13px] transition-all ${on ? 'bg-white text-[#111820] font-semibold' : 'text-[#5c6672] font-medium hover:text-[#111820]'}`}
+                    style={on ? { boxShadow: '0 1px 2px rgba(17,24,32,.08), 0 0 0 1px rgba(17,24,32,.05)' } : undefined}
+                  >
+                    {o.icon}
+                    {o.label}
+                  </button>
+                );
+              })}
             </div>
 
-            {hoFormMode === 'range' ? (
+            {hoFormMode === 'range' && (
               <>
                 <div className="flex gap-3 items-center">
                   <div className="flex-1 flex flex-col gap-1">
@@ -1138,7 +1164,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                   </p>
                 )}
               </>
-            ) : (
+            )}
+            {hoFormMode === 'hours' && (
               <>
                 <div className="flex flex-col gap-1">
                   <span className="text-[#8a929c] text-xs">{t('Odpracováno hodin', 'Hours worked')}</span>
@@ -1165,19 +1192,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               </>
             )}
             {hoFormMode === 'stopwatch' && (
-              <div className="flex flex-col items-center gap-4 py-2">
-                <p className="text-[#8a929c] text-sm text-center">
-                  {t('Stopky se spustí hned po kliknutí. Kdykoli se vrátíte a zadáte PIN — stopky zastavíte a docházka se uloží.', 'The timer starts immediately. Come back anytime, enter your PIN — stop the timer and your attendance is saved.')}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleHoStopwatchStart}
-                  className="w-full min-h-[56px] bg-[#111820] hover:bg-[#2a333e] text-white text-lg font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
-                >
-                  <span className="text-2xl">⏱</span>
-                  {t('Spustit stopky', 'Start timer')}
-                </button>
-              </div>
+              <p className="text-[#8a929c] text-sm text-center leading-relaxed">
+                {t('Stopky se spustí hned. Až skončíte, vrátíte se a zadáte PIN — docházka se uloží sama.', 'The timer starts right away. Come back when you finish, enter your PIN — your attendance is saved.')}
+              </p>
             )}
           </div>
 
@@ -1206,16 +1223,22 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             >
               {t('Zpět', 'Back')}
             </button>
-            {hoFormMode !== 'stopwatch' && (
-              <button
-                onClick={handleHoRecord}
-                disabled={!hoFormDate || (hoFormMode === 'range' ? (!hoFormStart || !hoFormEnd) : (!hoFormHours || parseFloat(hoFormHours.replace(',', '.')) <= 0)) || hoLoading}
-                className="flex-[2] min-h-[56px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {hoLoading ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
-                {t('Uložit docházku', 'Save attendance')}
-              </button>
-            )}
+            <button
+              onClick={hoFormMode === 'stopwatch' ? handleHoStopwatchStart : handleHoRecord}
+              disabled={
+                hoFormMode === 'stopwatch'
+                  ? false
+                  : !hoFormDate
+                    || (hoFormMode === 'range'
+                      ? (!hoFormStart || !hoFormEnd)
+                      : (!hoFormHours || parseFloat(hoFormHours.replace(',', '.')) <= 0))
+                    || hoLoading
+              }
+              className="flex-[2] min-h-[56px] bg-[#111820] hover:bg-[#2a333e] text-white text-base font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {hoLoading ? <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+              {hoFormMode === 'stopwatch' ? t('Spustit stopky', 'Start timer') : t('Uložit docházku', 'Save attendance')}
+            </button>
           </div>
         </div>
       )}
