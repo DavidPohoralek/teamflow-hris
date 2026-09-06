@@ -122,21 +122,26 @@ export async function DELETE(
   }
 
   // For approved vacations, remove any auto-inserted attendance_log rows.
-  // Matched by note (attendance_logs has no `type` column) — a no-op when the
-  // vacation never produced logs.
+  // Linked logs go with the request via ON DELETE CASCADE — that covers every
+  // path, including ones that never think about attendance. But logs predating
+  // the link (or that the backfill could not attribute) carry request_id NULL
+  // and cascade would leave them behind, so clean those by date range too.
+  // Scoped to request_id IS NULL so it can never reach into a request that owns
+  // its logs — that reach was the original bug.
   if (existing.status === 'approved' && existing.type === 'vacation') {
     const dateFrom = existing.date_from as string;
     const dateTo = (existing.date_to as string | null) ?? dateFrom;
-    const { error: logError } = await svc
+    const { error: legacyError } = await svc
       .from('attendance_logs')
       .delete()
       .eq('organization_id', orgId)
       .eq('employee_id', existing.employee_id)
       .eq('note', VACATION_LOG_NOTE)
+      .is('request_id', null)
       .gte('date', dateFrom)
       .lte('date', dateTo);
-    if (logError) {
-      console.error('DELETE vacation attendance_logs error:', logError.message);
+    if (legacyError) {
+      console.error('DELETE unlinked vacation logs error:', legacyError.message);
     }
   }
 
@@ -425,6 +430,7 @@ export async function PUT(
             check_in: `${dateStr}T09:00:00`,
             check_out: `${dateStr}T17:00:00`,
             note: VACATION_LOG_NOTE,
+            request_id: params.id,
           }));
 
         if (rows.length > 0) {

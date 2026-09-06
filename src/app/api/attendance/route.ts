@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pragueToday, toISODateLocal } from '@/lib/vacationDays';
+import { pragueToday, toISODateLocal, VACATION_LOG_NOTE, MANUAL_VACATION_NOTE } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 
@@ -123,6 +123,74 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Marking a day as vacation by hand here used to produce a log with no request
+  // behind it: Docházka showed the vacation, the balance never charged it. Give
+  // it a request so the two sides agree — and so deleting either removes both.
+  let vacationRequestId: string | null = null;
+  let createdRequestId: string | null = null;
+  if (note === VACATION_LOG_NOTE) {
+    // Refuse a second vacation day on a date that already has one — otherwise
+    // Docházka shows 16 h of vacation while the balance charges a single day.
+    // (The approval path guards the same way via its daysWithLog set.)
+    const { data: sameDay } = await supabase
+      .from('attendance_logs')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('employee_id', employee_id)
+      .eq('date', date)
+      .eq('note', VACATION_LOG_NOTE)
+      .limit(1)
+      .maybeSingle();
+
+    if (sameDay) {
+      return NextResponse.json(
+        { error: 'Tento den už je označený jako dovolená.' },
+        { status: 409 }
+      );
+    }
+
+    // A request already covering this day. date_to is nullable, so the overlap
+    // cannot be expressed as a single filter — narrow in SQL, match in JS.
+    // Pending counts too: approving it later would otherwise add a second day.
+    const yearStart = `${date.slice(0, 4)}-01-01`;
+    const { data: existingReqs } = await supabase
+      .from('requests')
+      .select('id, date_from, date_to, status')
+      .eq('organization_id', orgId)
+      .eq('employee_id', employee_id)
+      .eq('type', 'vacation')
+      .in('status', ['approved', 'pending'])
+      .gte('date_from', yearStart)
+      .lte('date_from', date);
+
+    const match = (existingReqs ?? []).find((r: { date_from: string; date_to: string | null }) =>
+      date >= r.date_from && date <= (r.date_to ?? r.date_from));
+
+    if (match) {
+      vacationRequestId = (match as { id: string }).id;
+    } else {
+      const { data: created, error: reqError } = await supabase
+        .from('requests')
+        .insert({
+          organization_id: orgId,
+          employee_id,
+          type: 'vacation',
+          status: 'approved',
+          date_from: date,
+          date_to: date,
+          note: MANUAL_VACATION_NOTE,
+        })
+        .select('id')
+        .single();
+      if (reqError) {
+        console.error('POST attendance: vacation request create failed:', reqError.message);
+      } else {
+        vacationRequestId = (created as { id: string }).id;
+        createdRequestId = vacationRequestId;
+      }
+    }
+  }
+
   const record = {
     organization_id: orgId,
     employee_id,
@@ -132,6 +200,7 @@ export async function POST(req: NextRequest) {
     ...(note !== undefined && { note }),
     ...(work_type_id !== undefined && { work_type_id }),
     ...(work_type_name !== undefined && { work_type_name }),
+    ...(vacationRequestId && { request_id: vacationRequestId }),
   };
 
   const { data, error } = await supabase
@@ -142,6 +211,11 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('POST attendance error:', error);
+    // We may have just created the backing request. Without the log it would
+    // charge the employee a day of vacation that nothing shows — take it back.
+    if (createdRequestId) {
+      await supabase.from('requests').delete().eq('id', createdRequestId).eq('organization_id', orgId);
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

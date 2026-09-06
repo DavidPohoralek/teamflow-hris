@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { VACATION_LOG_NOTE } from '@/lib/vacationDays'
 
 function getServiceClient() {
   return createClient((process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -33,13 +34,23 @@ export async function PATCH(req: NextRequest) {
     // Verify log belongs to this employee
     const { data: log } = await supabase
       .from('attendance_logs')
-      .select('employee_id')
+      .select('employee_id, note, request_id')
       .eq('id', logId)
       .eq('organization_id', orgId)
       .maybeSingle()
 
     if (!log || log.employee_id !== emp.id) {
       return NextResponse.json({ error: 'Záznam nenalezen.' }, { status: 404 })
+    }
+
+    // This endpoint writes the Home-office activity note. Overwriting the note
+    // on a vacation day would erase the marker Docházka reads, while the
+    // balance kept charging the day — so refuse rather than desync.
+    if (log.note === VACATION_LOG_NOTE || log.request_id) {
+      return NextResponse.json(
+        { error: 'U dne dovolené nelze měnit poznámku. Zrušte dovolenou v sekci Dovolená.' },
+        { status: 409 }
+      )
     }
 
     const { error } = await supabase

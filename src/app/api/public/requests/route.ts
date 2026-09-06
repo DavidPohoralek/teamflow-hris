@@ -2,6 +2,7 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { pragueToday } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server';
+import { MANUAL_VACATION_NOTE } from '@/lib/vacationDays';
 
 const VALID_TYPES = ['vacation', 'sick', 'correction', 'other'] as const;
 type RequestType = (typeof VALID_TYPES)[number];
@@ -147,7 +148,7 @@ export async function DELETE(req: NextRequest) {
     // Verify the request belongs to this employee
     const { data: existing } = await supabase
       .from('requests')
-      .select('id, status, date_from')
+      .select('id, status, date_from, note')
       .eq('id', requestId)
       .eq('employee_id', employee.id)
       .eq('organization_id', orgId)
@@ -162,6 +163,17 @@ export async function DELETE(req: NextRequest) {
     if (existing.date_from && existing.date_from < today) {
       return NextResponse.json(
         { error: 'Proběhlé žádosti nelze smazat.' },
+        { status: 403 }
+      );
+    }
+
+    // A vacation the MANAGER entered by hand in Docházka surfaces here as an
+    // approved request the employee never filed. Deleting it now cascades away
+    // the manager's attendance record, so an employee must not be able to. They
+    // can still cancel what they filed themselves.
+    if (existing.note === MANUAL_VACATION_NOTE) {
+      return NextResponse.json(
+        { error: 'Tuto dovolenou zadal manažer v Docházce. O zrušení požádejte svého manažera.' },
         { status: 403 }
       );
     }

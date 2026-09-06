@@ -2598,8 +2598,12 @@ function HomeOfficeTab() {
         throw new Error(d.error ?? 'Server error');
       }
       setLogs((prev) => prev.filter((l) => l.id !== logId));
-    } catch {
-      alert(t('Nepodařilo se smazat záznam.', 'Failed to delete record.'));
+    } catch (e) {
+      // The server explains WHY when it refuses (e.g. this is a vacation day).
+      // Swallowing that left the user with a dead end.
+      alert(e instanceof Error && e.message !== 'Server error'
+        ? e.message
+        : t('Nepodařilo se smazat záznam.', 'Failed to delete record.'));
     } finally {
       setDeletingId(null);
     }

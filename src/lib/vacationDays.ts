@@ -17,6 +17,14 @@
  */
 export const VACATION_LOG_NOTE = 'Placená dovolená';
 
+/**
+ * Note on the vacation request the app creates when a manager marks a day as
+ * vacation directly in Docházka. Marks it as "not filed by the employee", so
+ * the employee's own cancel button refuses it — cancelling would cascade away
+ * the manager's attendance record.
+ */
+export const MANUAL_VACATION_NOTE = 'Zadáno ručně v Docházce';
+
 /** Formats a Date as local YYYY-MM-DD. Never use toISOString for this. */
 export function toISODateLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

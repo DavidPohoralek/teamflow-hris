@@ -39,16 +39,42 @@ async function trimVacationRequestForDate(supabase: any, orgId: string, employee
       await supabase.from('requests').update({ date_to: addDays(date, -1) }).eq('id', r.id).eq('organization_id', orgId);
     } else {
       // Middle day → split into the part before and the part after the gap.
-      await supabase.from('requests').update({ date_to: addDays(date, -1) }).eq('id', r.id).eq('organization_id', orgId);
-      await supabase.from('requests').insert({
+      //
+      // Order matters. Create the tail FIRST: if it fails we abandon the split
+      // and the original request still covers everything, which merely leaves
+      // the day charged — recoverable, and visible. Shortening first and then
+      // failing would drop the second half from the balance while Docházka
+      // still showed it, with nothing pointing at the discrepancy.
+      const tailFrom = addDays(date, 1);
+      const { data: tail, error: tailError } = await supabase.from('requests').insert({
         organization_id: orgId,
         employee_id: employeeId,
         type: 'vacation',
         status: 'approved',
-        date_from: addDays(date, 1),
+        date_from: tailFrom,
         date_to: to,
         note: r.note ?? null,
-      });
+      }).select('id').single();
+
+      if (tailError || !tail?.id) {
+        console.error('Vacation split: tail request insert failed, leaving request intact:', tailError?.message);
+        continue;
+      }
+
+      // Hand the days after the gap to the request that now owns them. Also
+      // picks up logs with no link yet (pre-migration data) — without that they
+      // would belong to nobody and cascade would never clean them up.
+      await supabase
+        .from('attendance_logs')
+        .update({ request_id: tail.id })
+        .eq('organization_id', orgId)
+        .eq('employee_id', employeeId)
+        .eq('note', VACATION_LOG_NOTE)
+        .or(`request_id.eq.${r.id},request_id.is.null`)
+        .gte('date', tailFrom)
+        .lte('date', to);
+
+      await supabase.from('requests').update({ date_to: addDays(date, -1) }).eq('id', r.id).eq('organization_id', orgId);
     }
   }
 }
@@ -67,10 +93,10 @@ export async function PUT(
   // Fetch the existing log and verify org ownership
   const { data: existing, error: fetchError } = await supabase
     .from('attendance_logs')
-    .select('id, employee_id, organization_id, check_in, check_out, note')
+    .select('id, employee_id, organization_id, date, check_in, check_out, note, request_id')
     .eq('id', id)
     .eq('organization_id', orgId)
-    .single() as { data: { id: string; employee_id: string; organization_id: string; check_in: string | null; check_out: string | null; note: string | null } | null; error: unknown };
+    .single() as { data: { id: string; employee_id: string; organization_id: string; date: string | null; check_in: string | null; check_out: string | null; note: string | null; request_id: string | null } | null; error: unknown };
 
   if (fetchError || !existing) {
     return NextResponse.json({ error: 'Záznam nenalezen.' }, { status: 404 });
@@ -92,6 +118,30 @@ export async function PUT(
 
   if (body.check_out !== undefined) {
     updates.check_out = body.check_out;
+  }
+
+  // Editing a vacation day here would silently split the two sources: rename the
+  // note and Docházka loses the vacation while the balance keeps charging it;
+  // type the note IN and you get a vacation nobody requested. Vacation is
+  // managed in Dovolená, or removed by deleting the day (which trims the
+  // request) — so refuse the edit instead of desyncing.
+  const isVacationLog = existing.note === VACATION_LOG_NOTE || Boolean(existing.request_id);
+  if (body.note !== undefined && body.note !== existing.note && (isVacationLog || body.note === VACATION_LOG_NOTE)) {
+    return NextResponse.json(
+      {
+        error: isVacationLog
+          ? 'U dne dovolené nelze měnit poznámku. Dovolenou upravte v sekci Dovolená, nebo den smažte.'
+          : 'Dovolenou nelze zadat přepsáním poznámky. Použijte sekci Dovolená.',
+      },
+      { status: 409 }
+    );
+  }
+
+  if (isVacationLog && (body.check_in !== undefined || body.check_out !== undefined)) {
+    return NextResponse.json(
+      { error: 'U dne dovolené nelze měnit časy — dovolená se počítá jako celý den. Upravte ji v sekci Dovolená.' },
+      { status: 409 }
+    );
   }
 
   if (body.note !== undefined) {
@@ -150,7 +200,7 @@ export async function DELETE(
     .delete()
     .eq('id', params.id)
     .eq('organization_id', orgId)
-    .select('id, employee_id, date, note')
+    .select('id, employee_id, date, note, request_id')
     .maybeSingle();
 
   if (error) {
@@ -163,8 +213,8 @@ export async function DELETE(
 
   // If this was a vacation DOV day, keep the vacation request in sync so the
   // balance reflects the removal (otherwise it's a silent half-delete).
-  const deleted = data as { employee_id: string | null; date: string | null; note: string | null };
-  if (deleted.note === VACATION_LOG_NOTE && deleted.employee_id && deleted.date) {
+  const deleted = data as { employee_id: string | null; date: string | null; note: string | null; request_id: string | null };
+  if ((deleted.note === VACATION_LOG_NOTE || deleted.request_id) && deleted.employee_id && deleted.date) {
     try {
       await trimVacationRequestForDate(supabase, orgId, deleted.employee_id, deleted.date);
     } catch (e) {

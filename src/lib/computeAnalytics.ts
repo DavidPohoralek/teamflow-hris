@@ -36,7 +36,7 @@ export async function computeMonthlyStats(
 
   let empQuery = sb
     .from('employees')
-    .select('id, department, target_hours, vacation_days_per_year, name, email')
+    .select('id, department, target_hours, vacation_days_per_year, vacation_hours_offset, name, email')
     .eq('organization_id', orgId)
     .eq('active', true)
     .order('id');
@@ -59,7 +59,7 @@ export async function computeMonthlyStats(
     sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
   ]);
 
-  const employees: { id: string; department: string | null; target_hours: number; vacation_days_per_year: number; name: string | null; email: string | null }[] = empRes.data ?? [];
+  const employees: { id: string; department: string | null; target_hours: number; vacation_days_per_year: number; vacation_hours_offset?: number; name: string | null; email: string | null }[] = empRes.data ?? [];
   const vacRequests: { employee_id: string; date_from: string; date_to: string | null }[] = requestsRes.data ?? [];
   const extraSettings = (settingsRes.data as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
   const countWeekends = (extraSettings['vacation_counting_mode'] as string | undefined) === 'all';
@@ -108,6 +108,11 @@ export async function computeMonthlyStats(
       { start: `${year}-01-01`, end: `${year}-12-31` },
     ) * 8;
 
+    const vacTotalHours = (emp.vacation_days_per_year ?? 20) * 8;
+    const offsetHours = Number(emp.vacation_hours_offset ?? 0);
+    const effectiveStartHours = offsetHours > 0 ? offsetHours : vacTotalHours;
+    const vacUsedTotalHours = Math.max(0, vacTotalHours - effectiveStartHours) + vacUsedHours;
+
     const targetHours = emp.target_hours ?? 160;
 
     return {
@@ -119,7 +124,11 @@ export async function computeMonthlyStats(
       utilizationPct: targetHours > 0 ? Math.round((workedHours / targetHours) * 100) : 0,
       avgPunctualityMin: avgPunctuality,
       overtimeHours: Math.round(overtimeMinutes / 6) / 10,
-      vacationHoursRemaining: Math.max(0, (emp.vacation_days_per_year ?? 20) * 8 - vacUsedHours),
+      // vacation_hours_offset = hours remaining when tracking started. Hours used
+      // before that are folded into "used" so used + remaining = total — the same
+      // formula as /api/analytics. Without this the integration endpoint reported
+      // a different balance than the Analytics screen for anyone with an offset.
+      vacationHoursRemaining: Math.max(0, vacTotalHours - vacUsedTotalHours),
     };
   });
 

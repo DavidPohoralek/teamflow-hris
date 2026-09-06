@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pragueToday, toISODateLocal } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg'
+import { VACATION_LOG_NOTE } from '@/lib/vacationDays'
 
 function isHO(name: string | null | undefined): boolean {
   if (!name) return false
@@ -114,6 +115,25 @@ export async function DELETE(req: NextRequest) {
 
   const { logId } = body
   if (!logId) return NextResponse.json({ error: 'Chybí logId.' }, { status: 400 })
+
+  // This endpoint manages Home-office logs. Handed a vacation day it would
+  // delete the log and leave the request behind — the exact half-delete the
+  // request_id link exists to prevent. Vacation days are removed in Záznamy,
+  // which trims the request with them.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: log } = await (supabase as any)
+    .from('attendance_logs')
+    .select('note, request_id')
+    .eq('id', logId)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+
+  if (log && (log.note === VACATION_LOG_NOTE || log.request_id)) {
+    return NextResponse.json(
+      { error: 'Tento záznam je den dovolené. Smažte ho v Záznamech, nebo zrušte dovolenou v sekci Dovolená.' },
+      { status: 409 }
+    )
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any)
