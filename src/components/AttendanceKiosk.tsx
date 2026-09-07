@@ -166,6 +166,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   // HomeOffice activity report (post-checkout note)
   const [requireHoReport, setRequireHoReport] = useState(false);
   const [hoLogId, setHoLogId] = useState<string | null>(null);
+  // How long the employee worked today, shown on the goodbye screen.
+  const [workedDuration, setWorkedDuration] = useState('');
   const [hoNote, setHoNote] = useState('');
   const [hoLoading, setHoLoading] = useState(false);
 
@@ -273,6 +275,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setShowOtherWork(false);
       setShowActivityPicker(false);
       setSuccessMessage('');
+      setWorkedDuration('');
       setErrorMessage('');
       setPinError(false);
       setHoLogId(null);
@@ -411,6 +414,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       if (!res.ok) throw new Error();
       const json = await res.json() as { logId?: string; workTypeName?: string };
       const duration = presence ? formatDuration(presence.checkIn) : '';
+      setWorkedDuration(duration);
       const checkoutWt = json.workTypeName ?? presence?.workTypeName;
 
       if (requireHoReport && isHomeOffice(checkoutWt) && json.logId) {
@@ -1355,14 +1359,26 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       {/* Success Check-out Screen */}
       {screen === 'success-checkout' && (
         <div className="w-full max-w-md flex flex-col items-center gap-6 bg-emerald-600 rounded-3xl p-12">
-          <div className="text-8xl">👋</div>
-          <p className="text-3xl font-bold text-white text-center">
+          <div className="text-7xl">👋</div>
+          <p className="text-xl text-emerald-100 text-center">
             {t('Nashledanou', 'Goodbye')}, {employeeName}!
           </p>
-          <p className="text-xl text-emerald-100 text-center">
-            {t('Hezký zbytek dne!', 'Have a great rest of your day!')}
-          </p>
-          <p className="text-emerald-200 text-base text-center">{successMessage}</p>
+
+          {workedDuration ? (
+            <div className="text-center">
+              <p className="text-emerald-200 text-sm font-medium uppercase tracking-[.12em]">
+                {t('Odpracováno dnes', 'Worked today')}
+              </p>
+              <p className="text-5xl sm:text-6xl font-bold text-white tabular-nums mt-1.5">
+                {workedDuration}
+              </p>
+            </div>
+          ) : (
+            <p className="text-2xl font-bold text-white text-center">
+              {t('Odchod zaznamenán', 'Clocked out')}
+            </p>
+          )}
+
           <p className="text-emerald-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
         </div>
       )}
