@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { pragueMonth } from '@/lib/vacationDays';
+import { pragueMonth, monthEndISO } from '@/lib/vacationDays';
 import { resolveOrgId } from '@/lib/resolveOrg'
 
 // GET /api/manager/benefit-entries?month=YYYY-MM
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     .select('id, benefit_key, date, created_at, employees ( id, name, department )')
     .eq('organization_id', orgId)
     .gte('date', month + '-01')
-    .lte('date', month + '-31')
+    .lte('date', monthEndISO(month))
     .order('date', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -66,7 +66,7 @@ export async function DELETE(req: NextRequest) {
     .eq('employee_id', existing.employee_id)
     .eq('benefit_key', existing.benefit_key)
     .gte('date', month + '-01')
-    .lte('date', month + '-31')
+    .lte('date', monthEndISO(month))
 
   await sb
     .from('employee_benefit_logs')

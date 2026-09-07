@@ -48,6 +48,19 @@ export function pragueMonth(): string {
   return pragueToday().slice(0, 7);
 }
 
+/**
+ * Last day of a YYYY-MM month as YYYY-MM-DD.
+ *
+ * Do not build a month's end by appending '-31': September has 30 days, so
+ * "2026-09-31" is not a date and Postgres rejects the whole query with
+ * `date/time field value out of range`. Day 0 of the next month is the last
+ * day of this one.
+ */
+export function monthEndISO(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return toISODateLocal(new Date(y, m, 0));
+}
+
 /** Day of week (0=Sun … 6=Sat) for a YYYY-MM-DD string, timezone-safe. */
 export function dayOfWeekISO(iso: string): number {
   return new Date(iso + 'T12:00:00').getDay();

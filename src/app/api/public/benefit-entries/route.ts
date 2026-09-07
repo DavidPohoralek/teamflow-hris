@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { pragueToday } from '@/lib/vacationDays';
+import { pragueToday, monthEndISO } from '@/lib/vacationDays';
 import { NextRequest, NextResponse } from 'next/server'
 
 function svc() {
@@ -21,7 +21,7 @@ async function resolveEmployee(supabase: ReturnType<typeof svc>, orgId: string, 
 }
 
 async function syncBenefitLogs(supabase: ReturnType<typeof svc>, orgId: string, employeeId: string, benefitKey: string, month: string) {
-  const [dateFrom, dateTo] = [month + '-01', month + '-31']
+  const [dateFrom, dateTo] = [month + '-01', monthEndISO(month)]
   const { count } = await supabase
     .from('benefit_entries')
     .select('*', { count: 'exact', head: true })
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     .eq('organization_id', orgId)
     .eq('employee_id', employee.id)
     .gte('date', month + '-01')
-    .lte('date', month + '-31')
+    .lte('date', monthEndISO(month))
     .order('date', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
