@@ -112,6 +112,43 @@ function formatDuration(checkIn: string): string {
   return `${hours}h ${minutes}m`;
 }
 
+
+// Result-screen icons. Drawn rather than emoji so they scale on the door
+// tablet and take the surrounding text colour.
+function KioskCheck({ size = 40 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+      strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+  );
+}
+function KioskWave({ size = 40 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 13V6a1.5 1.5 0 0 1 3 0v5m0-1V4.5a1.5 1.5 0 0 1 3 0V10m0-.5V5a1.5 1.5 0 0 1 3 0v6m0-3a1.5 1.5 0 0 1 3 0v6a7 7 0 0 1-7 7h-1a6 6 0 0 1-6-6v-3" />
+    </svg>
+  );
+}
+function KioskCross({ size = 40 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+      strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+  );
+}
+
+// Colours for the full-bleed result screens — the app's ok/error greens and
+// reds, not Tailwind's emerald/red, so the kiosk matches everything else.
+const KIOSK_OK = '#2f7d46';
+
+// Time-of-day greeting for the welcome screen.
+function greeting(t: (cz: string, en: string) => string): string {
+  const h = new Date().getHours();
+  if (h < 10) return t('Dobré ráno', 'Good morning');
+  if (h < 18) return t('Dobrý den', 'Hello');
+  return t('Dobrý večer', 'Good evening');
+}
+const KIOSK_ERR = '#b3261e';
+
 // Mode icons for the Home-office "Pracovní doba" switcher.
 function HoIconTimer() {
   return (
@@ -168,6 +205,9 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
   const [hoLogId, setHoLogId] = useState<string | null>(null);
   // How long the employee worked today, shown on the goodbye screen.
   const [workedDuration, setWorkedDuration] = useState('');
+  // Clock-in time shown on the welcome screen. Empty for the HomeOffice
+  // completions that reuse this screen with a free-form message.
+  const [checkinTime, setCheckinTime] = useState('');
   const [hoNote, setHoNote] = useState('');
   const [hoLoading, setHoLoading] = useState(false);
 
@@ -276,6 +316,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       setShowActivityPicker(false);
       setSuccessMessage('');
       setWorkedDuration('');
+      setCheckinTime('');
       setErrorMessage('');
       setPinError(false);
       setHoLogId(null);
@@ -392,6 +433,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
       }
       const now = new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
       setSuccessMessage(`${t('Příchod zaznamenán v', 'Clocked in at')} ${now}`);
+      setCheckinTime(now);
       setScreen('success-checkin');
       resetKiosk();
     } catch {
@@ -1006,7 +1048,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           ) : (
             <div className="w-full bg-white border border-[#e2e0dc] rounded-[9px] p-5 flex flex-col gap-4">
               {correctionSuccess ? (
-                <p className="text-emerald-600 font-semibold text-center text-lg">
+                <p className="font-semibold text-center text-lg" style={{ color: KIOSK_OK }}>
                   ✓ {t('Žádost o opravu odeslána', 'Correction request sent')}
                 </p>
               ) : (
@@ -1025,7 +1067,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       value={correctionNote}
                       onChange={(e) => setCorrectionNote(e.target.value)}
                       placeholder={t('Např. zapomněl/a jsem přijít', 'E.g. forgot to clock in')}
-                      className="bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder:text-slate-500"
+                      className="bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder:text-[#8a929c]"
                     />
                   </div>
                   <div className="flex gap-3">
@@ -1149,14 +1191,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                     <span className="text-[#8a929c] text-xs">{t('Od', 'From')}</span>
                     <TimeSelect value={hoFormStart} onChange={setHoFormStart} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20" />
                   </div>
-                  <span className="text-slate-500 text-2xl mt-4">–</span>
+                  <span className="text-[#8a929c] text-2xl mt-4">–</span>
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[#8a929c] text-xs">{t('Do', 'To')}</span>
                     <TimeSelect value={hoFormEnd} onChange={setHoFormEnd} dark selectClassName="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20" />
                   </div>
                 </div>
                 {hoFormStart && hoFormEnd && hoFormEnd > hoFormStart && (
-                  <p className="text-emerald-600 text-sm text-center">
+                  <p className="text-sm text-center" style={{ color: KIOSK_OK }}>
                     {(() => {
                       const [sh, sm] = hoFormStart.split(':').map(Number);
                       const [eh, em] = hoFormEnd.split(':').map(Number);
@@ -1183,13 +1225,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
                       value={hoFormHours}
                       onChange={(e) => setHoFormHours(e.target.value)}
                       placeholder="8"
-                      className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-slate-500"
+                      className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl px-3 py-3 text-lg font-mono outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-[#8a929c]"
                     />
                     <span className="text-[#8a929c] text-base font-medium whitespace-nowrap">hod.</span>
                   </div>
                 </div>
                 {hoFormHours && !isNaN(parseFloat(hoFormHours.replace(',', '.'))) && parseFloat(hoFormHours.replace(',', '.')) > 0 && (
-                  <p className="text-emerald-600 text-sm text-center">
+                  <p className="text-sm text-center" style={{ color: KIOSK_OK }}>
                     {t('Celkem', 'Total')}: {parseFloat(hoFormHours.replace(',', '.')).toLocaleString('cs-CZ')}h
                   </p>
                 )}
@@ -1210,13 +1252,14 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
               onChange={(e) => setHoFormSummary(e.target.value)}
               placeholder={t('Např. Zpracování faktur, videokonference, příprava prezentace...', 'E.g. Invoice processing, video call, preparing presentation...')}
               rows={3}
-              className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-slate-500"
+              className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-[#8a929c]"
             />
           </div>
 
           {/* Error */}
           {hoFormError && (
-            <p className="text-red-400 text-sm text-center bg-red-900/30 rounded-xl px-4 py-2 w-full">{hoFormError}</p>
+            <p className="text-sm text-center rounded-xl px-4 py-2 w-full"
+              style={{ background: '#fdf2f2', border: '1px solid #f0cfcd', color: KIOSK_ERR }}>{hoFormError}</p>
           )}
 
           {/* Buttons */}
@@ -1262,10 +1305,11 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
           {/* Big timer display — amber + "Pozastaveno" tag while paused */}
           <div className="bg-white border border-[#e2e0dc] rounded-[9px] px-10 py-8 text-center w-full">
-            <div className={`text-6xl sm:text-7xl font-mono font-bold tracking-widest tabular-nums ${paused ? 'text-amber-600' : 'text-emerald-600'}`}>
+            <div className="text-6xl sm:text-7xl font-mono font-bold tracking-widest tabular-nums"
+              style={{ color: paused ? '#8a6420' : KIOSK_OK }}>
               {hoSwDisplay}
             </div>
-            <p className="text-slate-500 text-sm mt-2">
+            <p className="text-[#8a929c] text-sm mt-2">
               {paused
                 ? <span className="inline-flex items-center gap-1.5 text-amber-600 font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{t('Pozastaveno', 'Paused')}</span>
                 : t('hh:mm:ss', 'hh:mm:ss')}
@@ -1273,7 +1317,8 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           </div>
 
           {hoFormError && (
-            <p className="text-red-400 text-sm text-center bg-red-900/30 rounded-xl px-4 py-2 w-full">{hoFormError}</p>
+            <p className="text-sm text-center rounded-xl px-4 py-2 w-full"
+              style={{ background: '#fdf2f2', border: '1px solid #f0cfcd', color: KIOSK_ERR }}>{hoFormError}</p>
           )}
 
           {/* Pause / Resume + Stop */}
@@ -1319,12 +1364,13 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
             value={hoNote}
             onChange={(e) => setHoNote(e.target.value)}
             placeholder={t('Např. Zpracování faktur, videokonference s klientem, příprava prezentace...', 'E.g. Invoice processing, client video call, preparing presentation...')}
-            className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-slate-500"
+            className="w-full bg-white border border-[#e2e0dc] text-[#111820] rounded-2xl p-5 text-base min-h-[150px] resize-none outline-none focus:ring-2 focus:ring-[#111820]/20 placeholder-[#8a929c]"
             rows={5}
             autoFocus
           />
           {errorMessage && (
-            <p className="w-full text-center text-red-300 bg-red-900/40 border border-red-700 rounded-xl px-4 py-2.5 text-sm">{errorMessage}</p>
+            <p className="w-full text-center rounded-xl px-4 py-2.5 text-sm"
+              style={{ background: '#fdf2f2', border: '1px solid #f0cfcd', color: KIOSK_ERR }}>{errorMessage}</p>
           )}
           <div className="flex gap-3 w-full">
             <button
@@ -1349,46 +1395,65 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
 
       {/* Success Check-in Screen */}
       {screen === 'success-checkin' && (
-        <div className="w-full max-w-md flex flex-col items-center gap-6 bg-emerald-600 rounded-3xl p-12">
-          <div className="text-8xl">✓</div>
-          <p className="text-3xl font-bold text-white text-center">{successMessage}</p>
-          <p className="text-emerald-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
+        <div className="w-full max-w-md flex flex-col items-center gap-5 rounded-3xl p-12 text-white"
+          style={{ background: KIOSK_OK }}>
+          <KioskCheck />
+          {checkinTime ? (
+            <>
+              <p className="text-xl text-center" style={{ color: 'rgba(255,255,255,.85)' }}>
+                {greeting(t)}{employeeName ? `, ${employeeName}` : ''}
+              </p>
+              <div className="text-center">
+                <p className="text-sm font-semibold uppercase tracking-[.12em]" style={{ color: 'rgba(255,255,255,.7)' }}>
+                  {t('Příchod zaznamenán v', 'Clocked in at')}
+                </p>
+                <p className="text-5xl sm:text-6xl font-bold tabular-nums mt-1.5">{checkinTime}</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-2xl font-bold text-center">{successMessage}</p>
+          )}
+          <p className="text-lg" style={{ color: 'rgba(255,255,255,.6)' }}>
+            {t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}
+          </p>
         </div>
       )}
 
       {/* Success Check-out Screen */}
       {screen === 'success-checkout' && (
-        <div className="w-full max-w-md flex flex-col items-center gap-6 bg-emerald-600 rounded-3xl p-12">
-          <div className="text-7xl">👋</div>
-          <p className="text-xl text-emerald-100 text-center">
-            {t('Nashledanou', 'Goodbye')}, {employeeName}!
+        <div className="w-full max-w-md flex flex-col items-center gap-5 rounded-3xl p-12 text-white"
+          style={{ background: KIOSK_OK }}>
+          <KioskWave />
+          <p className="text-xl text-center" style={{ color: 'rgba(255,255,255,.85)' }}>
+            {t('Nashledanou', 'Goodbye')}, {employeeName}
           </p>
 
           {workedDuration ? (
             <div className="text-center">
-              <p className="text-emerald-200 text-sm font-medium uppercase tracking-[.12em]">
+              <p className="text-sm font-semibold uppercase tracking-[.12em]" style={{ color: 'rgba(255,255,255,.7)' }}>
                 {t('Odpracováno dnes', 'Worked today')}
               </p>
-              <p className="text-5xl sm:text-6xl font-bold text-white tabular-nums mt-1.5">
-                {workedDuration}
-              </p>
+              <p className="text-5xl sm:text-6xl font-bold tabular-nums mt-1.5">{workedDuration}</p>
             </div>
           ) : (
-            <p className="text-2xl font-bold text-white text-center">
-              {t('Odchod zaznamenán', 'Clocked out')}
-            </p>
+            <p className="text-2xl font-bold text-center">{t('Odchod zaznamenán', 'Clocked out')}</p>
           )}
 
-          <p className="text-emerald-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
+          <p className="text-lg" style={{ color: 'rgba(255,255,255,.6)' }}>
+            {t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}
+          </p>
         </div>
       )}
 
       {/* Error Screen */}
       {screen === 'error' && (
-        <div className="w-full max-w-md flex flex-col items-center gap-6 bg-red-700 rounded-3xl p-12">
-          <div className="text-8xl">✗</div>
-          <p className="text-3xl font-bold text-white text-center">{errorMessage}</p>
-          <p className="text-red-200 text-lg">{t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}</p>
+        <div className="w-full max-w-md flex flex-col items-center gap-5 rounded-3xl p-12 text-white"
+          style={{ background: KIOSK_ERR }}>
+          <KioskCross />
+          <p className="text-2xl font-bold text-center">{errorMessage}</p>
+          <p className="text-lg" style={{ color: 'rgba(255,255,255,.65)' }}>
+            {t('Zavírám za 3 sekundy...', 'Closing in 3 seconds...')}
+          </p>
         </div>
       )}
     </div>
