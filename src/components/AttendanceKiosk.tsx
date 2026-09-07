@@ -981,7 +981,7 @@ export default function AttendanceKiosk({ orgId }: AttendanceKioskProps) {
           {presence && (
             <div className="bg-white border border-[#e2e0dc] rounded-[9px] p-6 w-full text-center space-y-2">
               <p className="text-[#8a929c] text-lg">{t('Přihlášen/a od', 'Logged in since')}</p>
-              <p className="text-3xl font-bold text-white">
+              <p className="text-4xl font-bold tabular-nums" style={{ color: '#111820' }}>
                 {formatTime(presence.checkIn)}
               </p>
               {presence.workTypeName && (
