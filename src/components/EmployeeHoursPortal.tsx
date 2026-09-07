@@ -105,6 +105,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [benefitCounts, setBenefitCounts] = useState<Record<string, number>>({});
   const [benefitSaving, setBenefitSaving] = useState<string | null>(null);
+  // A failed save used to do nothing at all — no message, no state change — so
+  // the employee tapped and could not tell whether it worked.
+  const [benefitError, setBenefitError] = useState<string | null>(null);
   const [benefitEntries, setBenefitEntries] = useState<{ id: string; benefit_key: string; date: string }[]>([]);
   const [deletingBenefitId, setDeletingBenefitId] = useState<string | null>(null);
   // Retroactive date picker: key = benefit_key, value = ISO date being picked
@@ -291,30 +294,44 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const fetchBenefitEntries = async (currentPin: string, month: string) => {
     try {
       const res = await fetch(`/api/public/benefit-entries?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(currentPin)}&month=${encodeURIComponent(month)}`);
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        const json = await res.json();
         setBenefitEntries(json.entries ?? []);
+      } else {
+        setBenefitError(json.error ?? `Nepodařilo se načíst zápisy (${res.status}).`);
       }
-    } catch { /* ignore */ }
+    } catch {
+      setBenefitError('Nepodařilo se načíst zápisy.');
+    }
   };
 
   const logBenefit = async (benefitKey: string, date?: string) => {
     if (!data?.thisMonth.monthKey) return;
     setBenefitSaving(benefitKey);
+    setBenefitError(null);
     try {
       const res = await fetch('/api/public/benefit-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orgId, pin, benefit_key: benefitKey, date }),
       });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        const json = await res.json();
         if (json.entry) setBenefitEntries((prev) => [json.entry, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
         setBenefitCounts((prev) => ({ ...prev, [benefitKey]: (prev[benefitKey] ?? 0) + 1 }));
         // Close date picker if it was open
         setRetroDatePicker((prev) => { const n = { ...prev }; delete n[benefitKey]; return n; });
+        // Re-read from the server so what is on screen is what was stored —
+        // an optimistic count that silently failed to persist is worse than
+        // no count at all.
+        void fetchBenefitEntries(pin, data.thisMonth.monthKey);
+        void fetchBenefitCounts(pin, data.thisMonth.monthKey);
+      } else {
+        setBenefitError(json.error ?? `Nepodařilo se uložit (${res.status}).`);
       }
-    } catch { /* ignore */ }
+    } catch {
+      setBenefitError('Nepodařilo se spojit se serverem.');
+    }
     finally { setBenefitSaving(null); }
   };
 
@@ -527,6 +544,12 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                 const today = toISODateLocal(new Date());
                 return (
                   <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                    {benefitError && (
+                      <p className="px-4 py-2.5 text-[12.5px] text-center"
+                        style={{ background: '#fdf2f2', borderBottom: '1px solid #f0cfcd', color: '#b3261e' }}>
+                        {benefitError}
+                      </p>
+                    )}
                     <div className="px-4 py-2.5 border-b border-slate-100 bg-white">
                       <span className="text-sm font-semibold text-slate-700">Aktivity tento měsíc</span>
                     </div>
