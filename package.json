@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "audit": "node scripts/audit-data.mjs"
+    "audit": "node scripts/audit-data.mjs",
+    "test:payroll": "tsc src/lib/payrollMonth.ts src/lib/vacationDays.ts --outDir .payroll-test --module esnext --target es2022 --moduleResolution bundler --skipLibCheck && sed -i '' \"s|from '\\./vacationDays'|from './vacationDays.js'|\" .payroll-test/payrollMonth.js && node scripts/payroll-diff.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

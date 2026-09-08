@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { fetchAllRows } from '@/lib/fetchAllRows';
-import { countUniqueVacationDays, pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
+import { pragueMonth, toISODateLocal, VACATION_LOG_NOTE } from '@/lib/vacationDays';
+import { computeMonthBreakdown, parsePayrollSettings } from '@/lib/payrollMonth';
 import * as XLSX from 'xlsx';
 import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate';
 
@@ -58,21 +59,9 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   const extra: Record<string, unknown> = (settingsRow?.extra_settings ?? {}) as Record<string, unknown>;
-  const saturdayBonusPct: number = typeof extra['bonus_saturday_pct'] === 'number' ? extra['bonus_saturday_pct'] : Number(extra['bonus_saturday_pct'] ?? 0);
-  const overtimeThreshold: number = typeof extra['bonus_overtime_threshold'] === 'number' ? extra['bonus_overtime_threshold'] : Number(extra['bonus_overtime_threshold'] ?? 0);
-  const overtimeBonusPct: number = typeof extra['bonus_overtime_pct'] === 'number' ? extra['bonus_overtime_pct'] : Number(extra['bonus_overtime_pct'] ?? 0);
-  const satBonusDepts: string[] = Array.isArray(extra['bonus_saturday_departments']) ? (extra['bonus_saturday_departments'] as string[]) : [];
-
-  // Benefit definitions from extra_settings
-  const BENEFIT_DEFS = [
-    { key: 'blood',   czLabel: 'Darování krve',  enLabel: 'Blood donation',  hoursKey: 'benefit_blood_hours' },
-    { key: 'english', czLabel: 'Angličtina',      enLabel: 'English lessons', hoursKey: 'benefit_english_hours' },
-    { key: 'gym',     czLabel: 'Cvičení',         enLabel: 'Gym',             hoursKey: 'benefit_gym_hours' },
-  ];
-  const activeBenefits = BENEFIT_DEFS.filter((b) => extra[b.hoursKey] != null).map((b) => ({
-    ...b,
-    hoursPerUnit: Number(extra[b.hoursKey]),
-  }));
+  const payrollSettings = parsePayrollSettings(extra);
+  // Still needed further down for the sheet's own headings and formulas.
+  const { overtimeThreshold, overtimeBonusPct, countWeekends, activeBenefits } = payrollSettings;
 
   // hourly_rate only fetched when admin and column selected
   const includeRate = isAdmin && col('hourlyRate');
@@ -110,18 +99,6 @@ export async function GET(req: NextRequest) {
     managerBonusMap.set(b.employee_id, (managerBonusMap.get(b.employee_id) ?? 0) + (Number(b.amount) || 0));
   }
 
-  function isSat(dateStr: string) { return new Date(dateStr + 'T00:00:00').getDay() === 6; }
-
-  const countWeekends = (extra['vacation_counting_mode'] as string | undefined) === 'all';
-
-  function countVacHoursInMonth(empId: string): number {
-    return countUniqueVacationDays(
-      vacReqs.filter((r) => r.employee_id === empId),
-      countWeekends,
-      { start: dateFrom, end: dateTo },
-    ) * 8;
-  }
-
   const filteredEmployees = allowedEmpIds
     ? employees.filter((e) => allowedEmpIds.has(e.id))
     : employees;
@@ -129,89 +106,39 @@ export async function GET(req: NextRequest) {
   const LEGACY: Record<string, string> = { hpp: 'HPP', dpp: 'DPP', dpc: 'DPČ', ico: 'IČO' };
 
   const rows = filteredEmployees.map((emp) => {
-    // Auto-inserted vacation logs are EXCLUDED from worked hours — vacation is
-    // counted separately from requests (vacHours); including both doubled it.
-    const empLogs = logs.filter((l) => l.employee_id === emp.id && l.check_in && l.check_out && l.note !== VACATION_LOG_NOTE);
-    const hasAttendance = empLogs.length > 0;
-
-    const empDept = emp.department ?? '';
-    let workedMinutes = 0;
-    let saturdayMinutes = 0;
-    let satBonusMinutes = 0;
-    for (const l of empLogs) {
-      const mins = Math.round((new Date(l.check_out).getTime() - new Date(l.check_in).getTime()) / 60000);
-      workedMinutes += mins;
-      if (isSat(l.date)) {
-        saturdayMinutes += mins;
-        if (saturdayBonusPct > 0) {
-          const logType = l.work_type_name ?? '';
-          const eligible = satBonusDepts.length === 0
-            || satBonusDepts.includes(empDept)
-            || satBonusDepts.includes(logType);
-          if (eligible) satBonusMinutes += mins;
-        }
-      }
-    }
-
-    const workedHours = workedMinutes / 60;
-    const saturdayHours = saturdayMinutes / 60;
-    const satBonusHours = satBonusMinutes / 60 * (saturdayBonusPct / 100);
-    let otBonusHours = 0;
-    if (overtimeThreshold > 0 && workedHours > overtimeThreshold) {
-      otBonusHours = (workedHours - overtimeThreshold) * (overtimeBonusPct / 100);
-    }
-    const targetHours = emp.target_hours ?? 160;
-
-    const empBenefitLogs = benefitLogs.filter((bl) => bl.employee_id === emp.id);
-    const benefitHours: Record<string, number> = {};
-    let totalBenefitHours = 0;
-    for (const b of activeBenefits) {
-      const log = empBenefitLogs.find((bl) => bl.benefit_key === b.key);
-      const h = log ? Math.round(log.count * b.hoursPerUnit * 100) / 100 : 0;
-      benefitHours[b.key] = h;
-      totalBenefitHours += h;
-    }
-    totalBenefitHours = Math.round(totalBenefitHours * 100) / 100;
-
-    const totalBonusHours = Math.round((satBonusHours + otBonusHours + totalBenefitHours) * 100) / 100;
-    // Benefit hours carry their own sign (blood +8/unit, gym/english −1/unit),
-    // so everything is ADDED — subtracting a negative would double-count.
-    const finalHours = Math.round((
-      workedHours + satBonusHours + otBonusHours
-      + (benefitHours['blood'] ?? 0)
-      + (benefitHours['gym'] ?? 0)
-      + (benefitHours['english'] ?? 0)
-    ) * 100) / 100;
-
-    const managerBonus = managerBonusMap.get(emp.id) ?? 0;
-    const hourlyRate = includeRate ? (emp.hourly_rate ?? null) : null;
-    const vacHours = countVacHoursInMonth(emp.id);
-    const isHPP = (emp.employment_type ?? '') === 'hpp';
-    // Payroll total = final hours × rate + manager bonus (CZK)
-    // For HPP employees, vacation hours are also paid at the hourly rate
-    const billableTotal = hourlyRate != null
-      ? Math.round(((finalHours + (isHPP ? vacHours : 0)) * hourlyRate + managerBonus) * 100) / 100
-      : null;
+    // The arithmetic lives in src/lib/payrollMonth.ts so the employee-facing
+    // breakdown computes payroll the same way this export does. Proven
+    // identical to the previous inline version by `npm run test:payroll`.
+    const b = computeMonthBreakdown(emp, {
+      logs,
+      vacationRequests: vacReqs,
+      benefitLogs,
+      managerBonus: managerBonusMap.get(emp.id) ?? 0,
+      settings: payrollSettings,
+      dateFrom,
+      dateTo,
+      includeRate,
+    });
 
     return {
       name: emp.name,
       employmentType: LEGACY[emp.employment_type ?? ''] ?? (emp.employment_type ?? ''),
-      source: hasAttendance ? (lang === 'en' ? 'attendance' : 'docházka') : (lang === 'en' ? 'no data' : 'bez dat'),
-      workedHours: Math.round(workedHours * 100) / 100,
-      saturdayHours: Math.round(saturdayHours * 100) / 100,
-      satBonusHours: Math.round(satBonusHours * 100) / 100,
-      otBonusHours: Math.round(otBonusHours * 100) / 100,
-      benefitHours,
-      totalBenefitHours,
-      totalBonusHours,
-      finalHours,
-      targetHours,
-      delta: Math.round((workedHours - targetHours) * 100) / 100,
-      vacHours,
-      finalWithVac: Math.round((finalHours + vacHours) * 100) / 100,
-      managerBonus,
-      hourlyRate,
-      billableTotal,
+      source: b.hasAttendance ? (lang === 'en' ? 'attendance' : 'docházka') : (lang === 'en' ? 'no data' : 'bez dat'),
+      workedHours: b.workedHours,
+      saturdayHours: b.saturdayHours,
+      satBonusHours: b.satBonusHours,
+      otBonusHours: b.otBonusHours,
+      benefitHours: b.benefitHours,
+      totalBenefitHours: b.totalBenefitHours,
+      totalBonusHours: b.totalBonusHours,
+      finalHours: b.finalHours,
+      targetHours: b.targetHours,
+      delta: b.delta,
+      vacHours: b.vacHours,
+      finalWithVac: b.finalWithVac,
+      managerBonus: b.managerBonus,
+      hourlyRate: b.hourlyRate,
+      billableTotal: b.billableTotal,
     };
   });
 
