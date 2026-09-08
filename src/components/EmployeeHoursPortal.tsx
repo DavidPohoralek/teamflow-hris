@@ -123,10 +123,13 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   type BreakdownLine = { key: string; label: string; date: string; hours: number };
   type Breakdown = {
     monthName: string;
+    /** Only HPP gets vacation hours paid — the payroll total works the same way. */
+    vacationPaid: boolean;
     totals: {
       workedHours: number; satBonusHours: number; otBonusHours: number;
       benefitHours: Record<string, number>; totalBenefitHours: number;
-      vacHours: number; targetHours: number; delta: number; finalWithVac: number;
+      vacHours: number; targetHours: number; delta: number;
+      finalHours: number; finalWithVac: number;
     };
     detail: {
       workedDays: number;
@@ -874,9 +877,11 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                           <Line
                             id="vac"
                             name="Dovolená"
-                            sub={`${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'}`}
-                            value={h(breakdown.totals.vacHours)}
-                            cls="text-[#2f7d46]"
+                            sub={breakdown.vacationPaid
+                              ? `${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'}`
+                              : `${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'} · u vašeho úvazku se neproplácí`}
+                            value={breakdown.vacationPaid ? h(breakdown.totals.vacHours) : plain(breakdown.totals.vacHours)}
+                            cls={breakdown.vacationPaid ? 'text-[#2f7d46]' : 'text-[#8a929c]'}
                           >
                             {breakdown.detail.vacations.map((v, i) => (
                               <Detail
@@ -892,7 +897,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                           style={{ borderTop: '2px solid #111820' }}>
                           <b className="text-sm font-bold text-[#111820]">Celkem k proplacení</b>
                           <span className="text-xl font-bold tabular-nums text-[#111820]">
-                            {plain(breakdown.totals.finalWithVac)}
+                            {plain(breakdown.vacationPaid ? breakdown.totals.finalWithVac : breakdown.totals.finalHours)}
                           </span>
                         </div>
                       </div>

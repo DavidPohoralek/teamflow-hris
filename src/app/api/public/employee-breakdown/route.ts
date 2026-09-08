@@ -114,8 +114,11 @@ export async function GET(req: NextRequest) {
       month,
       monthName: `${CZECH_MONTHS[m]} ${y}`,
       employee: { name: employee.name },
+      // Same rule the payroll total uses: only HPP gets vacation hours paid.
+      vacationPaid: (employee.employment_type ?? '') === 'hpp',
       totals: {
         workedHours: breakdown.workedHours,
+        finalHours: breakdown.finalHours,
         satBonusHours: breakdown.satBonusHours,
         otBonusHours: breakdown.otBonusHours,
         benefitHours: breakdown.benefitHours,
@@ -126,7 +129,7 @@ export async function GET(req: NextRequest) {
         finalWithVac: breakdown.finalWithVac,
       },
       detail: {
-        workedDays: logs.filter((l) => l.check_in && l.check_out).length,
+        workedDays: new Set(logs.filter((l) => l.check_in && l.check_out).map((l) => l.date)).size,
         saturdays,
         saturdayBonusPct: settings.saturdayBonusPct,
         overtimeThreshold: settings.overtimeThreshold,
