@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
 import { createClient } from '@supabase/supabase-js';
 import { vacationDaysInRange, VACATION_LOG_NOTE } from '@/lib/vacationDays';
+import { vacationPaidFor } from '@/lib/payrollMonth';
 
 function getServiceClient() {
   return createClient(
@@ -399,10 +400,8 @@ export async function PUT(
         .maybeSingle();
 
       const extraSettings = (settingsRow as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
-      const configs = (extraSettings.employment_type_configs as Record<string, { paidVacation: boolean }> | undefined) ?? {};
-      const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
       const empType = (emp as { employment_type?: string } | null)?.employment_type ?? '';
-      const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
+      const hasPaidVacation = vacationPaidFor(empType, extraSettings);
       const countWeekends = (extraSettings.vacation_counting_mode as string | undefined) === 'all';
 
       if (hasPaidVacation) {

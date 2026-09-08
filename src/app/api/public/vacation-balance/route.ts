@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { vacationDaysInRange, toISODateLocal } from '@/lib/vacationDays';
+import { vacationPaidFor } from '@/lib/payrollMonth';
 
 function getServiceClient() {
   const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!;
@@ -42,12 +43,10 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   const extraSettings = (settings as { extra_settings?: Record<string, unknown> | null } | null)?.extra_settings ?? {};
-  const configs = (extraSettings.employment_type_configs as Record<string, { paidVacation: boolean }> | undefined) ?? {};
   const countWeekends = (extraSettings.vacation_counting_mode as string | undefined) === 'all';
   const defaultVacationDays = typeof extraSettings.default_vacation_days === 'number' ? extraSettings.default_vacation_days : 20;
-  const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
   const empType = employee.employment_type ?? '';
-  const hasPaidVacation = configs[empType]?.paidVacation ?? DEFAULT_PAID[empType] ?? true;
+  const hasPaidVacation = vacationPaidFor(empType, extraSettings);
 
   // Employees without a paid-vacation entitlement still book unpaid vacation days,
   // so we compute their consumed/planned days below — only the entitlement-based

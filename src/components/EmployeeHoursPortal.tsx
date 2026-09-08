@@ -873,15 +873,13 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                           </Line>
                         )}
 
-                        {breakdown.totals.vacHours !== 0 && (
+                        {breakdown.vacationPaid && breakdown.totals.vacHours !== 0 && (
                           <Line
                             id="vac"
                             name="Dovolená"
-                            sub={breakdown.vacationPaid
-                              ? `${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'}`
-                              : `${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'} · u vašeho úvazku se neproplácí`}
-                            value={breakdown.vacationPaid ? h(breakdown.totals.vacHours) : plain(breakdown.totals.vacHours)}
-                            cls={breakdown.vacationPaid ? 'text-[#2f7d46]' : 'text-[#8a929c]'}
+                            sub={`${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'}`}
+                            value={h(breakdown.totals.vacHours)}
+                            cls="text-[#2f7d46]"
                           >
                             {breakdown.detail.vacations.map((v, i) => (
                               <Detail

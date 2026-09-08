@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrgId } from '@/lib/resolveOrg';
+import { DEFAULT_PAID_VACATION } from '@/lib/payrollMonth';
 
 const DEFAULT_TYPES = ['HPP', 'DPP', 'DPČ', 'IČO'];
 // By default HPP, DPP, DPČ have paid vacation; IČO does not
-const DEFAULT_PAID: Record<string, boolean> = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
+// Shared with payroll so the screen shows what will actually be paid.
+const DEFAULT_PAID = DEFAULT_PAID_VACATION;
 
 // GET — returns { types: string[], configs: Record<string, {paidVacation: boolean}> }
 export async function GET(req: NextRequest) {
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
   // Fill defaults for types not yet configured
   const fullConfigs: Record<string, { paidVacation: boolean }> = {};
   for (const t of types) {
-    fullConfigs[t] = configs[t] ?? { paidVacation: DEFAULT_PAID[t] ?? true };
+    fullConfigs[t] = configs[t] ?? { paidVacation: DEFAULT_PAID[t.toUpperCase()] ?? true };
   }
 
   return NextResponse.json({ types, configs: fullConfigs });

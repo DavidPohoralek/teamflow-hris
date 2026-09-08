@@ -124,12 +124,18 @@ export function parsePayrollSettings(extra: Record<string, unknown>): PayrollSet
   };
 }
 
-/** Defaults when the company has not configured a type. */
-const DEFAULT_PAID_VACATION: Record<string, boolean> = {
-  HPP: true, DPP: true, 'DPČ': true, 'IČO': false,
+/**
+ * Defaults when a company has not configured a type, keyed UPPERCASE.
+ *
+ * A default, not a legal opinion: entitlement for the Czech agreements has
+ * moved in recent years, so a company that needs it different sets it in
+ * Správa → Nastavení and that choice wins.
+ */
+export const DEFAULT_PAID_VACATION: Record<string, boolean> = {
+  HPP: true, DPP: false, 'DPČ': true, 'IČO': false,
 };
 
-function parsePaidVacation(extra: Record<string, unknown>): Record<string, boolean> {
+export function parsePaidVacation(extra: Record<string, unknown>): Record<string, boolean> {
   const configs = (extra['employment_type_configs'] as Record<string, { paidVacation?: boolean }> | undefined) ?? {};
   const out: Record<string, boolean> = { ...DEFAULT_PAID_VACATION };
   for (const [type, cfg] of Object.entries(configs)) {
@@ -149,6 +155,19 @@ function parsePaidVacation(extra: Record<string, unknown>): Record<string, boole
 export function isVacationPaid(employmentType: string | null | undefined, settings: PayrollSettings): boolean {
   const key = (employmentType ?? '').toUpperCase();
   return settings.paidVacationByType[key] ?? true;
+}
+
+/**
+ * Same answer for callers that hold raw company_settings.extra_settings rather
+ * than parsed PayrollSettings — the vacation balances and the approval path.
+ * They each used to carry their own copy of the table, all of them
+ * case-sensitive, which is how payroll and the balances drifted apart.
+ */
+export function vacationPaidFor(
+  employmentType: string | null | undefined,
+  extra: Record<string, unknown>,
+): boolean {
+  return parsePaidVacation(extra)[(employmentType ?? '').toUpperCase()] ?? true;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
