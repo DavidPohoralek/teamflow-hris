@@ -33,12 +33,14 @@ interface EmployeeHoursData {
     hours: number;
     days: number;
     monthKey?: string;
+    monthName?: string;
     saturdayBonusHours?: number;
   };
   lastMonth: {
     hours: number;
     days: number;
     monthKey?: string;
+    monthName?: string;
     saturdayBonusHours?: number;
   };
   records: AttendanceRecord[];
@@ -114,7 +116,31 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
   const [retroDatePicker, setRetroDatePicker] = useState<Record<string, string>>({});
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   // Bottom tab: 'logs' | 'requests' | 'ho'
-  const [activeTab, setActiveTab] = useState<'logs' | 'requests' | 'ho'>('logs');
+  const [activeTab, setActiveTab] = useState<'logs' | 'requests' | 'ho' | 'breakdown'>('logs');
+
+  // Itemised month, computed by the same module as the payroll export so the
+  // employee's arithmetic and the accountant's cannot disagree.
+  type BreakdownLine = { key: string; label: string; date: string; hours: number };
+  type Breakdown = {
+    monthName: string;
+    totals: {
+      workedHours: number; satBonusHours: number; otBonusHours: number;
+      benefitHours: Record<string, number>; totalBenefitHours: number;
+      vacHours: number; targetHours: number; delta: number; finalWithVac: number;
+    };
+    detail: {
+      workedDays: number;
+      saturdays: { date: string; from: string; to: string; workType: string | null; hours: number }[];
+      saturdayBonusPct: number; overtimeThreshold: number; overtimeBonusPct: number;
+      benefits: BreakdownLine[];
+      vacations: { from: string; to: string }[];
+    };
+  };
+  const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
+  const [breakdownMonth, setBreakdownMonth] = useState<string>('');
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdownError, setBreakdownError] = useState<string | null>(null);
+  const [openLine, setOpenLine] = useState<string | null>(null);
   // Log filter: 'today' | '7d' | '30d' | 'all'
   const [logFilter, setLogFilter] = useState<'today' | '7d' | '30d' | 'all'>('30d');
   // Vacation balance — from /api/public/vacation-balance, the single source of
@@ -224,12 +250,14 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
             hours: json.thisMonth?.hours ?? 0,
             days: json.thisMonth?.days ?? 0,
             monthKey: json.thisMonth?.monthKey,
+            monthName: json.thisMonth?.monthName,
             saturdayBonusHours: json.thisMonth?.saturdayBonusHours ?? 0,
           },
           lastMonth: {
             hours: json.lastMonth?.hours ?? 0,
             days: json.lastMonth?.days ?? 0,
             monthKey: json.lastMonth?.monthKey,
+            monthName: json.lastMonth?.monthName,
             saturdayBonusHours: json.lastMonth?.saturdayBonusHours ?? 0,
           },
           vacation: json.vacation ?? undefined,
@@ -288,6 +316,27 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       // silently ignore
     } finally {
       setRequestsLoading(false);
+    }
+  };
+
+  const fetchBreakdown = async (currentPin: string, month: string) => {
+    setBreakdownLoading(true);
+    setBreakdownError(null);
+    try {
+      const res = await fetch(
+        `/api/public/employee-breakdown?orgId=${encodeURIComponent(orgId)}&pin=${encodeURIComponent(currentPin)}&month=${encodeURIComponent(month)}`
+      );
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setBreakdown(json as Breakdown);
+        setBreakdownMonth(month);
+      } else {
+        setBreakdownError(json.error ?? `Nepodařilo se načíst rozpis (${res.status}).`);
+      }
+    } catch {
+      setBreakdownError('Nepodařilo se načíst rozpis.');
+    } finally {
+      setBreakdownLoading(false);
     }
   };
 
@@ -676,6 +725,17 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                   <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-amber-400 text-white rounded-full">{requests.filter(r => r.status === 'pending').length}</span>
                 )}
               </button>
+              <button
+                onClick={() => {
+                  setActiveTab('breakdown');
+                  // Default to last month — that is the one whose pay just arrived.
+                  const m = breakdownMonth || data?.lastMonth.monthKey || data?.thisMonth.monthKey;
+                  if (m && (!breakdown || breakdownMonth !== m)) fetchBreakdown(pin, m);
+                }}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'breakdown' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Rozpis
+              </button>
               {hoEnabled && (
                 <button
                   onClick={() => setActiveTab('ho')}
@@ -685,6 +745,168 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                 </button>
               )}
             </div>
+
+            {/* BREAKDOWN TAB — the receipt */}
+            {activeTab === 'breakdown' && (() => {
+              const fmtD = (iso: string) => {
+                const [, m, d] = iso.split('-');
+                return `${Number(d)}. ${Number(m)}.`;
+              };
+              const h = (n: number) => `${n > 0 ? '+ ' : n < 0 ? '− ' : ''}${Math.abs(n).toFixed(2).replace('.', ',')} h`;
+              const plain = (n: number) => `${n.toFixed(2).replace('.', ',')} h`;
+
+              const months = [data?.lastMonth, data?.thisMonth]
+                .filter((m): m is { hours: number; days: number; monthKey?: string; monthName?: string; saturdayBonusHours?: number } => Boolean(m?.monthKey))
+                .map((m) => ({ monthKey: m.monthKey as string, monthName: m.monthName ?? (m.monthKey as string) }));
+
+              const Line = ({ id, name, sub, value, cls, children }: {
+                id: string; name: string; sub?: string; value: string; cls?: string; children?: React.ReactNode;
+              }) => {
+                const open = openLine === id;
+                const canOpen = Boolean(children);
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => canOpen && setOpenLine(open ? null : id)}
+                      className={`w-full flex items-center gap-2.5 px-4 py-3 text-left border-b border-[#e6e2db] ${canOpen ? 'hover:bg-[#faf9f7]' : 'cursor-default'}`}
+                    >
+                      <span className="w-3 text-[11px] text-[#8a929c]">{canOpen ? (open ? '⌄' : '›') : ''}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13.5px] font-medium text-[#111820]">{name}</span>
+                        {sub && <span className="block text-[11.5px] text-[#8a929c]">{sub}</span>}
+                      </span>
+                      <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${cls ?? 'text-[#111820]'}`}>{value}</span>
+                    </button>
+                    {open && children && <div className="bg-[#faf9f7] border-b border-[#e6e2db] px-4 py-2">{children}</div>}
+                  </>
+                );
+              };
+
+              const Detail = ({ left, right }: { left: string; right: string }) => (
+                <div className="flex justify-between py-1.5 text-[12px] text-[#5c6672] border-b border-dashed border-[#e0dbd3] last:border-0">
+                  <span>{left}</span><span className="tabular-nums">{right}</span>
+                </div>
+              );
+
+              return (
+                <div>
+                  {months.length > 1 && (
+                    <div className="flex gap-1 mb-3">
+                      {months.map((m) => (
+                        <button
+                          key={m.monthKey}
+                          onClick={() => fetchBreakdown(pin, m.monthKey)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                            breakdownMonth === m.monthKey
+                              ? 'bg-[#111820] text-white border-[#111820]'
+                              : 'bg-white text-[#5c6672] border-[#e2e0dc] hover:border-[#c9c3b9]'
+                          }`}
+                        >
+                          {m.monthName}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {breakdownError && (
+                    <p className="rounded-lg px-4 py-2.5 text-[12.5px] text-center mb-3"
+                      style={{ background: '#fdf2f2', border: '1px solid #f0cfcd', color: '#b3261e' }}>
+                      {breakdownError}
+                    </p>
+                  )}
+
+                  {breakdownLoading && <p className="text-center text-sm text-[#8a929c] py-8">Načítám…</p>}
+
+                  {!breakdownLoading && breakdown && (
+                    <>
+                      <div className="bg-white border border-[#e6e2db] rounded-xl overflow-hidden">
+                        <Line
+                          id="worked"
+                          name="Odpracováno"
+                          sub={`${breakdown.detail.workedDays} dní docházky`}
+                          value={plain(breakdown.totals.workedHours)}
+                        />
+
+                        {breakdown.totals.satBonusHours !== 0 && (
+                          <Line
+                            id="sat"
+                            name="Bonus za soboty"
+                            sub={`${breakdown.detail.saturdays.length}× · bonus ${breakdown.detail.saturdayBonusPct} %`}
+                            value={h(breakdown.totals.satBonusHours)}
+                            cls="text-[#2f7d46]"
+                          >
+                            {breakdown.detail.saturdays.map((sd) => (
+                              <Detail
+                                key={sd.date}
+                                left={`${fmtD(sd.date)} · ${sd.from}–${sd.to}${sd.workType ? ` · ${sd.workType}` : ''}`}
+                                right={plain(sd.hours)}
+                              />
+                            ))}
+                          </Line>
+                        )}
+
+                        {breakdown.totals.otBonusHours !== 0 && (
+                          <Line
+                            id="ot"
+                            name="Bonus za přesčas"
+                            sub={`${breakdown.detail.overtimeBonusPct} % z hodin nad ${breakdown.detail.overtimeThreshold} h`}
+                            value={h(breakdown.totals.otBonusHours)}
+                            cls="text-[#2f7d46]"
+                          />
+                        )}
+
+                        {breakdown.detail.benefits.length > 0 && (
+                          <Line
+                            id="ben"
+                            name="Aktivity"
+                            sub={`${breakdown.detail.benefits.length} ${breakdown.detail.benefits.length === 1 ? 'zápis' : 'zápisů'}`}
+                            value={h(breakdown.totals.totalBenefitHours)}
+                            cls={breakdown.totals.totalBenefitHours < 0 ? 'text-[#b3261e]' : 'text-[#2f7d46]'}
+                          >
+                            {breakdown.detail.benefits.map((b, i) => (
+                              <Detail key={`${b.key}-${b.date}-${i}`} left={`${b.label} · ${fmtD(b.date)}`} right={h(b.hours)} />
+                            ))}
+                          </Line>
+                        )}
+
+                        {breakdown.totals.vacHours !== 0 && (
+                          <Line
+                            id="vac"
+                            name="Dovolená"
+                            sub={`${breakdown.totals.vacHours / 8} ${breakdown.totals.vacHours / 8 === 1 ? 'den' : 'dní'}`}
+                            value={h(breakdown.totals.vacHours)}
+                            cls="text-[#2f7d46]"
+                          >
+                            {breakdown.detail.vacations.map((v, i) => (
+                              <Detail
+                                key={i}
+                                left={v.from === v.to ? fmtD(v.from) : `${fmtD(v.from)} – ${fmtD(v.to)}`}
+                                right=""
+                              />
+                            ))}
+                          </Line>
+                        )}
+
+                        <div className="flex items-center justify-between px-4 py-3.5 bg-[#faf9f7]"
+                          style={{ borderTop: '2px solid #111820' }}>
+                          <b className="text-sm font-bold text-[#111820]">Celkem k proplacení</b>
+                          <span className="text-xl font-bold tabular-nums text-[#111820]">
+                            {plain(breakdown.totals.finalWithVac)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-[11.5px] text-[#8a929c] mt-3 leading-relaxed">
+                        Měsíční fond {plain(breakdown.totals.targetHours)}
+                        {breakdown.totals.delta !== 0 && ` · odpracováno o ${plain(Math.abs(breakdown.totals.delta))} ${breakdown.totals.delta > 0 ? 'víc' : 'míň'}`}.
+                        Počítá se stejně jako podklad pro mzdy. Když vám něco nesedí, ozvěte se manažerovi.
+                      </p>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* LOGS TAB */}
             {activeTab === 'logs' && (() => {
