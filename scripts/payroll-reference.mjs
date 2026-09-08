@@ -1,10 +1,19 @@
-// FROZEN COPY of the payroll arithmetic as it stood in
-// src/app/api/analytics/export/route.ts before it was extracted into
-// src/lib/payrollMonth.ts (commit 8fbfa31, 8. 9. 2026).
+// A SECOND, INDEPENDENT implementation of the payroll month, kept deliberately
+// separate from src/lib/payrollMonth.ts so that `npm run test:payroll` compares
+// two things rather than one thing with itself.
 //
-// It exists for one purpose: to prove the extraction changed nothing. Do not
-// "improve" it and do not keep it in sync with later fixes — the moment it
-// stops describing the old behaviour it stops being evidence.
+// It started as a frozen copy of the pre-extraction arithmetic, which proved the
+// extraction changed nothing. Since then exactly one rule was changed on
+// purpose, and this file was updated to match — see below. Never edit it to
+// make a red test go green: work out which behaviour is right first, then change
+// both sides knowingly.
+//
+// CHANGED 8. 9. 2026 — paid vacation.
+//   Was: `employment_type === 'hpp'`. The column holds 'HPP' uppercase, so the
+//   check never matched and no HPP employee had vacation paid in the money
+//   column, while every contractor had it added to their hours.
+//   Now: the company's own employment_type_configs, compared case-insensitively,
+//   the same rule the vacation balances already used.
 
 const VACATION_LOG_NOTE = 'Placená dovolená';
 
@@ -31,6 +40,14 @@ function countUniqueVacationDays(requests, countWeekends, clip) {
     }
   }
   return set.size;
+}
+
+const FALLBACK_PAID = { HPP: true, DPP: true, 'DPČ': true, 'IČO': false };
+
+function vacationIsPaid(type, settings) {
+  const table = settings.paidVacationByType ?? FALLBACK_PAID;
+  const key = String(type ?? '').toUpperCase();
+  return key in table ? table[key] : true;
 }
 
 export function referenceBreakdown(emp, inputs) {
@@ -92,9 +109,9 @@ export function referenceBreakdown(emp, inputs) {
 
   const hourlyRate = includeRate ? (emp.hourly_rate ?? null) : null;
   const vacHours = countVacHoursInMonth(emp.id);
-  const isHPP = (emp.employment_type ?? '') === 'hpp';
+  const paidVac = vacationIsPaid(emp.employment_type, settings);
   const billableTotal = hourlyRate != null
-    ? Math.round(((finalHours + (isHPP ? vacHours : 0)) * hourlyRate + managerBonus) * 100) / 100
+    ? Math.round(((finalHours + (paidVac ? vacHours : 0)) * hourlyRate + managerBonus) * 100) / 100
     : null;
 
   return {
@@ -106,7 +123,7 @@ export function referenceBreakdown(emp, inputs) {
     benefitHours, totalBenefitHours, totalBonusHours, finalHours, targetHours,
     delta: Math.round((workedHours - targetHours) * 100) / 100,
     vacHours,
-    finalWithVac: Math.round((finalHours + vacHours) * 100) / 100,
+    finalWithVac: Math.round((finalHours + (paidVac ? vacHours : 0)) * 100) / 100,
     managerBonus, hourlyRate, billableTotal,
   };
 }

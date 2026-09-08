@@ -26,6 +26,12 @@ export interface PayrollSettings {
   satBonusDepts: string[];
   countWeekends: boolean;
   activeBenefits: BenefitDef[];
+  /**
+   * Which employment types get vacation paid, keyed UPPERCASE. Same source the
+   * vacation balances use (company_settings.employment_type_configs), so the
+   * number an employee sees and the money payroll pays follow one rule.
+   */
+  paidVacationByType: Record<string, boolean>;
 }
 
 export interface PayrollEmployee {
@@ -83,6 +89,7 @@ export interface MonthBreakdown {
   finalHours: number;
   targetHours: number;
   delta: number;
+  vacationPaid: boolean;
   vacHours: number;
   finalWithVac: number;
   managerBonus: number;
@@ -113,7 +120,35 @@ export function parsePayrollSettings(extra: Record<string, unknown>): PayrollSet
     activeBenefits: BENEFIT_DEFS
       .filter((b) => extra[`benefit_${b.key}_hours`] != null)
       .map((b) => ({ ...b, hoursPerUnit: Number(extra[`benefit_${b.key}_hours`]) })),
+    paidVacationByType: parsePaidVacation(extra),
   };
+}
+
+/** Defaults when the company has not configured a type. */
+const DEFAULT_PAID_VACATION: Record<string, boolean> = {
+  HPP: true, DPP: true, 'DPČ': true, 'IČO': false,
+};
+
+function parsePaidVacation(extra: Record<string, unknown>): Record<string, boolean> {
+  const configs = (extra['employment_type_configs'] as Record<string, { paidVacation?: boolean }> | undefined) ?? {};
+  const out: Record<string, boolean> = { ...DEFAULT_PAID_VACATION };
+  for (const [type, cfg] of Object.entries(configs)) {
+    if (typeof cfg?.paidVacation === 'boolean') out[type.toUpperCase()] = cfg.paidVacation;
+  }
+  return out;
+}
+
+/**
+ * Whether this employee's vacation hours are paid.
+ *
+ * Case-insensitive on purpose: the column holds both 'HPP' and 'hpp' — the
+ * export carries a legacy map for exactly that reason — and the old check
+ * compared against lowercase only, so every employee stored uppercase silently
+ * lost their paid vacation in the money column.
+ */
+export function isVacationPaid(employmentType: string | null | undefined, settings: PayrollSettings): boolean {
+  const key = (employmentType ?? '').toUpperCase();
+  return settings.paidVacationByType[key] ?? true;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -191,11 +226,11 @@ export function computeMonthBreakdown(emp: PayrollEmployee, inputs: MonthInputs)
   ) * 8;
 
   const hourlyRate = inputs.includeRate ? (emp.hourly_rate ?? null) : null;
-  const isHPP = (emp.employment_type ?? '') === 'hpp';
+  const vacationPaid = isVacationPaid(emp.employment_type, settings);
   // Payroll total = final hours × rate + manager bonus (CZK)
-  // For HPP employees, vacation hours are also paid at the hourly rate
+  // Vacation hours are paid at the hourly rate only where the type earns them.
   const billableTotal = hourlyRate != null
-    ? r2((finalHours + (isHPP ? vacHours : 0)) * hourlyRate + managerBonus)
+    ? r2((finalHours + (vacationPaid ? vacHours : 0)) * hourlyRate + managerBonus)
     : null;
 
   return {
@@ -210,8 +245,11 @@ export function computeMonthBreakdown(emp: PayrollEmployee, inputs: MonthInputs)
     finalHours,
     targetHours,
     delta: r2(workedHours - targetHours),
+    vacationPaid,
     vacHours,
-    finalWithVac: r2(finalHours + vacHours),
+    // Hours a type does not earn are not added to the payable figure either —
+    // this used to add them for everyone, so contractors looked overpaid.
+    finalWithVac: r2(finalHours + (vacationPaid ? vacHours : 0)),
     managerBonus,
     hourlyRate,
     billableTotal,

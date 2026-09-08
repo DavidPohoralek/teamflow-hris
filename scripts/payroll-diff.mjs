@@ -34,7 +34,7 @@ function makeCase(i) {
     name: 'Test',
     department: pick(DEPTS),
     target_hours: pick([null, 120, 160, 168]),
-    employment_type: pick(['hpp', 'dpp', 'dpc', 'ico', '', null]),
+    employment_type: pick(['hpp', 'HPP', 'dpp', 'DPP', 'DPČ', 'ico', 'IČO', '', null]),
     hourly_rate: pick([null, 0, 180.5, 250]),
   };
 
@@ -86,6 +86,11 @@ function makeCase(i) {
     satBonusDepts: pick([[], ['Prodejna'], ['Sklad', 'Expedice'], ['Kancelář']]),
     countWeekends: rnd() < 0.3,
     activeBenefits,
+    paidVacationByType: pick([
+      { HPP: true, DPP: true, 'DPČ': true, 'IČO': false },
+      { HPP: true, DPP: false, 'DPČ': true, 'IČO': false },
+      { HPP: false, DPP: true, 'DPČ': false, 'IČO': true },
+    ]),
   };
 
   return {
@@ -101,20 +106,38 @@ function makeCase(i) {
 
 const CASES = 2000;
 let failures = 0;
+const changedFields = new Map();
 
 for (let i = 0; i < CASES; i++) {
   const { emp, inputs } = makeCase(i);
   const before = referenceBreakdown(emp, inputs);
   const after = computeMonthBreakdown(emp, inputs);
+  // The reference has no `vacationPaid` field — compare the shape it knows.
+  const trimmed = { ...after };
+  delete trimmed.vacationPaid;
   const a = JSON.stringify(before);
-  const b = JSON.stringify(after);
+  const b = JSON.stringify(trimmed);
   if (a !== b) {
     failures++;
-    if (failures <= 3) {
+    // Which fields moved matters more than how many cases did: a change that
+    // touches a field nobody expected is a different change from the one meant.
+    for (const k of Object.keys(before)) {
+      if (JSON.stringify(before[k]) !== JSON.stringify(trimmed[k])) {
+        changedFields.set(k, (changedFields.get(k) ?? 0) + 1);
+      }
+    }
+    if (failures <= 2) {
       console.error(`\n✗ případ #${i} (${inputs.dateFrom})`);
       console.error('  před:', a);
       console.error('  po:  ', b);
     }
+  }
+}
+
+if (changedFields.size > 0) {
+  console.error('\nZměněná pole:');
+  for (const [k, n] of [...changedFields].sort((x, y) => y[1] - x[1])) {
+    console.error(`  ${k}: ${n}× z ${CASES}`);
   }
 }
 

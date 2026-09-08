@@ -114,8 +114,8 @@ export async function GET(req: NextRequest) {
       month,
       monthName: `${CZECH_MONTHS[m]} ${y}`,
       employee: { name: employee.name },
-      // Same rule the payroll total uses: only HPP gets vacation hours paid.
-      vacationPaid: (employee.employment_type ?? '') === 'hpp',
+      // Comes straight off the shared calculation — no second opinion here.
+      vacationPaid: breakdown.vacationPaid,
       totals: {
         workedHours: breakdown.workedHours,
         finalHours: breakdown.finalHours,
