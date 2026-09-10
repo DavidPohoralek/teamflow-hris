@@ -11,8 +11,10 @@ import { monthEndISO, pragueMonth, toISODateLocal } from '@/lib/vacationDays'
 // different numbers and the feature would create disputes instead of settling
 // them.
 //
-// Money stays out of the response: hours only, never an hourly rate or a total
-// in CZK. Those are not something a PIN should reveal.
+// The hourly rate and the CZK payroll total stay out of the response — from
+// those anyone could derive a salary, and a PIN should not unlock that. Manager
+// bonuses are different: a discretionary amount granted to this one person, with
+// the manager's own note, that they are entitled to see on their own payslip.
 
 function svc() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -58,7 +60,7 @@ export async function GET(req: NextRequest) {
     const dateFrom = `${month}-01`
     const dateTo = monthEndISO(month)
 
-    const [settingsRes, logsRes, vacRes, benefitRes, entriesRes] = await Promise.all([
+    const [settingsRes, logsRes, vacRes, benefitRes, entriesRes, bonusRes] = await Promise.all([
       sb.from('company_settings').select('extra_settings').eq('organization_id', orgId).maybeSingle(),
       sb.from('attendance_logs')
         .select('employee_id, date, check_in, check_out, note, work_type_name')
@@ -77,6 +79,10 @@ export async function GET(req: NextRequest) {
         .select('benefit_key, date')
         .eq('organization_id', orgId).eq('employee_id', employee.id)
         .gte('date', dateFrom).lte('date', dateTo).order('date'),
+      sb.from('employee_bonuses')
+        .select('amount, note, granted_by, created_at')
+        .eq('organization_id', orgId).eq('employee_id', employee.id).eq('month', month)
+        .order('created_at'),
     ])
 
     const extra = (settingsRes.data?.extra_settings ?? {}) as Record<string, unknown>
@@ -145,6 +151,13 @@ export async function GET(req: NextRequest) {
           to: r.date_to ?? r.date_from,
         })),
       },
+      // Kept apart from `totals`: these are CZK, not hours, and never fold into
+      // the hours figure.
+      bonuses: (bonusRes.data ?? []).map((b: { amount: number; note: string | null; granted_by: string | null }) => ({
+        amount: Number(b.amount) || 0,
+        note: b.note,
+        grantedBy: b.granted_by,
+      })),
       generatedAt: toISODateLocal(new Date()),
     })
   } catch (err) {

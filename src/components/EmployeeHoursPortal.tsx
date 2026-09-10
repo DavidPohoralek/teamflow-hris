@@ -138,6 +138,8 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       benefits: BreakdownLine[];
       vacations: { from: string; to: string }[];
     };
+    /** CZK — shown apart from the hours, never summed into them. */
+    bonuses: { amount: number; note: string | null; grantedBy: string | null }[];
   };
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [breakdownMonth, setBreakdownMonth] = useState<string>('');
@@ -899,6 +901,39 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                           </span>
                         </div>
                       </div>
+
+                      {breakdown.bonuses.length > 0 && (() => {
+                        const kc = (n: number) => `${n.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} Kč`;
+                        const total = breakdown.bonuses.reduce((a, b) => a + b.amount, 0);
+                        return (
+                          <div className="bg-white border border-[#e6e2db] rounded-xl overflow-hidden mt-3">
+                            <div className="px-4 py-2.5 border-b border-[#e6e2db]">
+                              <span className="text-[11px] font-semibold uppercase tracking-[.08em] text-[#8a929c]">
+                                Odměny od vedoucího
+                              </span>
+                            </div>
+                            {breakdown.bonuses.map((b, i) => (
+                              <div key={i} className="flex items-center gap-2.5 px-4 py-3 border-b border-[#e6e2db]">
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-[13.5px] font-medium text-[#111820]">
+                                    {b.note?.trim() || 'Odměna'}
+                                  </span>
+                                  {b.grantedBy && <span className="block text-[11.5px] text-[#8a929c]">{b.grantedBy}</span>}
+                                </span>
+                                <span className="text-sm font-semibold tabular-nums whitespace-nowrap text-[#2f7d46]">
+                                  + {kc(b.amount)}
+                                </span>
+                              </div>
+                            ))}
+                            {breakdown.bonuses.length > 1 && (
+                              <div className="flex items-center justify-between px-4 py-3 bg-[#faf9f7]">
+                                <b className="text-sm font-bold text-[#111820]">Odměny celkem</b>
+                                <span className="text-base font-bold tabular-nums text-[#111820]">{kc(total)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <p className="text-[11.5px] text-[#8a929c] mt-3 leading-relaxed">
                         Měsíční fond {plain(breakdown.totals.targetHours)}
