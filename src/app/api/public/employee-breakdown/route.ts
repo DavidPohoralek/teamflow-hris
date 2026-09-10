@@ -85,6 +85,7 @@ export async function GET(req: NextRequest) {
         .order('created_at'),
     ])
 
+    if (bonusRes.error) console.error('employee-breakdown: bonuses query failed:', bonusRes.error.message)
     const extra = (settingsRes.data?.extra_settings ?? {}) as Record<string, unknown>
     const settings = parsePayrollSettings(extra)
     const logs: Log[] = logsRes.data ?? []

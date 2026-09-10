@@ -138,8 +138,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
       benefits: BreakdownLine[];
       vacations: { from: string; to: string }[];
     };
-    /** CZK — shown apart from the hours, never summed into them. */
-    bonuses: { amount: number; note: string | null; grantedBy: string | null }[];
+    /** CZK — shown apart from the hours, never summed into them. Optional so a
+     *  client that outlives the API version it was built against does not crash. */
+    bonuses?: { amount: number; note: string | null; grantedBy: string | null }[];
   };
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [breakdownMonth, setBreakdownMonth] = useState<string>('');
@@ -902,9 +903,9 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                         </div>
                       </div>
 
-                      {breakdown.bonuses.length > 0 && (() => {
+                      {(breakdown.bonuses?.length ?? 0) > 0 && (() => {
                         const kc = (n: number) => `${n.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} Kč`;
-                        const total = breakdown.bonuses.reduce((a, b) => a + b.amount, 0);
+                        const total = (breakdown.bonuses ?? []).reduce((a, b) => a + b.amount, 0);
                         return (
                           <div className="bg-white border border-[#e6e2db] rounded-xl overflow-hidden mt-3">
                             <div className="px-4 py-2.5 border-b border-[#e6e2db]">
@@ -912,7 +913,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                 Odměny od vedoucího
                               </span>
                             </div>
-                            {breakdown.bonuses.map((b, i) => (
+                            {(breakdown.bonuses ?? []).map((b, i) => (
                               <div key={i} className="flex items-center gap-2.5 px-4 py-3 border-b border-[#e6e2db]">
                                 <span className="flex-1 min-w-0">
                                   <span className="block text-[13.5px] font-medium text-[#111820]">
@@ -925,7 +926,7 @@ export default function EmployeeHoursPortal({ orgId, onClose }: EmployeeHoursPor
                                 </span>
                               </div>
                             ))}
-                            {breakdown.bonuses.length > 1 && (
+                            {(breakdown.bonuses?.length ?? 0) > 1 && (
                               <div className="flex items-center justify-between px-4 py-3 bg-[#faf9f7]">
                                 <b className="text-sm font-bold text-[#111820]">Odměny celkem</b>
                                 <span className="text-base font-bold tabular-nums text-[#111820]">{kc(total)}</span>
